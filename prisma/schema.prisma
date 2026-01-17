@@ -131,6 +131,7 @@ model Service {
   duration    Int      // Duration in minutes
   price       Decimal  @db.Decimal(10, 2)
   currency    String   @default("RSD")
+  color       String?  // Hex color for service badge (e.g., "#3B82F6")
   isActive    Boolean  @default(true)
 
   createdAt   DateTime @default(now())

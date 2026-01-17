@@ -5,6 +5,7 @@ import { Link } from "@/i18n/routing";
 import { UserMenu } from "./user-menu";
 import { MobileNav } from "./mobile-nav";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Settings, Calendar } from "lucide-react";
 
 interface NavItem {
@@ -17,6 +18,7 @@ interface HeaderProps {
   companySlug?: string;
   showAdminLink?: boolean;
   showMyAppointments?: boolean;
+  appointmentCount?: number;
   navItems?: NavItem[];
 }
 
@@ -25,6 +27,7 @@ export function Header({
   companySlug,
   showAdminLink = false,
   showMyAppointments = false,
+  appointmentCount = 0,
   navItems = [],
 }: HeaderProps) {
   const tNav = useTranslations("nav");
@@ -42,6 +45,7 @@ export function Header({
           navItems={navItems}
           showAdminLink={showAdminLink}
           showMyAppointments={showMyAppointments}
+          appointmentCount={appointmentCount}
         />
 
         {/* Logo / Company name */}
@@ -71,9 +75,17 @@ export function Header({
         <div className="flex flex-1 items-center justify-end space-x-2">
           {showMyAppointments && (
             <Link href={myAppointmentsHref} className="hidden md:block">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="relative">
                 <Calendar className="mr-2 h-4 w-4" />
                 {tNav("myAppointments")}
+                {appointmentCount > 0 && (
+                  <Badge
+                    variant="default"
+                    className="ml-2 h-5 min-w-5 px-1.5 text-xs"
+                  >
+                    {appointmentCount}
+                  </Badge>
+                )}
               </Button>
             </Link>
           )}

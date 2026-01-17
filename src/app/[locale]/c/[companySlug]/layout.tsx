@@ -4,6 +4,7 @@ import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/navigation/header";
 import { generateThemePalette } from "@/lib/utils/colors";
+import { prisma } from "@/lib/prisma";
 
 interface CompanyLayoutProps {
   children: React.ReactNode;
@@ -30,6 +31,19 @@ export default async function CompanyLayout({
     (user?.role === "COMPANY_ADMIN" && user.companyId === company.id);
   const isLoggedIn = !!user;
 
+  // Get upcoming appointments count for the user
+  let appointmentCount = 0;
+  if (user) {
+    appointmentCount = await prisma.appointment.count({
+      where: {
+        companyId: company.id,
+        userId: user.id,
+        startTime: { gte: new Date() },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+    });
+  }
+
   // Generate theme palette from company's primary color
   const palette = generateThemePalette(company.primaryColor);
 
@@ -50,6 +64,7 @@ export default async function CompanyLayout({
         companySlug={companySlug}
         showAdminLink={canAccessAdmin}
         showMyAppointments={isLoggedIn}
+        appointmentCount={appointmentCount}
       />
       {children}
     </div>

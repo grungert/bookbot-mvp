@@ -73,31 +73,45 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {company.services.map((service) => (
-              <Card key={service.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {service.name}
-                    <Badge variant="secondary">
-                      {service.currency} {Number(service.price).toLocaleString()}
-                    </Badge>
-                  </CardTitle>
-                  {service.description && (
-                    <CardDescription>{service.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{t("minutes", { count: service.duration })}</span>
-                    </div>
+              <Card key={service.id} className="overflow-hidden">
+                <div className="flex">
+                  <div
+                    className="w-1 shrink-0"
+                    style={{ backgroundColor: service.color || "#3B82F6" }}
+                  />
+                  <div className="flex-1">
+                    <CardHeader>
+                      <CardTitle className="flex items-center justify-between">
+                        {service.name}
+                        <Badge
+                          style={{
+                            backgroundColor: service.color || undefined,
+                            borderColor: service.color || undefined,
+                            color: service.color ? "white" : undefined,
+                          }}
+                        >
+                          {service.currency} {Number(service.price).toLocaleString()}
+                        </Badge>
+                      </CardTitle>
+                      {service.description && (
+                        <CardDescription>{service.description}</CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{t("minutes", { count: service.duration })}</span>
+                        </div>
+                      </div>
+                      <Link href={`/c/${companySlug}/book?service=${service.id}`}>
+                        <Button className="w-full mt-4" variant="outline">
+                          {t("title")}
+                        </Button>
+                      </Link>
+                    </CardContent>
                   </div>
-                  <Link href={`/c/${companySlug}/book?service=${service.id}`}>
-                    <Button className="w-full mt-4" variant="outline">
-                      {t("title")}
-                    </Button>
-                  </Link>
-                </CardContent>
+                </div>
               </Card>
             ))}
           </div>

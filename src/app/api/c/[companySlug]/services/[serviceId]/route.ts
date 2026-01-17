@@ -9,6 +9,7 @@ const updateServiceSchema = z.object({
   duration: z.number().int().min(5).max(480).optional(),
   price: z.number().min(0).optional(),
   currency: z.string().optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   isActive: z.boolean().optional(),
 });
 

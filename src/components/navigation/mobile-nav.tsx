@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Menu, Settings, Calendar } from "lucide-react";
 
 interface NavItem {
@@ -24,6 +25,7 @@ interface MobileNavProps {
   navItems?: NavItem[];
   showAdminLink?: boolean;
   showMyAppointments?: boolean;
+  appointmentCount?: number;
 }
 
 export function MobileNav({
@@ -32,6 +34,7 @@ export function MobileNav({
   navItems = [],
   showAdminLink = false,
   showMyAppointments = false,
+  appointmentCount = 0,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const tNav = useTranslations("nav");
@@ -72,6 +75,11 @@ export function MobileNav({
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 {tNav("myAppointments")}
+                {appointmentCount > 0 && (
+                  <Badge variant="default" className="ml-2 h-5 min-w-5 px-1.5 text-xs">
+                    {appointmentCount}
+                  </Badge>
+                )}
               </Link>
             </>
           )}

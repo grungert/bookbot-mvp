@@ -34,6 +34,7 @@ interface Appointment {
     duration: number;
     price: number;
     currency: string;
+    color: string | null;
   };
 }
 
@@ -214,6 +215,10 @@ function AppointmentCard({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full shrink-0"
+                style={{ backgroundColor: appointment.service.color || "#3B82F6" }}
+              />
               <h3 className="font-semibold text-lg">{appointment.service.name}</h3>
               <Badge className={statusColors[appointment.status]} variant="outline">
                 {t(appointment.status.toLowerCase())}

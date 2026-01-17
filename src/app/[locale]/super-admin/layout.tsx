@@ -20,7 +20,7 @@ export default async function SuperAdminLayout({
   const user = await getCurrentUser();
 
   if (!user || user.role !== "SUPER_ADMIN") {
-    redirect("/");
+    redirect(`/${locale}`);
   }
 
   const navItems = [

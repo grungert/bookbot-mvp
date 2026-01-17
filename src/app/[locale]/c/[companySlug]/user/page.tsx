@@ -23,13 +23,13 @@ export default async function UserDashboard({ params }: UserDashboardProps) {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect(`/login?callbackUrl=/c/${companySlug}/user`);
+    redirect(`/${locale}/login?callbackUrl=/${locale}/c/${companySlug}/user`);
   }
 
   const company = await getCompanyBySlug(companySlug);
 
   if (!company) {
-    redirect("/");
+    redirect(`/${locale}`);
   }
 
   const [appointments, invoices] = await Promise.all([

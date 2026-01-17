@@ -50,6 +50,7 @@ export default async function BookingPage({
     duration: s.duration,
     price: Number(s.price),
     currency: s.currency,
+    color: s.color,
   }));
 
   return (

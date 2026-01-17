@@ -20,23 +20,23 @@ export default async function AdminLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(`/${locale}/login`);
   }
 
   // Only super admin and company admin can access
   if (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN") {
-    redirect(`/c/${companySlug}`);
+    redirect(`/${locale}/c/${companySlug}`);
   }
 
   const company = await getCompanyBySlug(companySlug);
 
   if (!company) {
-    redirect("/");
+    redirect(`/${locale}`);
   }
 
   // Company admin must belong to this company
   if (user.role === "COMPANY_ADMIN" && user.companyId !== company.id) {
-    redirect("/");
+    redirect(`/${locale}`);
   }
 
   return (

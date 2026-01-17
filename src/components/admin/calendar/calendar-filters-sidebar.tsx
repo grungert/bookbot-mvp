@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export interface Service {
   id: string;
   name: string;
+  color?: string | null;
 }
 
 export interface FilterState {
@@ -70,17 +71,18 @@ export function CalendarFiltersSidebar({
           {t("typeTreatment")}
         </h3>
         <div className="space-y-2.5">
-          {services.map((service, index) => {
+          {services.map((service) => {
             const isChecked = filters.services.includes(service.id);
-            const colors = serviceColors[index % serviceColors.length];
+            const serviceColor = service.color || "#3B82F6";
 
             return (
               <label
                 key={service.id}
                 className={cn(
                   "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                  isChecked ? colors.light : "hover:bg-muted/50"
+                  "hover:bg-muted/50"
                 )}
+                style={isChecked ? { backgroundColor: `${serviceColor}15` } : undefined}
               >
                 <Checkbox
                   id={`service-${service.id}`}
@@ -88,7 +90,10 @@ export function CalendarFiltersSidebar({
                   onCheckedChange={() => toggleService(service.id)}
                   className="border-2 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                 />
-                <span className={cn("h-2.5 w-2.5 rounded-full", colors.dot)} />
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: serviceColor }}
+                />
                 <span className="text-sm font-medium flex-1">{service.name}</span>
               </label>
             );

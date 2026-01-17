@@ -9,6 +9,7 @@ const createServiceSchema = z.object({
   duration: z.number().int().min(5).max(480),
   price: z.number().min(0),
   currency: z.string().default("RSD"),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
 });
 
 interface RouteParams {
@@ -77,6 +78,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         duration: parsed.data.duration,
         price: parsed.data.price,
         currency: parsed.data.currency,
+        color: parsed.data.color,
       },
     });
 

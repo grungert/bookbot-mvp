@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { format, parseISO } from "date-fns";
+import { useRouter } from "@/i18n/routing";
+import { format, parseISO, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, CheckCircle, Loader2 } from "lucide-react";
+import { Clock, CheckCircle, Loader2, CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Service {
@@ -22,6 +22,7 @@ interface Service {
   duration: number;
   price: number;
   currency: string;
+  color: string | null;
 }
 
 interface TimeSlot {
@@ -34,6 +35,17 @@ interface UserInfo {
   name?: string | null;
   email?: string | null;
   phone?: string | null;
+}
+
+interface UserAppointment {
+  id: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  service: {
+    name: string;
+    color?: string | null;
+  };
 }
 
 interface BookingFlowProps {
@@ -76,6 +88,50 @@ export function BookingFlow({
   const [guestName, setGuestName] = useState(user?.name || "");
   const [guestEmail, setGuestEmail] = useState(user?.email || "");
   const [guestPhone, setGuestPhone] = useState(user?.phone || "");
+
+  // User's existing appointments
+  const [userAppointments, setUserAppointments] = useState<UserAppointment[]>([]);
+
+  // Load user's appointments on mount (only for logged-in users)
+  const loadUserAppointments = useCallback(async () => {
+    if (isGuest) return;
+
+    try {
+      const response = await fetch(`/api/c/${companySlug}/appointments`);
+      if (response.ok) {
+        const data = await response.json();
+        // Filter to only upcoming appointments
+        const upcoming = data.filter((apt: UserAppointment) =>
+          new Date(apt.startTime) >= new Date() &&
+          apt.status !== "CANCELLED"
+        );
+        setUserAppointments(upcoming);
+      }
+    } catch {
+      // Silently fail - not critical
+    }
+  }, [companySlug, isGuest]);
+
+  useEffect(() => {
+    loadUserAppointments();
+  }, [loadUserAppointments]);
+
+  // Get dates that have appointments
+  const appointmentDates = userAppointments.map(apt => parseISO(apt.startTime));
+
+  // Get appointments for a specific date
+  function getAppointmentsForDate(date: Date) {
+    return userAppointments.filter(apt =>
+      isSameDay(parseISO(apt.startTime), date)
+    );
+  }
+
+  // Get unique service colors for a specific date
+  function getColorsForDate(date: Date): string[] {
+    const appointments = getAppointmentsForDate(date);
+    const colors = [...new Set(appointments.map(apt => apt.service.color || "#3B82F6"))];
+    return colors;
+  }
 
   async function loadSlots(date: Date, serviceId: string) {
     setIsLoadingSlots(true);
@@ -260,19 +316,30 @@ export function BookingFlow({
                 className="w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition text-left"
               >
                 <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium">{service.name}</h3>
-                    {service.description && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {service.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                      <Clock className="h-4 w-4" />
-                      <span>{t("minutes", { count: service.duration })}</span>
+                  <div className="flex gap-3">
+                    <div
+                      className="w-1 rounded-full shrink-0 mt-1"
+                      style={{ backgroundColor: service.color || "#3B82F6", height: "calc(100% - 4px)" }}
+                    />
+                    <div>
+                      <h3 className="font-medium">{service.name}</h3>
+                      {service.description && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {service.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{t("minutes", { count: service.duration })}</span>
+                      </div>
                     </div>
                   </div>
-                  <Badge>
+                  <Badge
+                    style={{
+                      backgroundColor: service.color || undefined,
+                      borderColor: service.color || undefined,
+                    }}
+                  >
                     {service.currency} {Number(service.price).toLocaleString()}
                   </Badge>
                 </div>
@@ -287,18 +354,45 @@ export function BookingFlow({
         <Card>
           <CardHeader>
             <CardTitle>{t("selectDate")}</CardTitle>
-            <CardDescription>
+            <CardDescription className="flex items-center gap-2">
+              <div
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: selectedService.color || "#3B82F6" }}
+              />
               {selectedService.name} - {t("minutes", { count: selectedService.duration })}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
+          <CardContent className="flex flex-col items-center gap-4">
             <Calendar
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
               disabled={(date) => date < new Date()}
               className="rounded-md border"
+              getDayIndicators={getColorsForDate}
             />
+            {userAppointments.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground text-center">
+                  {t("datesWithAppointments")}:
+                </p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {userAppointments
+                    .filter((apt, i, arr) =>
+                      arr.findIndex(a => a.service.name === apt.service.name) === i
+                    )
+                    .map((apt) => (
+                      <div key={apt.service.name} className="flex items-center gap-1.5 text-xs">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                        />
+                        <span>{apt.service.name}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </CardContent>
           <div className="px-6 pb-6">
             <Button variant="outline" onClick={goBack}>
@@ -313,11 +407,44 @@ export function BookingFlow({
         <Card>
           <CardHeader>
             <CardTitle>{t("selectTime")}</CardTitle>
-            <CardDescription>
-              {format(selectedDate, "EEEE, MMMM d, yyyy")}
+            <CardDescription className="flex items-center gap-2">
+              <div
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: selectedService.color || "#3B82F6" }}
+              />
+              {selectedService.name} • {format(selectedDate, "EEEE, MMMM d, yyyy")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
+            {/* Show user's existing appointments on this date */}
+            {getAppointmentsForDate(selectedDate).length > 0 && (
+              <div className="bg-primary/10 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CalendarCheck className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">{t("yourAppointmentsOnDate")}</span>
+                </div>
+                <div className="space-y-2">
+                  {getAppointmentsForDate(selectedDate).map((apt) => (
+                    <div
+                      key={apt.id}
+                      className="flex items-center justify-between text-sm bg-background/50 rounded px-3 py-2"
+                    >
+                      <span className="font-medium flex items-center gap-2">
+                        <div
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                        />
+                        {apt.service.name}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {format(parseISO(apt.startTime), "HH:mm")} - {format(parseISO(apt.endTime), "HH:mm")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {isLoadingSlots ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -354,8 +481,12 @@ export function BookingFlow({
         <Card>
           <CardHeader>
             <CardTitle>{t("yourDetails")}</CardTitle>
-            <CardDescription>
-              {t("enterContactDetails")}
+            <CardDescription className="flex items-center gap-2">
+              <div
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: selectedService.color || "#3B82F6" }}
+              />
+              {selectedService.name} • {format(selectedDate, "MMM d")} • {format(parseISO(selectedSlot.start), "HH:mm")}
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleDetailsSubmit}>
@@ -414,7 +545,13 @@ export function BookingFlow({
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("service")}:</span>
-                <span className="font-medium">{selectedService.name}</span>
+                <span className="font-medium flex items-center gap-2">
+                  <div
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: selectedService.color || "#3B82F6" }}
+                  />
+                  {selectedService.name}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("dateTime")}:</span>

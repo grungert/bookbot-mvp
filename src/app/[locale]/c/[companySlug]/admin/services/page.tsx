@@ -45,8 +45,20 @@ interface Service {
   duration: number;
   price: number;
   currency: string;
+  color: string | null;
   isActive: boolean;
 }
+
+const DEFAULT_COLORS = [
+  "#F97316", // Orange
+  "#3B82F6", // Blue
+  "#22C55E", // Green
+  "#EF4444", // Red
+  "#A855F7", // Purple
+  "#EC4899", // Pink
+  "#14B8A6", // Teal
+  "#F59E0B", // Amber
+];
 
 export default function ServicesPage() {
   const params = useParams();
@@ -66,6 +78,7 @@ export default function ServicesPage() {
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("60");
   const [price, setPrice] = useState("0");
+  const [color, setColor] = useState("");
 
   const loadServices = useCallback(async () => {
     try {
@@ -91,6 +104,7 @@ export default function ServicesPage() {
     setDescription("");
     setDuration("60");
     setPrice("0");
+    setColor("");
     setIsDialogOpen(true);
   }
 
@@ -100,6 +114,7 @@ export default function ServicesPage() {
     setDescription(service.description || "");
     setDuration(service.duration.toString());
     setPrice(service.price.toString());
+    setColor(service.color || "");
     setIsDialogOpen(true);
   }
 
@@ -120,6 +135,7 @@ export default function ServicesPage() {
           description: description || undefined,
           duration: parseInt(duration),
           price: parseFloat(price),
+          color: color || undefined,
         }),
       });
 
@@ -246,6 +262,43 @@ export default function ServicesPage() {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>{t("serviceColor")}</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DEFAULT_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setColor(c)}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${
+                          color === c ? "border-foreground scale-110" : "border-transparent"
+                        }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                    <div className="relative">
+                      <input
+                        type="color"
+                        value={color || "#3B82F6"}
+                        onChange={(e) => setColor(e.target.value)}
+                        className="absolute inset-0 w-8 h-8 opacity-0 cursor-pointer"
+                      />
+                      <div
+                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs ${
+                          color && !DEFAULT_COLORS.includes(color)
+                            ? "border-foreground"
+                            : "border-dashed border-muted-foreground"
+                        }`}
+                        style={{
+                          backgroundColor:
+                            color && !DEFAULT_COLORS.includes(color) ? color : "transparent",
+                        }}
+                      >
+                        {(!color || DEFAULT_COLORS.includes(color)) && "+"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button
@@ -302,13 +355,19 @@ export default function ServicesPage() {
               {services.map((service) => (
                 <TableRow key={service.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell>
-                    <div>
-                      <div className="font-medium">{service.name}</div>
-                      {service.description && (
-                        <div className="text-sm text-muted-foreground line-clamp-1">
-                          {service.description}
-                        </div>
-                      )}
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: service.color || "#3B82F6" }}
+                      />
+                      <div>
+                        <div className="font-medium">{service.name}</div>
+                        {service.description && (
+                          <div className="text-sm text-muted-foreground line-clamp-1">
+                            {service.description}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>

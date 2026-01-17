@@ -281,7 +281,15 @@ export default function AppointmentsPage() {
                             {format(parseISO(apt.startTime), "HH:mm")} -{" "}
                             {format(parseISO(apt.endTime), "HH:mm")}
                           </TableCell>
-                          <TableCell>{apt.service.name}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                              />
+                              {apt.service.name}
+                            </div>
+                          </TableCell>
                           <TableCell className="hidden md:table-cell">
                             <div>
                               <div className="font-medium">

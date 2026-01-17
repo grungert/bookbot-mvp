@@ -123,7 +123,13 @@ export function AppointmentDetailModal({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-xs text-muted-foreground">{t("typeTreatment")}</span>
-              <p className="font-medium">{appointment.service.name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: appointment.service.color || "#3B82F6" }}
+                />
+                <p className="font-medium">{appointment.service.name}</p>
+              </div>
             </div>
             <div>
               <span className="text-xs text-muted-foreground">{tCommon("status")}</span>

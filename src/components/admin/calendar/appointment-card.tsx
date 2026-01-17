@@ -14,6 +14,7 @@ export interface Appointment {
     id?: string;
     name: string;
     duration: number;
+    color?: string | null;
   };
   user: {
     id: string;
@@ -83,6 +84,7 @@ export function AppointmentCard({
   style,
   className,
 }: AppointmentCardProps) {
+  const serviceColor = appointment.service.color || "#3B82F6";
   const colors = getCardColor(appointment.service.name);
   const startTime = parseISO(appointment.startTime);
   const endTime = parseISO(appointment.endTime);
@@ -95,11 +97,13 @@ export function AppointmentCard({
       tabIndex={0}
       className={cn(
         "absolute left-1 right-1 cursor-pointer rounded-lg border-l-4 p-2.5 transition-all hover:shadow-lg hover:z-10 overflow-hidden",
-        colors.bg,
-        colors.border,
         className
       )}
-      style={style}
+      style={{
+        ...style,
+        backgroundColor: `${serviceColor}15`,
+        borderLeftColor: serviceColor,
+      }}
       onClick={() => onClick?.(appointment)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -119,19 +123,19 @@ export function AppointmentCard({
               {initials}
             </AvatarFallback>
           </Avatar>
-          <span className={cn("font-semibold text-sm truncate", colors.text)}>
+          <span className="font-semibold text-sm truncate text-foreground">
             {displayName}
           </span>
         </div>
 
         {/* Service name */}
-        <p className={cn("text-xs truncate opacity-80 mb-auto", colors.text)}>
+        <p className="text-xs truncate opacity-80 mb-auto text-foreground">
           {appointment.service.name}
         </p>
 
         {/* Time range at bottom */}
         <div className="flex items-center justify-between mt-1">
-          <span className={cn("text-[11px] font-medium", colors.text)}>
+          <span className="text-[11px] font-medium text-foreground">
             {formatTime(startTime)} - {formatTime(endTime)}
           </span>
 

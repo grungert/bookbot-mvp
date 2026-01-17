@@ -97,9 +97,15 @@ export function PatientQueue({
                     <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
                       {displayName}
                     </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {format(startTime, "d MMM yyyy")} • {apt.service.name}
-                    </p>
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <span className="truncate">{format(startTime, "d MMM yyyy")}</span>
+                      <span>•</span>
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                      />
+                      <span className="truncate">{apt.service.name}</span>
+                    </div>
                   </div>
                 </button>
               );
