@@ -138,7 +138,7 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to save settings");
+        throw new Error(error.details || error.error || "Failed to save settings");
       }
 
       const updatedSettings: CompanySettings = await response.json();

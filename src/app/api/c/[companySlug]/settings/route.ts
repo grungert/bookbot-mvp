@@ -141,8 +141,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json(settings);
   } catch (error) {
     console.error("Error updating settings:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: errorMessage },
       { status: 500 }
     );
   }

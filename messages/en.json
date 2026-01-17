@@ -141,8 +141,12 @@
     "past": "Past",
     "all": "All",
     "today": "Today",
+    "tomorrow": "Tomorrow",
+    "at": "at",
+    "next": "Next",
     "noAppointments": "No appointments found",
     "noUpcoming": "No upcoming appointments",
+    "noAppointmentsOnDate": "No appointments on this date",
     "bookNow": "Book an Appointment",
     "statusPending": "Pending",
     "statusConfirmed": "Confirmed",
@@ -156,7 +160,13 @@
     "appointmentCancelled": "Appointment cancelled successfully",
     "cancelAppointment": "Cancel Appointment?",
     "cancelConfirmation": "Are you sure you want to cancel this appointment? This action cannot be undone.",
-    "confirmCancel": "Yes, Cancel"
+    "confirmCancel": "Yes, Cancel",
+    "viewCalendar": "Calendar",
+    "viewList": "List",
+    "upcomingCount": "{count} upcoming",
+    "appointmentDetails": "Appointment Details",
+    "reschedule": "Reschedule",
+    "filterByStatus": "Filter by status"
   },
   "invoices": {
     "title": "Invoices",
