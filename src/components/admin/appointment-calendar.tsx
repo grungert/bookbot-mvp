@@ -55,10 +55,10 @@ interface AppointmentCalendarProps {
 }
 
 const statusColors: Record<Appointment["status"], string> = {
-  PENDING: "bg-yellow-500",
-  CONFIRMED: "bg-green-500",
+  PENDING: "bg-amber-500",
+  CONFIRMED: "bg-primary",
   CANCELLED: "bg-red-500",
-  COMPLETED: "bg-blue-500",
+  COMPLETED: "bg-green-500",
 };
 
 const statusIcons: Record<

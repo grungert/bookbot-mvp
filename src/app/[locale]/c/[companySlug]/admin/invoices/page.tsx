@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Eye } from "lucide-react";
+import { Plus, Loader2, Trash2, Eye, FileText } from "lucide-react";
 
 interface LineItem {
   id?: string;
@@ -218,11 +218,11 @@ export default function InvoicesPage() {
   }
 
   function getStatusBadge(status: Invoice["status"]) {
-    const variants: Record<Invoice["status"], "default" | "secondary" | "destructive" | "outline"> = {
-      DRAFT: "secondary",
-      SENT: "default",
-      PAID: "outline",
-      CANCELLED: "destructive",
+    const styles: Record<Invoice["status"], string> = {
+      DRAFT: "bg-gray-100 text-gray-700 border-gray-200",
+      SENT: "bg-primary/10 text-primary border-primary/20",
+      PAID: "bg-green-100 text-green-700 border-green-200",
+      CANCELLED: "bg-red-100 text-red-700 border-red-200",
     };
 
     const labels: Record<Invoice["status"], string> = {
@@ -232,7 +232,11 @@ export default function InvoicesPage() {
       CANCELLED: t("statusCancelled"),
     };
 
-    return <Badge variant={variants[status]}>{labels[status]}</Badge>;
+    return (
+      <Badge variant="outline" className={`font-medium ${styles[status]}`}>
+        {labels[status]}
+      </Badge>
+    );
   }
 
   if (isLoading) {
@@ -244,12 +248,18 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage and track your invoices
+          </p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button onClick={resetForm} className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-2" />
               {t("createInvoice")}
             </Button>
@@ -372,68 +382,88 @@ export default function InvoicesPage() {
         </Dialog>
       </div>
 
-      {invoices.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
+      {/* Invoices Table Container */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="p-4 border-b">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            All Invoices
+          </h3>
+        </div>
+        {invoices.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
             <p className="text-muted-foreground">{t("noInvoices")}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
+            <Button
+              onClick={() => {
+                resetForm();
+                setIsDialogOpen(true);
+              }}
+              variant="link"
+              className="mt-2 text-primary"
+            >
+              {t("createInvoice")}
+            </Button>
+          </div>
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>{t("invoiceNumber")}</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>{t("issueDate")}</TableHead>
-                <TableHead>{t("total")}</TableHead>
-                <TableHead>{tCommon("status")}</TableHead>
-                <TableHead className="text-right">{tCommon("actions")}</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium">{t("invoiceNumber")}</TableHead>
+                <TableHead className="text-xs font-medium">Customer</TableHead>
+                <TableHead className="text-xs font-medium">{t("issueDate")}</TableHead>
+                <TableHead className="text-xs font-medium">{t("total")}</TableHead>
+                <TableHead className="text-xs font-medium">{tCommon("status")}</TableHead>
+                <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {invoices.map((invoice) => (
-                <TableRow key={invoice.id}>
+                <TableRow key={invoice.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="font-medium">
                     {invoice.invoiceNumber}
                   </TableCell>
                   <TableCell>
-                    {invoice.user.name || invoice.user.email}
+                    <span className="text-sm">{invoice.user.name || invoice.user.email}</span>
                   </TableCell>
                   <TableCell>
-                    {format(parseISO(invoice.issueDate), "MMM d, yyyy")}
+                    <span className="text-sm">{format(parseISO(invoice.issueDate), "MMM d, yyyy")}</span>
                   </TableCell>
                   <TableCell>
-                    {invoice.currency} {Number(invoice.total).toLocaleString()}
+                    <span className="font-medium">{invoice.currency} {Number(invoice.total).toLocaleString()}</span>
                   </TableCell>
                   <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                   <TableCell className="text-right">
-                    {invoice.status === "DRAFT" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mr-2"
-                        onClick={() => updateStatus(invoice.id, "SENT")}
-                      >
-                        Send
-                      </Button>
-                    )}
-                    {invoice.status === "SENT" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateStatus(invoice.id, "PAID")}
-                      >
-                        Mark Paid
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {invoice.status === "DRAFT" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                          onClick={() => updateStatus(invoice.id, "SENT")}
+                        >
+                          Send
+                        </Button>
+                      )}
+                      {invoice.status === "SENT" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+                          onClick={() => updateStatus(invoice.id, "PAID")}
+                        >
+                          Mark Paid
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 }

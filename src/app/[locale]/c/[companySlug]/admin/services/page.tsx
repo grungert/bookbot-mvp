@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, PackageOpen } from "lucide-react";
 
 interface Service {
   id: string;
@@ -164,12 +164,18 @@ export default function ServicesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">{t("title")}</h1>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">{t("title")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your service offerings
+          </p>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
+            <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-2" />
               {t("addService")}
             </Button>
@@ -247,64 +253,84 @@ export default function ServicesPage() {
         </Dialog>
       </div>
 
-      {services.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
+      {/* Services Table Container */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="p-4 border-b">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            All Services
+          </h3>
+        </div>
+        {services.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <PackageOpen className="h-6 w-6 text-muted-foreground" />
+            </div>
             <p className="text-muted-foreground">{t("noServices")}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
+            <Button
+              onClick={openCreateDialog}
+              variant="link"
+              className="mt-2 text-primary"
+            >
+              {t("addService")}
+            </Button>
+          </div>
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>{tCommon("name")}</TableHead>
-                <TableHead>{tCommon("duration")}</TableHead>
-                <TableHead>{tCommon("price")}</TableHead>
-                <TableHead className="text-right">{tCommon("actions")}</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium">{tCommon("name")}</TableHead>
+                <TableHead className="text-xs font-medium">{tCommon("duration")}</TableHead>
+                <TableHead className="text-xs font-medium">{tCommon("price")}</TableHead>
+                <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {services.map((service) => (
-                <TableRow key={service.id}>
+                <TableRow key={service.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell>
                     <div>
                       <div className="font-medium">{service.name}</div>
                       {service.description && (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground line-clamp-1">
                           {service.description}
                         </div>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{service.duration} min</TableCell>
                   <TableCell>
-                    <Badge variant="secondary">
+                    <span className="text-sm">{service.duration} min</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary" className="font-medium">
                       {service.currency} {Number(service.price).toLocaleString()}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(service)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(service.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                        onClick={() => openEditDialog(service)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDelete(service.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 }

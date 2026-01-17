@@ -141,17 +141,18 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{t("documents")}</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground mt-1">
             Add documents to your knowledge base for the AI chatbot
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
+            <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90">
               <Plus className="h-4 w-4 mr-2" />
               {t("uploadDocument")}
             </Button>
@@ -206,62 +207,71 @@ export default function DocumentsPage() {
         </Dialog>
       </div>
 
-      {documents.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground mb-4">
+      {/* Documents Table Container */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="p-4 border-b">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Knowledge Base
+          </h3>
+        </div>
+        {documents.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground mb-2">
               No documents in your knowledge base yet
             </p>
-            <Button onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-2" />
+            <Button onClick={openCreateDialog} variant="link" className="text-primary">
               Add your first document
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
+          </div>
+        ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Preview</TableHead>
-                <TableHead>Last Updated</TableHead>
-                <TableHead className="text-right">{tCommon("actions")}</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-xs font-medium">Title</TableHead>
+                <TableHead className="text-xs font-medium">Preview</TableHead>
+                <TableHead className="text-xs font-medium">Last Updated</TableHead>
+                <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {documents.map((doc) => (
-                <TableRow key={doc.id}>
+                <TableRow key={doc.id} className="hover:bg-muted/50 transition-colors">
                   <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground">
+                  <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
                     {doc.content.substring(0, 100)}...
                   </TableCell>
                   <TableCell>
-                    {format(parseISO(doc.updatedAt), "MMM d, yyyy")}
+                    <span className="text-sm">{format(parseISO(doc.updatedAt), "MMM d, yyyy")}</span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(doc)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(doc.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                        onClick={() => openEditDialog(doc)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleDelete(doc.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </Card>
-      )}
+        )}
+      </div>
     </div>
   );
 }

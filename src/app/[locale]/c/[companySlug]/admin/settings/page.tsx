@@ -9,7 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check } from "lucide-react";
+
+// Color presets for brand color
+const colorPresets = [
+  { name: "Blue", value: "#3B82F6" },
+  { name: "Green", value: "#22C55E" },
+  { name: "Purple", value: "#8B5CF6" },
+  { name: "Rose", value: "#F43F5E" },
+  { name: "Orange", value: "#F97316" },
+  { name: "Teal", value: "#14B8A6" },
+];
 
 interface CompanySettings {
   id: string;
@@ -136,9 +146,15 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <Button onClick={handleSave} disabled={isSaving}>
+        <div>
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your company settings and preferences
+          </p>
+        </div>
+        <Button onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
           {isSaving ? (
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
           ) : (
@@ -149,32 +165,33 @@ export default function SettingsPage() {
       </div>
 
       {/* General Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>Basic company information</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+          General Information
+        </h3>
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">{t("companyName")}</Label>
+              <Label htmlFor="name" className="text-sm font-medium">{t("companyName")}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                className="h-10"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="timezone">{t("timezone")}</Label>
+              <Label htmlFor="timezone" className="text-sm font-medium">{t("timezone")}</Label>
               <Input
                 id="timezone"
                 value={timezone}
                 onChange={(e) => setTimezone(e.target.value)}
+                className="h-10"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-sm font-medium">Description</Label>
             <Textarea
               id="description"
               value={description}
@@ -182,60 +199,76 @@ export default function SettingsPage() {
               rows={2}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Branding */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Branding</CardTitle>
-          <CardDescription>Customize your company appearance</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="logoUrl">{t("companyLogo")}</Label>
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+          Branding
+        </h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="logoUrl" className="text-sm font-medium">{t("companyLogo")}</Label>
+            <Input
+              id="logoUrl"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://..."
+              className="h-10"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="color" className="text-sm font-medium">{t("primaryColor")}</Label>
+            <div className="flex gap-3 items-center">
               <Input
-                id="logoUrl"
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://..."
+                id="color"
+                type="color"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="w-12 h-10 p-1 cursor-pointer"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="color">{t("primaryColor")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="color"
-                  type="color"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="w-16 h-10 p-1"
-                />
-                <Input
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="flex-1"
-                />
+              <Input
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="w-28 h-10"
+              />
+              <div className="flex gap-1.5">
+                {colorPresets.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => setPrimaryColor(preset.value)}
+                    className="relative h-8 w-8 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                    style={{ backgroundColor: preset.value }}
+                    title={preset.name}
+                  >
+                    {primaryColor.toUpperCase() === preset.value.toUpperCase() && (
+                      <Check className="absolute inset-0 m-auto h-4 w-4 text-white drop-shadow" />
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              This color will be used throughout your booking pages and admin interface
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* AI Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("aiSettings")}</CardTitle>
-          <CardDescription>
-            Configure AI chatbot settings. The chatbot uses these settings to
-            generate responses.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          AI Chatbot
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Configure AI settings for your customer chatbot
+        </p>
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="aiApiKey">{t("aiApiKey")}</Label>
+              <Label htmlFor="aiApiKey" className="text-sm font-medium">{t("aiApiKey")}</Label>
               <div className="flex gap-2">
                 <Input
                   id="aiApiKey"
@@ -243,11 +276,13 @@ export default function SettingsPage() {
                   value={aiApiKey}
                   onChange={(e) => setAiApiKey(e.target.value)}
                   placeholder={hasExistingApiKey ? "Enter new key to replace" : "sk-..."}
+                  className="h-10"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
+                  className="h-10 w-10"
                   onClick={() => setShowApiKey(!showApiKey)}
                 >
                   {showApiKey ? (
@@ -264,26 +299,28 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="aiModel">{t("aiModel")}</Label>
+              <Label htmlFor="aiModel" className="text-sm font-medium">{t("aiModel")}</Label>
               <Input
                 id="aiModel"
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
                 placeholder="gpt-3.5-turbo"
+                className="h-10"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="aiEndpoint">{t("aiEndpoint")}</Label>
+            <Label htmlFor="aiEndpoint" className="text-sm font-medium">{t("aiEndpoint")}</Label>
             <Input
               id="aiEndpoint"
               value={aiEndpoint}
               onChange={(e) => setAiEndpoint(e.target.value)}
               placeholder="https://api.openai.com/v1 (leave empty for default)"
+              className="h-10"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="aiSystemPrompt">{t("aiSystemPrompt")}</Label>
+            <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>
             <Textarea
               id="aiSystemPrompt"
               value={aiSystemPrompt}
@@ -292,8 +329,8 @@ export default function SettingsPage() {
               rows={4}
             />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

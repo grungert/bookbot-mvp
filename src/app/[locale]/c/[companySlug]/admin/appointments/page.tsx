@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
@@ -17,60 +17,67 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Clock, TableIcon, CalendarIcon } from "lucide-react";
-import { AppointmentCalendar } from "@/components/admin/appointment-calendar";
-
-interface Appointment {
-  id: string;
-  startTime: string;
-  endTime: string;
-  status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
-  notes: string | null;
-  service: {
-    name: string;
-    duration: number;
-  };
-  user: {
-    id: string;
-    name: string | null;
-    email: string;
-    phone: string | null;
-  };
-}
+import { Loader2, CheckCircle, XCircle, Clock, Filter } from "lucide-react";
+import {
+  CalendarHeader,
+  WeekGridView,
+  CalendarFiltersSidebar,
+  PatientQueue,
+  AppointmentDetailModal,
+  Appointment,
+  Service,
+  FilterState,
+} from "@/components/admin/calendar";
 
 export default function AppointmentsPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
   const t = useTranslations("appointments");
   const tCommon = useTranslations("common");
+  const tCalendar = useTranslations("calendar");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
+  const [viewMode, setViewMode] = useState<"schedule" | "table">("schedule");
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const [filters, setFilters] = useState<FilterState>({
+    services: [],
+    statuses: ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"],
+  });
+
+  // Load appointments and services
   useEffect(() => {
     loadAppointments();
-  }, [companySlug, statusFilter]);
+    loadServices();
+  }, [companySlug]);
+
+  // Initialize service filters when services are loaded
+  useEffect(() => {
+    if (services.length > 0 && filters.services.length === 0) {
+      setFilters((prev) => ({
+        ...prev,
+        services: services.map((s) => s.id),
+      }));
+    }
+  }, [services]);
 
   async function loadAppointments() {
     try {
-      const url =
-        statusFilter === "all"
-          ? `/api/c/${companySlug}/appointments`
-          : `/api/c/${companySlug}/appointments?status=${statusFilter}`;
-
-      const response = await fetch(url);
+      const response = await fetch(`/api/c/${companySlug}/appointments`);
       if (response.ok) {
         const data = await response.json();
         setAppointments(data);
@@ -79,6 +86,18 @@ export default function AppointmentsPage() {
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function loadServices() {
+    try {
+      const response = await fetch(`/api/c/${companySlug}/services`);
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data);
+      }
+    } catch (error) {
+      console.error("Failed to load services:", error);
     }
   }
 
@@ -100,12 +119,30 @@ export default function AppointmentsPage() {
         throw new Error("Failed to update status");
       }
 
-      toast.success("Status updated");
+      toast.success(tCalendar("statusUpdated"));
       loadAppointments();
+      setIsDetailModalOpen(false);
     } catch (error) {
       toast.error(tCommon("error"));
     }
   }
+
+  // Filter appointments
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((apt) => {
+      const serviceMatch =
+        filters.services.length === 0 ||
+        (apt.service.id && filters.services.includes(apt.service.id));
+      const statusMatch =
+        filters.statuses.length === 0 || filters.statuses.includes(apt.status);
+      return serviceMatch && statusMatch;
+    });
+  }, [appointments, filters]);
+
+  const handleAppointmentClick = useCallback((appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setIsDetailModalOpen(true);
+  }, []);
 
   function getStatusBadge(status: Appointment["status"]) {
     const variants: Record<
@@ -148,122 +185,170 @@ export default function AppointmentsPage() {
     );
   }
 
+  const SidebarContent = () => (
+    <div className="space-y-4">
+      <CalendarFiltersSidebar
+        services={services}
+        filters={filters}
+        onFiltersChange={setFilters}
+      />
+      <PatientQueue
+        appointments={appointments}
+        onAppointmentClick={handleAppointmentClick}
+      />
+    </div>
+  );
+
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="space-y-4">
+      {/* Header Row */}
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
-        <div className="flex items-center gap-2">
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "calendar")}>
-            <TabsList>
-              <TabsTrigger value="table" className="gap-1">
-                <TableIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">Table</span>
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-1">
-                <CalendarIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">Calendar</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32 sm:w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("all")}</SelectItem>
-              <SelectItem value="PENDING">{t("statusPending")}</SelectItem>
-              <SelectItem value="CONFIRMED">{t("statusConfirmed")}</SelectItem>
-              <SelectItem value="COMPLETED">{t("statusCompleted")}</SelectItem>
-              <SelectItem value="CANCELLED">{t("statusCancelled")}</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Mobile filter button */}
+        <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="lg:hidden">
+              <Filter className="h-4 w-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[280px] sm:w-[320px]">
+            <SheetHeader>
+              <SheetTitle>{tCalendar("filters")}</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <SidebarContent />
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      <div className="flex gap-6">
+        {/* Sidebar - desktop only */}
+        <aside className="hidden lg:block w-[260px] shrink-0">
+          <div className="sticky top-4 space-y-6">
+            <SidebarContent />
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0 space-y-4">
+          <CalendarHeader
+            currentDate={currentDate}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onDateChange={setCurrentDate}
+          />
+
+          {viewMode === "schedule" ? (
+            <WeekGridView
+              currentDate={currentDate}
+              appointments={filteredAppointments}
+              onAppointmentClick={handleAppointmentClick}
+            />
+          ) : (
+            // Table View
+            filteredAppointments.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">{t("noAppointments")}</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="rounded-xl">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{tCommon("date")}</TableHead>
+                        <TableHead>{tCommon("time")}</TableHead>
+                        <TableHead>Service</TableHead>
+                        <TableHead className="hidden md:table-cell">Customer</TableHead>
+                        <TableHead>{tCommon("status")}</TableHead>
+                        <TableHead className="text-right">{tCommon("actions")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAppointments.map((apt) => (
+                        <TableRow
+                          key={apt.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleAppointmentClick(apt)}
+                        >
+                          <TableCell>
+                            {format(parseISO(apt.startTime), "MMM d, yyyy")}
+                          </TableCell>
+                          <TableCell>
+                            {format(parseISO(apt.startTime), "HH:mm")} -{" "}
+                            {format(parseISO(apt.endTime), "HH:mm")}
+                          </TableCell>
+                          <TableCell>{apt.service.name}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <div>
+                              <div className="font-medium">
+                                {apt.user.name || "No name"}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {apt.user.email}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(apt.status)}</TableCell>
+                          <TableCell className="text-right">
+                            {apt.status === "PENDING" && (
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateStatus(apt.id, "CONFIRMED");
+                                  }}
+                                >
+                                  Confirm
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateStatus(apt.id, "CANCELLED");
+                                  }}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            )}
+                            {apt.status === "CONFIRMED" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  updateStatus(apt.id, "COMPLETED");
+                                }}
+                              >
+                                Complete
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </Card>
+            )
+          )}
         </div>
       </div>
 
-      {viewMode === "table" ? (
-        // Table View
-        appointments.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">{t("noAppointments")}</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{tCommon("date")}</TableHead>
-                    <TableHead>{tCommon("time")}</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead className="hidden md:table-cell">Customer</TableHead>
-                    <TableHead>{tCommon("status")}</TableHead>
-                    <TableHead className="text-right">{tCommon("actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {appointments.map((apt) => (
-                    <TableRow key={apt.id}>
-                      <TableCell>
-                        {format(parseISO(apt.startTime), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell>
-                        {format(parseISO(apt.startTime), "HH:mm")} -{" "}
-                        {format(parseISO(apt.endTime), "HH:mm")}
-                      </TableCell>
-                      <TableCell>{apt.service.name}</TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div>
-                          <div className="font-medium">
-                            {apt.user.name || "No name"}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {apt.user.email}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(apt.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {apt.status === "PENDING" && (
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateStatus(apt.id, "CONFIRMED")}
-                            >
-                              Confirm
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => updateStatus(apt.id, "CANCELLED")}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
-                        {apt.status === "CONFIRMED" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateStatus(apt.id, "COMPLETED")}
-                          >
-                            Complete
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
-        )
-      ) : (
-        // Calendar View
-        <AppointmentCalendar appointments={appointments} />
-      )}
+      {/* Appointment Detail Modal */}
+      <AppointmentDetailModal
+        appointment={selectedAppointment}
+        open={isDetailModalOpen}
+        onOpenChange={setIsDetailModalOpen}
+        onStatusChange={updateStatus}
+      />
     </div>
   );
 }
