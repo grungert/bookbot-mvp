@@ -217,9 +217,16 @@
     "aiApiKey": "API kljuc",
     "aiEndpoint": "Endpoint",
     "aiModel": "Model",
-    "aiSystemPrompt": "Sistemski prompt",
+    "aiSystemPrompt": "Dodatne instrukcije",
     "documents": "Baza znanja",
-    "uploadDocument": "Dodaj dokument"
+    "uploadDocument": "Dodaj dokument",
+    "botPersonality": "Licnost bota",
+    "botPersonalityDescription": "Prilagodite kako vas AI asistent komunicira sa klijentima",
+    "aiBotName": "Ime bota",
+    "aiBotNameDescription": "Dajte asistentu prilagodjeno ime (npr. Luna, Max, Asistent)",
+    "aiPersonalityLabel": "Licnost",
+    "aiGreeting": "Pozdravna poruka",
+    "aiGreetingDescription": "Prilagodjena pozdravna poruka na pocetku razgovora"
   },
   "landing": {
     "heroTitle": "Pametno zakazivanje za vas biznis",

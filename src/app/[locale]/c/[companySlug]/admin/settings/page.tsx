@@ -10,6 +10,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, Save, Eye, EyeOff, Check } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BOT_PERSONALITIES, type PersonalityKey } from "@/lib/ai/personalities";
 
 // Color presets for brand color
 const colorPresets = [
@@ -34,6 +42,9 @@ interface CompanySettings {
   aiEndpoint: string | null;
   aiModel: string | null;
   aiSystemPrompt: string | null;
+  aiBotName: string | null;
+  aiGreeting: string | null;
+  aiPersonality: string | null;
 }
 
 export default function SettingsPage() {
@@ -57,6 +68,9 @@ export default function SettingsPage() {
   const [aiEndpoint, setAiEndpoint] = useState("");
   const [aiModel, setAiModel] = useState("");
   const [aiSystemPrompt, setAiSystemPrompt] = useState("");
+  const [aiBotName, setAiBotName] = useState("");
+  const [aiGreeting, setAiGreeting] = useState("");
+  const [aiPersonality, setAiPersonality] = useState<string>("friendly");
 
   useEffect(() => {
     loadSettings();
@@ -82,6 +96,9 @@ export default function SettingsPage() {
       setAiEndpoint(settings.aiEndpoint || "");
       setAiModel(settings.aiModel || "");
       setAiSystemPrompt(settings.aiSystemPrompt || "");
+      setAiBotName(settings.aiBotName || "");
+      setAiGreeting(settings.aiGreeting || "");
+      setAiPersonality(settings.aiPersonality || "friendly");
     } catch (error) {
       console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
@@ -103,6 +120,9 @@ export default function SettingsPage() {
         aiEndpoint: aiEndpoint || null,
         aiModel: aiModel || null,
         aiSystemPrompt: aiSystemPrompt || null,
+        aiBotName: aiBotName || null,
+        aiGreeting: aiGreeting || null,
+        aiPersonality: aiPersonality || null,
       };
 
       // Only include API key if it's been changed (not masked)
@@ -318,6 +338,64 @@ export default function SettingsPage() {
               placeholder="https://api.openai.com/v1 (leave empty for default)"
               className="h-10"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Bot Personality */}
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          {t("botPersonality")}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          {t("botPersonalityDescription")}
+        </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="aiBotName" className="text-sm font-medium">{t("aiBotName")}</Label>
+              <Input
+                id="aiBotName"
+                value={aiBotName}
+                onChange={(e) => setAiBotName(e.target.value)}
+                placeholder="Assistant"
+                className="h-10"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("aiBotNameDescription")}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="aiPersonality" className="text-sm font-medium">{t("aiPersonalityLabel")}</Label>
+              <Select value={aiPersonality} onValueChange={setAiPersonality}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Select a personality" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(BOT_PERSONALITIES) as PersonalityKey[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {BOT_PERSONALITIES[key].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {BOT_PERSONALITIES[aiPersonality as PersonalityKey]?.description || BOT_PERSONALITIES.friendly.description}
+              </p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
+            <Input
+              id="aiGreeting"
+              value={aiGreeting}
+              onChange={(e) => setAiGreeting(e.target.value)}
+              placeholder="Hello! How can I help you today?"
+              className="h-10"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("aiGreetingDescription")}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>

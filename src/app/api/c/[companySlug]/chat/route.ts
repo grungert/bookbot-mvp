@@ -7,6 +7,8 @@ import {
   getOrCreateChatSession,
   saveChatMessage,
   getChatHistory,
+  type CompanyContext,
+  type UserContext,
 } from "@/lib/ai/chat";
 import { z } from "zod";
 
@@ -40,7 +42,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const user = await getCurrentUser();
+    const currentUser = await getCurrentUser();
     const body = await request.json();
     const parsed = chatRequestSchema.safeParse(body);
 
@@ -65,7 +67,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     }
 
     if (!session) {
-      session = await getOrCreateChatSession(company.id, user?.id);
+      session = await getOrCreateChatSession(company.id, currentUser?.id);
     }
 
     // Get chat history
@@ -78,9 +80,29 @@ export async function POST(request: Request, { params }: RouteParams) {
     // Save user message
     await saveChatMessage(session.id, "user", message);
 
-    // Generate response
+    // Build company context with personality settings
+    const companyContext: CompanyContext = {
+      id: company.id,
+      slug: company.slug,
+      name: company.name,
+      botName: company.aiBotName,
+      greeting: company.aiGreeting,
+      personality: company.aiPersonality,
+    };
+
+    // Build user context if logged in (only if email is available)
+    const userContext: UserContext | null =
+      currentUser && currentUser.email
+        ? {
+            id: currentUser.id,
+            email: currentUser.email,
+            name: currentUser.name,
+          }
+        : null;
+
+    // Generate response with enhanced context
     const response = await chat(
-      company.id,
+      companyContext,
       {
         apiKey: company.aiApiKey,
         endpoint: company.aiEndpoint || undefined,
@@ -88,7 +110,9 @@ export async function POST(request: Request, { params }: RouteParams) {
         systemPrompt: company.aiSystemPrompt || undefined,
       },
       messages,
-      message
+      message,
+      userContext,
+      session.id
     );
 
     // Save assistant response

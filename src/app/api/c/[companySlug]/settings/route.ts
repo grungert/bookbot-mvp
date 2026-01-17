@@ -13,6 +13,9 @@ const updateSettingsSchema = z.object({
   aiEndpoint: z.string().nullable().optional(),
   aiModel: z.string().nullable().optional(),
   aiSystemPrompt: z.string().nullable().optional(),
+  aiBotName: z.string().nullable().optional(),
+  aiGreeting: z.string().nullable().optional(),
+  aiPersonality: z.string().nullable().optional(),
 });
 
 interface RouteParams {
@@ -49,6 +52,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       aiEndpoint: company.aiEndpoint,
       aiModel: company.aiModel,
       aiSystemPrompt: company.aiSystemPrompt,
+      aiBotName: company.aiBotName,
+      aiGreeting: company.aiGreeting,
+      aiPersonality: company.aiPersonality,
     };
 
     return NextResponse.json(settings);
@@ -97,6 +103,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.aiEndpoint !== undefined) updateData.aiEndpoint = data.aiEndpoint;
     if (data.aiModel !== undefined) updateData.aiModel = data.aiModel;
     if (data.aiSystemPrompt !== undefined) updateData.aiSystemPrompt = data.aiSystemPrompt;
+    if (data.aiBotName !== undefined) updateData.aiBotName = data.aiBotName;
+    if (data.aiGreeting !== undefined) updateData.aiGreeting = data.aiGreeting;
+    if (data.aiPersonality !== undefined) updateData.aiPersonality = data.aiPersonality;
 
     // Only update API key if a new one is provided (not masked value)
     if (data.aiApiKey !== undefined && !data.aiApiKey?.startsWith("***")) {
@@ -124,6 +133,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       aiEndpoint: updatedCompany.aiEndpoint,
       aiModel: updatedCompany.aiModel,
       aiSystemPrompt: updatedCompany.aiSystemPrompt,
+      aiBotName: updatedCompany.aiBotName,
+      aiGreeting: updatedCompany.aiGreeting,
+      aiPersonality: updatedCompany.aiPersonality,
     };
 
     return NextResponse.json(settings);

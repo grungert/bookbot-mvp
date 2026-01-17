@@ -217,9 +217,16 @@
     "aiApiKey": "API Key",
     "aiEndpoint": "Endpoint",
     "aiModel": "Model",
-    "aiSystemPrompt": "System Prompt",
+    "aiSystemPrompt": "Custom Instructions",
     "documents": "Knowledge Base",
-    "uploadDocument": "Upload Document"
+    "uploadDocument": "Upload Document",
+    "botPersonality": "Bot Personality",
+    "botPersonalityDescription": "Customize how your AI assistant communicates with customers",
+    "aiBotName": "Bot Name",
+    "aiBotNameDescription": "Give your assistant a custom name (e.g., Luna, Max, Assistant)",
+    "aiPersonalityLabel": "Personality",
+    "aiGreeting": "Greeting Message",
+    "aiGreetingDescription": "Custom greeting shown when a conversation starts"
   },
   "landing": {
     "heroTitle": "Smart Booking for Your Business",

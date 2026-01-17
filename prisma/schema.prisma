@@ -38,10 +38,15 @@ model Company {
   timezone     String   @default("Europe/Belgrade")
 
   // AI Configuration
-  aiApiKey     String?
-  aiEndpoint   String?
-  aiModel      String?
+  aiApiKey       String?
+  aiEndpoint     String?
+  aiModel        String?
   aiSystemPrompt String?
+
+  // Bot Personality Configuration
+  aiBotName      String?   // Custom bot name (e.g., "Luna", "Dr. Smith's Assistant")
+  aiGreeting     String?   // Custom greeting message
+  aiPersonality  String?   // Personality preset key (e.g., "professional", "friendly")
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
