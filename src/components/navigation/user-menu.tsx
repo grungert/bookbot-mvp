@@ -17,9 +17,10 @@ import { LogOut, User, LayoutDashboard } from "lucide-react";
 
 interface UserMenuProps {
   showDashboardLink?: boolean;
+  companySlug?: string;
 }
 
-export function UserMenu({ showDashboardLink = true }: UserMenuProps) {
+export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProps) {
   const { data: session } = useSession();
   const t = useTranslations("auth");
   const tNav = useTranslations("nav");
@@ -66,14 +67,17 @@ export function UserMenu({ showDashboardLink = true }: UserMenuProps) {
         <DropdownMenuSeparator />
         {showDashboardLink && (
           <DropdownMenuItem asChild>
-            <Link href="/user" className="cursor-pointer">
+            <Link
+              href={companySlug ? `/c/${companySlug}/my-appointments` : "/user"}
+              className="cursor-pointer"
+            >
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              {tNav("dashboard")}
+              {companySlug ? tNav("myAppointments") : tNav("dashboard")}
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
-          <Link href="/user/profile" className="cursor-pointer">
+          <Link href={companySlug ? `/c/${companySlug}/user/profile` : "/user/profile"} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             {tNav("profile")}
           </Link>

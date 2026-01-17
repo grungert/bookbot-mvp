@@ -97,7 +97,7 @@ export function Header({
               </Button>
             </Link>
           )}
-          <UserMenu />
+          <UserMenu companySlug={companySlug} />
         </div>
       </div>
     </header>
