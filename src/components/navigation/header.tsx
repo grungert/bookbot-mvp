@@ -49,10 +49,10 @@ export function Header({
         />
 
         {/* Logo / Company name */}
-        <div className="mr-4 flex">
+        <div className="mr-4 flex items-center">
           <Link
             href={companySlug ? `/c/${companySlug}` : "/"}
-            className="mr-6 flex items-center space-x-2"
+            className="flex items-center"
           >
             <span className="font-bold">{companyName}</span>
           </Link>
@@ -72,16 +72,16 @@ export function Header({
         </nav>
 
         {/* Right side - My Appointments, Admin link & User menu */}
-        <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="flex flex-1 items-center justify-end gap-1">
           {showMyAppointments && (
-            <Link href={myAppointmentsHref} className="hidden md:block">
-              <Button variant="ghost" size="sm" className="relative">
-                <Calendar className="mr-2 h-4 w-4" />
-                {tNav("myAppointments")}
+            <Link href={myAppointmentsHref} className="hidden md:flex">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Calendar className="h-4 w-4" />
+                <span>{tNav("myAppointments")}</span>
                 {appointmentCount > 0 && (
                   <Badge
                     variant="default"
-                    className="ml-2 h-5 min-w-5 px-1.5 text-xs"
+                    className="h-5 min-w-5 px-1.5 text-xs rounded-full"
                   >
                     {appointmentCount}
                   </Badge>
@@ -90,10 +90,10 @@ export function Header({
             </Link>
           )}
           {showAdminLink && (
-            <Link href={adminHref} className="hidden md:block">
-              <Button variant="ghost" size="sm">
-                <Settings className="mr-2 h-4 w-4" />
-                {tNav("admin")}
+            <Link href={adminHref} className="hidden md:flex">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Settings className="h-4 w-4" />
+                <span>{tNav("admin")}</span>
               </Button>
             </Link>
           )}
