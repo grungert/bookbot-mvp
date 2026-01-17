@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Loader2, Save, Eye, EyeOff } from "lucide-react";
 
@@ -21,6 +20,7 @@ interface CompanySettings {
   primaryColor: string;
   timezone: string;
   aiApiKey: string | null;
+  hasAiApiKey: boolean;
   aiEndpoint: string | null;
   aiModel: string | null;
   aiSystemPrompt: string | null;
@@ -32,7 +32,6 @@ export default function SettingsPage() {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
 
-  const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -44,6 +43,7 @@ export default function SettingsPage() {
   const [primaryColor, setPrimaryColor] = useState("#3B82F6");
   const [timezone, setTimezone] = useState("Europe/Belgrade");
   const [aiApiKey, setAiApiKey] = useState("");
+  const [hasExistingApiKey, setHasExistingApiKey] = useState(false);
   const [aiEndpoint, setAiEndpoint] = useState("");
   const [aiModel, setAiModel] = useState("");
   const [aiSystemPrompt, setAiSystemPrompt] = useState("");
@@ -54,13 +54,26 @@ export default function SettingsPage() {
 
   async function loadSettings() {
     try {
-      // We'll use the company page endpoint
-      const response = await fetch(`/api/c/${companySlug}/services`);
-      // This is a workaround - in production you'd have a dedicated settings endpoint
-      // For now, we'll just simulate the settings
-      setName(companySlug);
-      setPrimaryColor("#3B82F6");
+      const response = await fetch(`/api/c/${companySlug}/settings`);
+
+      if (!response.ok) {
+        throw new Error("Failed to load settings");
+      }
+
+      const settings: CompanySettings = await response.json();
+
+      setName(settings.name);
+      setDescription(settings.description || "");
+      setLogoUrl(settings.logoUrl || "");
+      setPrimaryColor(settings.primaryColor || "#3B82F6");
+      setTimezone(settings.timezone || "Europe/Belgrade");
+      setAiApiKey(settings.aiApiKey || "");
+      setHasExistingApiKey(settings.hasAiApiKey);
+      setAiEndpoint(settings.aiEndpoint || "");
+      setAiModel(settings.aiModel || "");
+      setAiSystemPrompt(settings.aiSystemPrompt || "");
     } catch (error) {
+      console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
@@ -71,11 +84,43 @@ export default function SettingsPage() {
     setIsSaving(true);
 
     try {
-      // In a real implementation, you'd call an API to update settings
-      // For now, we'll just show a success message
-      toast.success("Settings saved");
+      const updateData: Record<string, unknown> = {
+        name,
+        description: description || null,
+        logoUrl: logoUrl || null,
+        primaryColor,
+        timezone,
+        aiEndpoint: aiEndpoint || null,
+        aiModel: aiModel || null,
+        aiSystemPrompt: aiSystemPrompt || null,
+      };
+
+      // Only include API key if it's been changed (not masked)
+      if (aiApiKey && !aiApiKey.startsWith("***")) {
+        updateData.aiApiKey = aiApiKey || null;
+      }
+
+      const response = await fetch(`/api/c/${companySlug}/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save settings");
+      }
+
+      const updatedSettings: CompanySettings = await response.json();
+
+      // Update form with returned values
+      setAiApiKey(updatedSettings.aiApiKey || "");
+      setHasExistingApiKey(updatedSettings.hasAiApiKey);
+
+      toast.success("Settings saved successfully");
     } catch (error) {
-      toast.error(tCommon("error"));
+      console.error("Error saving settings:", error);
+      toast.error(error instanceof Error ? error.message : tCommon("error"));
     } finally {
       setIsSaving(false);
     }
@@ -110,7 +155,7 @@ export default function SettingsPage() {
           <CardDescription>Basic company information</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">{t("companyName")}</Label>
               <Input
@@ -147,7 +192,7 @@ export default function SettingsPage() {
           <CardDescription>Customize your company appearance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="logoUrl">{t("companyLogo")}</Label>
               <Input
@@ -188,7 +233,7 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="aiApiKey">{t("aiApiKey")}</Label>
               <div className="flex gap-2">
@@ -197,7 +242,7 @@ export default function SettingsPage() {
                   type={showApiKey ? "text" : "password"}
                   value={aiApiKey}
                   onChange={(e) => setAiApiKey(e.target.value)}
-                  placeholder="sk-..."
+                  placeholder={hasExistingApiKey ? "Enter new key to replace" : "sk-..."}
                 />
                 <Button
                   type="button"
@@ -212,6 +257,11 @@ export default function SettingsPage() {
                   )}
                 </Button>
               </div>
+              {hasExistingApiKey && aiApiKey?.startsWith("***") && (
+                <p className="text-xs text-muted-foreground">
+                  API key is configured. Enter a new key to replace it.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="aiModel">{t("aiModel")}</Label>
