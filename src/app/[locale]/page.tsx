@@ -3,7 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, FileText, MessageSquare } from "lucide-react";
+import { Calendar, FileText, MessageSquare, User, Building2 } from "lucide-react";
 
 interface HomePageProps {
   params: Promise<{ locale: string }>;
@@ -52,6 +52,42 @@ function HomeContent() {
           <Button variant="outline" size="lg">
             {t("learnMore")}
           </Button>
+        </div>
+      </section>
+
+      {/* Login Section */}
+      <section className="container mx-auto px-4 py-16 border-b">
+        <h2 className="text-3xl font-bold text-center mb-4">{t("loginSection")}</h2>
+        <p className="text-muted-foreground text-center mb-12">{t("loginSectionDesc")}</p>
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <User className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle>{t("userLogin")}</CardTitle>
+              <CardDescription>{t("userLoginDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/login" className="block">
+                <Button className="w-full" size="lg">{t("userLoginButton")}</Button>
+              </Link>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+                <Building2 className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle>{t("companyLogin")}</CardTitle>
+              <CardDescription>{t("companyLoginDesc")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/login" className="block">
+                <Button className="w-full" size="lg" variant="outline">{t("companyLoginButton")}</Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </section>
 

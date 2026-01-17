@@ -249,7 +249,15 @@
     "invoicing": "Invoicing",
     "invoicingDesc": "Create and manage professional invoices with ease",
     "ai": "AI Assistant",
-    "aiDesc": "Engage customers with intelligent chatbot powered by your knowledge base"
+    "aiDesc": "Engage customers with intelligent chatbot powered by your knowledge base",
+    "loginSection": "Sign In",
+    "loginSectionDesc": "Choose how you want to sign in",
+    "userLogin": "Customer Login",
+    "userLoginDesc": "Book appointments and manage your bookings",
+    "userLoginButton": "Sign in as Customer",
+    "companyLogin": "Business Login",
+    "companyLoginDesc": "Manage your business, appointments, and services",
+    "companyLoginButton": "Sign in as Business"
   },
   "errors": {
     "notFound": "Page not found",

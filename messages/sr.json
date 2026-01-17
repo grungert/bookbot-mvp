@@ -249,7 +249,15 @@
     "invoicing": "Fakturisanje",
     "invoicingDesc": "Kreirajte i upravljajte profesionalnim fakturama sa lakocom",
     "ai": "AI Asistent",
-    "aiDesc": "Komunicirajte sa klijentima putem inteligentnog chatbota baziranog na vasoj bazi znanja"
+    "aiDesc": "Komunicirajte sa klijentima putem inteligentnog chatbota baziranog na vasoj bazi znanja",
+    "loginSection": "Prijavite se",
+    "loginSectionDesc": "Izaberite kako zelite da se prijavite",
+    "userLogin": "Prijava za klijente",
+    "userLoginDesc": "Zakazujte termine i upravljajte vasim rezervacijama",
+    "userLoginButton": "Prijavite se kao klijent",
+    "companyLogin": "Prijava za firme",
+    "companyLoginDesc": "Upravljajte vasim biznisom, terminima i uslugama",
+    "companyLoginButton": "Prijavite se kao firma"
   },
   "errors": {
     "notFound": "Stranica nije pronadjena",
