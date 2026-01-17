@@ -1,0 +1,310 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+
+interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  duration: number;
+  price: number;
+  currency: string;
+  isActive: boolean;
+}
+
+export default function ServicesPage() {
+  const params = useParams();
+  const companySlug = params.companySlug as string;
+  const t = useTranslations("services");
+  const tCommon = useTranslations("common");
+
+  const [services, setServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form state
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [duration, setDuration] = useState("60");
+  const [price, setPrice] = useState("0");
+
+  useEffect(() => {
+    loadServices();
+  }, [companySlug]);
+
+  async function loadServices() {
+    try {
+      const response = await fetch(`/api/c/${companySlug}/services`);
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data);
+      }
+    } catch (error) {
+      toast.error(tCommon("error"));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function openCreateDialog() {
+    setEditingService(null);
+    setName("");
+    setDescription("");
+    setDuration("60");
+    setPrice("0");
+    setIsDialogOpen(true);
+  }
+
+  function openEditDialog(service: Service) {
+    setEditingService(service);
+    setName(service.name);
+    setDescription(service.description || "");
+    setDuration(service.duration.toString());
+    setPrice(service.price.toString());
+    setIsDialogOpen(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const url = editingService
+        ? `/api/c/${companySlug}/services/${editingService.id}`
+        : `/api/c/${companySlug}/services`;
+
+      const response = await fetch(url, {
+        method: editingService ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description: description || undefined,
+          duration: parseInt(duration),
+          price: parseFloat(price),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save service");
+      }
+
+      toast.success(
+        editingService ? t("serviceUpdated") : t("serviceCreated")
+      );
+      setIsDialogOpen(false);
+      loadServices();
+    } catch (error) {
+      toast.error(tCommon("error"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDelete(serviceId: string) {
+    if (!confirm("Are you sure you want to delete this service?")) return;
+
+    try {
+      const response = await fetch(
+        `/api/c/${companySlug}/services/${serviceId}`,
+        { method: "DELETE" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to delete service");
+      }
+
+      toast.success(t("serviceDeleted"));
+      loadServices();
+    } catch (error) {
+      toast.error(tCommon("error"));
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">{t("title")}</h1>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t("addService")}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingService ? t("editService") : t("addService")}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">{t("serviceName")}</Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">{t("serviceDescription")}</Label>
+                  <Textarea
+                    id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">{t("serviceDuration")}</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      min="5"
+                      max="480"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">{t("servicePrice")}</Label>
+                    <Input
+                      id="price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  {tCommon("cancel")}
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  )}
+                  {tCommon("save")}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {services.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">{t("noServices")}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{tCommon("name")}</TableHead>
+                <TableHead>{tCommon("duration")}</TableHead>
+                <TableHead>{tCommon("price")}</TableHead>
+                <TableHead className="text-right">{tCommon("actions")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {services.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{service.name}</div>
+                      {service.description && (
+                        <div className="text-sm text-muted-foreground">
+                          {service.description}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{service.duration} min</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">
+                      {service.currency} {Number(service.price).toLocaleString()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEditDialog(service)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(service.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
+    </div>
+  );
+}
