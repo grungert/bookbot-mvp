@@ -160,3 +160,48 @@ export function hasRole(userRole: UserRole, allowedRoles: UserRole[]) {
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
 }
+
+// Allowed hosts for callback URLs (add your domains here)
+const ALLOWED_CALLBACK_HOSTS: string[] = [
+  // Add production domains here if needed
+];
+
+/**
+ * Validates that a callback URL is safe to redirect to.
+ * Only allows relative URLs or URLs from allowed hosts.
+ */
+export function isValidCallbackUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+
+  // Allow relative URLs (starting with /)
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    return true;
+  }
+
+  // Check if it's an absolute URL from an allowed host
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow http/https protocols
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return false;
+    }
+    // Check against allowed hosts
+    return ALLOWED_CALLBACK_HOSTS.includes(parsedUrl.host);
+  } catch {
+    // Invalid URL format
+    return false;
+  }
+}
+
+/**
+ * Returns a safe callback URL, falling back to the provided fallback if the URL is invalid.
+ */
+export function getSafeCallbackUrl(
+  url: string | null | undefined,
+  fallback: string = "/"
+): string {
+  if (isValidCallbackUrl(url)) {
+    return url as string;
+  }
+  return fallback;
+}

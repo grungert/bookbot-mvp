@@ -12,13 +12,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { getSafeCallbackUrl } from "@/lib/url-utils";
 
 function LoginForm() {
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const callbackUrl = getSafeCallbackUrl(searchParams.get("callbackUrl"), "/");
 
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");

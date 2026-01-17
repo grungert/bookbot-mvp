@@ -60,7 +60,14 @@
     "invoices": "Fakture",
     "settings": "Podesavanja",
     "admin": "Administracija",
-    "profile": "Profil"
+    "profile": "Profil",
+    "backToSite": "Nazad na sajt"
+  },
+  "calendar": {
+    "week": "Nedelja",
+    "month": "Mesec",
+    "noAppointments": "Nema termina",
+    "today": "Danas"
   },
   "booking": {
     "title": "Zakazivanje termina",

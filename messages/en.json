@@ -60,7 +60,14 @@
     "invoices": "Invoices",
     "settings": "Settings",
     "admin": "Admin",
-    "profile": "Profile"
+    "profile": "Profile",
+    "backToSite": "Back to site"
+  },
+  "calendar": {
+    "week": "Week",
+    "month": "Month",
+    "noAppointments": "No appointments",
+    "today": "Today"
   },
   "booking": {
     "title": "Book an Appointment",

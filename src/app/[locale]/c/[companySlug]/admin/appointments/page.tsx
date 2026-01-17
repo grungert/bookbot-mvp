@@ -24,9 +24,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, TableIcon, CalendarIcon } from "lucide-react";
+import { AppointmentCalendar } from "@/components/admin/appointment-calendar";
 
 interface Appointment {
   id: string;
@@ -55,6 +57,7 @@ export default function AppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"table" | "calendar">("table");
 
   useEffect(() => {
     loadAppointments();
@@ -147,98 +150,119 @@ export default function AppointmentsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <h1 className="text-2xl font-bold">{t("title")}</h1>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("all")}</SelectItem>
-            <SelectItem value="PENDING">{t("statusPending")}</SelectItem>
-            <SelectItem value="CONFIRMED">{t("statusConfirmed")}</SelectItem>
-            <SelectItem value="COMPLETED">{t("statusCompleted")}</SelectItem>
-            <SelectItem value="CANCELLED">{t("statusCancelled")}</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "table" | "calendar")}>
+            <TabsList>
+              <TabsTrigger value="table" className="gap-1">
+                <TableIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Table</span>
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-1">
+                <CalendarIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Calendar</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-32 sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("all")}</SelectItem>
+              <SelectItem value="PENDING">{t("statusPending")}</SelectItem>
+              <SelectItem value="CONFIRMED">{t("statusConfirmed")}</SelectItem>
+              <SelectItem value="COMPLETED">{t("statusCompleted")}</SelectItem>
+              <SelectItem value="CANCELLED">{t("statusCancelled")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {appointments.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">{t("noAppointments")}</p>
-          </CardContent>
-        </Card>
+      {viewMode === "table" ? (
+        // Table View
+        appointments.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">{t("noAppointments")}</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{tCommon("date")}</TableHead>
+                    <TableHead>{tCommon("time")}</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead className="hidden md:table-cell">Customer</TableHead>
+                    <TableHead>{tCommon("status")}</TableHead>
+                    <TableHead className="text-right">{tCommon("actions")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {appointments.map((apt) => (
+                    <TableRow key={apt.id}>
+                      <TableCell>
+                        {format(parseISO(apt.startTime), "MMM d, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        {format(parseISO(apt.startTime), "HH:mm")} -{" "}
+                        {format(parseISO(apt.endTime), "HH:mm")}
+                      </TableCell>
+                      <TableCell>{apt.service.name}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div>
+                          <div className="font-medium">
+                            {apt.user.name || "No name"}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {apt.user.email}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(apt.status)}</TableCell>
+                      <TableCell className="text-right">
+                        {apt.status === "PENDING" && (
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateStatus(apt.id, "CONFIRMED")}
+                            >
+                              Confirm
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => updateStatus(apt.id, "CANCELLED")}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                        {apt.status === "CONFIRMED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateStatus(apt.id, "COMPLETED")}
+                          >
+                            Complete
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        )
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{tCommon("date")}</TableHead>
-                <TableHead>{tCommon("time")}</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>{tCommon("status")}</TableHead>
-                <TableHead className="text-right">{tCommon("actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {appointments.map((apt) => (
-                <TableRow key={apt.id}>
-                  <TableCell>
-                    {format(parseISO(apt.startTime), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell>
-                    {format(parseISO(apt.startTime), "HH:mm")} -{" "}
-                    {format(parseISO(apt.endTime), "HH:mm")}
-                  </TableCell>
-                  <TableCell>{apt.service.name}</TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {apt.user.name || "No name"}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {apt.user.email}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(apt.status)}</TableCell>
-                  <TableCell className="text-right">
-                    {apt.status === "PENDING" && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mr-2"
-                          onClick={() => updateStatus(apt.id, "CONFIRMED")}
-                        >
-                          Confirm
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => updateStatus(apt.id, "CANCELLED")}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    )}
-                    {apt.status === "CONFIRMED" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateStatus(apt.id, "COMPLETED")}
-                      >
-                        Complete
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        // Calendar View
+        <AppointmentCalendar appointments={appointments} />
       )}
     </div>
   );

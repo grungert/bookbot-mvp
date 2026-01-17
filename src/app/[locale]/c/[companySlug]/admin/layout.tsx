@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { AdminSidebar, AdminMobileNav } from "@/components/admin/admin-sidebar";
+import { UserMenu } from "@/components/navigation/user-menu";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -40,9 +41,19 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-muted/30">
+      {/* Mobile header */}
+      <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 items-center px-4">
+          <AdminMobileNav companySlug={companySlug} companyName={company.name} />
+          <span className="font-semibold ml-2">{company.name}</span>
+          <div className="ml-auto">
+            <UserMenu showDashboardLink={false} />
+          </div>
+        </div>
+      </header>
       <div className="flex">
         <AdminSidebar companySlug={companySlug} companyName={company.name} />
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 p-4 lg:p-6">{children}</main>
       </div>
     </div>
   );

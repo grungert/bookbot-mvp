@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { setRequestLocale } from "next-intl/server";
+import { getCurrentUser } from "@/lib/auth";
+import { Header } from "@/components/navigation/header";
 
 interface CompanyLayoutProps {
   children: React.ReactNode;
@@ -20,6 +22,12 @@ export default async function CompanyLayout({
     notFound();
   }
 
+  // Check if user can access admin
+  const user = await getCurrentUser();
+  const canAccessAdmin =
+    user?.role === "SUPER_ADMIN" ||
+    (user?.role === "COMPANY_ADMIN" && user.companyId === company.id);
+
   return (
     <div
       className="min-h-screen"
@@ -29,6 +37,11 @@ export default async function CompanyLayout({
         } as React.CSSProperties
       }
     >
+      <Header
+        companyName={company.name}
+        companySlug={companySlug}
+        showAdminLink={canAccessAdmin}
+      />
       {children}
     </div>
   );
