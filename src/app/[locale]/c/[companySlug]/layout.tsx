@@ -28,6 +28,7 @@ export default async function CompanyLayout({
   const canAccessAdmin =
     user?.role === "SUPER_ADMIN" ||
     (user?.role === "COMPANY_ADMIN" && user.companyId === company.id);
+  const isLoggedIn = !!user;
 
   // Generate theme palette from company's primary color
   const palette = generateThemePalette(company.primaryColor);
@@ -48,6 +49,7 @@ export default async function CompanyLayout({
         companyName={company.name}
         companySlug={companySlug}
         showAdminLink={canAccessAdmin}
+        showMyAppointments={isLoggedIn}
       />
       {children}
     </div>

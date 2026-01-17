@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
-import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
+import { getCurrentUser, hashPassword } from "@/lib/auth";
+import { getCompanyBySlug } from "@/lib/db/tenant";
 import { isSlotAvailable } from "@/lib/utils/slots";
+import { sendBookingConfirmationEmail } from "@/lib/email/send";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
 import { AppointmentStatus, Prisma } from "@prisma/client";
@@ -11,6 +12,10 @@ const createAppointmentSchema = z.object({
   serviceId: z.string(),
   startTime: z.string().datetime(),
   notes: z.string().optional(),
+  // Guest checkout fields
+  guestName: z.string().optional(),
+  guestEmail: z.string().email().optional(),
+  guestPhone: z.string().optional(),
 });
 
 interface RouteParams {
@@ -90,11 +95,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { companySlug } = await params;
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    let user = await getCurrentUser();
 
     const company = await getCompanyBySlug(companySlug);
     if (!company) {
@@ -114,7 +115,41 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { serviceId, startTime, notes } = parsed.data;
+    const { serviceId, startTime, notes, guestName, guestEmail, guestPhone } = parsed.data;
+
+    // Handle guest checkout - require guest info if not logged in
+    if (!user) {
+      if (!guestEmail || !guestName) {
+        return NextResponse.json(
+          { error: "Guest name and email are required for booking" },
+          { status: 400 }
+        );
+      }
+
+      // Check if user exists by email
+      const existingUser = await prisma.user.findUnique({
+        where: { email: guestEmail },
+      });
+
+      if (existingUser) {
+        // Use existing user
+        user = existingUser;
+      } else {
+        // Create new user with random password (they can reset later)
+        const randomPassword = Math.random().toString(36).slice(-12);
+        const hashedPassword = await hashPassword(randomPassword);
+
+        user = await prisma.user.create({
+          data: {
+            email: guestEmail,
+            name: guestName,
+            phone: guestPhone || null,
+            password: hashedPassword,
+            role: "END_USER",
+          },
+        });
+      }
+    }
 
     // Get the service
     const service = await prisma.service.findFirst({
@@ -158,8 +193,28 @@ export async function POST(request: Request, { params }: RouteParams) {
       },
       include: {
         service: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
+
+    // Send confirmation email
+    if (user.email) {
+      await sendBookingConfirmationEmail({
+        customerEmail: user.email,
+        customerName: user.name || "Customer",
+        serviceName: service.name,
+        startTime: appointmentStart,
+        duration: service.duration,
+        companyName: company.name,
+        notes: notes || undefined,
+      });
+    }
 
     return NextResponse.json(appointment, { status: 201 });
   } catch (error) {

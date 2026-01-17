@@ -11,7 +11,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Settings } from "lucide-react";
+import { Menu, Settings, Calendar } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -23,6 +23,7 @@ interface MobileNavProps {
   companySlug?: string;
   navItems?: NavItem[];
   showAdminLink?: boolean;
+  showMyAppointments?: boolean;
 }
 
 export function MobileNav({
@@ -30,11 +31,13 @@ export function MobileNav({
   companySlug,
   navItems = [],
   showAdminLink = false,
+  showMyAppointments = false,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const tNav = useTranslations("nav");
 
   const adminHref = companySlug ? `/c/${companySlug}/admin` : "/admin";
+  const myAppointmentsHref = companySlug ? `/c/${companySlug}/my-appointments` : "/my-appointments";
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -59,6 +62,19 @@ export function MobileNav({
               {item.label}
             </Link>
           ))}
+          {showMyAppointments && (
+            <>
+              <div className="h-px bg-border my-2" />
+              <Link
+                href={myAppointmentsHref}
+                onClick={() => setOpen(false)}
+                className="flex items-center text-muted-foreground hover:text-foreground transition-colors py-2"
+              >
+                <Calendar className="mr-2 h-4 w-4" />
+                {tNav("myAppointments")}
+              </Link>
+            </>
+          )}
           {showAdminLink && (
             <>
               <div className="h-px bg-border my-2" />

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
+import { getCompanyBySlug } from "@/lib/db/tenant";
+import { sendCancellationEmail } from "@/lib/email/send";
 import { z } from "zod";
 
 const updateAppointmentSchema = z.object({
@@ -149,6 +150,17 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       },
     });
+
+    // Send cancellation email if status changed to CANCELLED
+    if (parsed.data.status === "CANCELLED" && updated.user?.email) {
+      await sendCancellationEmail({
+        customerEmail: updated.user.email,
+        customerName: updated.user.name || "Customer",
+        serviceName: updated.service.name,
+        startTime: updated.startTime,
+        companyName: company.name,
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

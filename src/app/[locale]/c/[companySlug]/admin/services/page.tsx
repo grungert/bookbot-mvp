@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -8,21 +8,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -56,6 +59,7 @@ export default function ServicesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState("");
@@ -63,23 +67,23 @@ export default function ServicesPage() {
   const [duration, setDuration] = useState("60");
   const [price, setPrice] = useState("0");
 
-  useEffect(() => {
-    loadServices();
-  }, [companySlug]);
-
-  async function loadServices() {
+  const loadServices = useCallback(async () => {
     try {
       const response = await fetch(`/api/c/${companySlug}/services`);
       if (response.ok) {
         const data = await response.json();
         setServices(data);
       }
-    } catch (error) {
+    } catch {
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [companySlug, tCommon]);
+
+  useEffect(() => {
+    loadServices();
+  }, [loadServices]);
 
   function openCreateDialog() {
     setEditingService(null);
@@ -120,7 +124,13 @@ export default function ServicesPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save service");
+        const data = await response.json();
+        if (response.status === 400) {
+          toast.error(data.error || "Validation failed. Please check your input.");
+        } else {
+          toast.error("Failed to save service. Please try again.");
+        }
+        return;
       }
 
       toast.success(
@@ -128,15 +138,15 @@ export default function ServicesPage() {
       );
       setIsDialogOpen(false);
       loadServices();
-    } catch (error) {
-      toast.error(tCommon("error"));
+    } catch {
+      toast.error("Failed to save service. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleDelete(serviceId: string) {
-    if (!confirm("Are you sure you want to delete this service?")) return;
+    setDeletingServiceId(serviceId);
 
     try {
       const response = await fetch(
@@ -145,13 +155,17 @@ export default function ServicesPage() {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete service");
+        const data = await response.json();
+        toast.error(data.error || "Failed to delete service. Please try again.");
+        return;
       }
 
       toast.success(t("serviceDeleted"));
       loadServices();
-    } catch (error) {
-      toast.error(tCommon("error"));
+    } catch {
+      toast.error("Failed to delete service. Please try again.");
+    } finally {
+      setDeletingServiceId(null);
     }
   }
 
@@ -315,14 +329,38 @@ export default function ServicesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleDelete(service.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>{t("deleteService")}</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &quot;{service.name}&quot;? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(service.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              disabled={deletingServiceId === service.id}
+                            >
+                              {deletingServiceId === service.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : null}
+                              {tCommon("delete")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

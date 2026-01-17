@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +16,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -47,27 +57,28 @@ export default function DocumentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  useEffect(() => {
-    loadDocuments();
-  }, [companySlug]);
-
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     try {
       const response = await fetch(`/api/c/${companySlug}/documents`);
       if (response.ok) {
         const data = await response.json();
         setDocuments(data);
       }
-    } catch (error) {
+    } catch {
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [companySlug, tCommon]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   function openCreateDialog() {
     setEditingDocument(null);
@@ -99,21 +110,27 @@ export default function DocumentsPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save document");
+        const data = await response.json();
+        if (response.status === 400) {
+          toast.error(data.error || "Validation failed. Please check your input.");
+        } else {
+          toast.error("Failed to save document. Please try again.");
+        }
+        return;
       }
 
       toast.success(editingDocument ? "Document updated" : "Document created");
       setIsDialogOpen(false);
       loadDocuments();
-    } catch (error) {
-      toast.error(tCommon("error"));
+    } catch {
+      toast.error("Failed to save document. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleDelete(documentId: string) {
-    if (!confirm("Are you sure you want to delete this document?")) return;
+    setDeletingDocumentId(documentId);
 
     try {
       const response = await fetch(
@@ -122,13 +139,17 @@ export default function DocumentsPage() {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete document");
+        const data = await response.json();
+        toast.error(data.error || "Failed to delete document. Please try again.");
+        return;
       }
 
       toast.success("Document deleted");
       loadDocuments();
-    } catch (error) {
-      toast.error(tCommon("error"));
+    } catch {
+      toast.error("Failed to delete document. Please try again.");
+    } finally {
+      setDeletingDocumentId(null);
     }
   }
 
@@ -256,14 +277,38 @@ export default function DocumentsPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleDelete(doc.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Document?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete &quot;{doc.title}&quot;? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(doc.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              disabled={deletingDocumentId === doc.id}
+                            >
+                              {deletingDocumentId === doc.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              ) : null}
+                              {tCommon("delete")}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

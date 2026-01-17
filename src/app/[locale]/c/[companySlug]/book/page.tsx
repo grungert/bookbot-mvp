@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { getCompanyWithServices } from "@/lib/db/tenant";
 import { getCurrentUser } from "@/lib/auth";
@@ -19,11 +19,7 @@ export default async function BookingPage({
 
   const user = await getCurrentUser();
 
-  // Require login for booking
-  if (!user) {
-    redirect(`/login?callbackUrl=/c/${companySlug}/book${serviceId ? `?service=${serviceId}` : ""}`);
-  }
-
+  // Allow guest checkout - no longer require login
   const company = await getCompanyWithServices(companySlug);
 
   if (!company) {
@@ -69,6 +65,7 @@ export default async function BookingPage({
           companySlug={companySlug}
           services={services}
           initialServiceId={serviceId}
+          user={user ? { name: user.name, email: user.email } : null}
         />
       </div>
     </div>

@@ -5,7 +5,7 @@ import { Link } from "@/i18n/routing";
 import { UserMenu } from "./user-menu";
 import { MobileNav } from "./mobile-nav";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
+import { Settings, Calendar } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -16,6 +16,7 @@ interface HeaderProps {
   companyName?: string;
   companySlug?: string;
   showAdminLink?: boolean;
+  showMyAppointments?: boolean;
   navItems?: NavItem[];
 }
 
@@ -23,11 +24,13 @@ export function Header({
   companyName = "BookBot",
   companySlug,
   showAdminLink = false,
+  showMyAppointments = false,
   navItems = [],
 }: HeaderProps) {
   const tNav = useTranslations("nav");
 
   const adminHref = companySlug ? `/c/${companySlug}/admin` : "/admin";
+  const myAppointmentsHref = companySlug ? `/c/${companySlug}/my-appointments` : "/my-appointments";
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -38,6 +41,7 @@ export function Header({
           companySlug={companySlug}
           navItems={navItems}
           showAdminLink={showAdminLink}
+          showMyAppointments={showMyAppointments}
         />
 
         {/* Logo / Company name */}
@@ -63,8 +67,16 @@ export function Header({
           ))}
         </nav>
 
-        {/* Right side - Admin link & User menu */}
+        {/* Right side - My Appointments, Admin link & User menu */}
         <div className="flex flex-1 items-center justify-end space-x-2">
+          {showMyAppointments && (
+            <Link href={myAppointmentsHref} className="hidden md:block">
+              <Button variant="ghost" size="sm">
+                <Calendar className="mr-2 h-4 w-4" />
+                {tNav("myAppointments")}
+              </Button>
+            </Link>
+          )}
           {showAdminLink && (
             <Link href={adminHref} className="hidden md:block">
               <Button variant="ghost" size="sm">

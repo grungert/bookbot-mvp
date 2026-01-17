@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Clock, CheckCircle, Loader2 } from "lucide-react";
@@ -29,22 +30,32 @@ interface TimeSlot {
   available: boolean;
 }
 
+interface UserInfo {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
 interface BookingFlowProps {
   companySlug: string;
   services: Service[];
   initialServiceId?: string;
+  user?: UserInfo | null;
 }
 
-type BookingStep = "service" | "date" | "time" | "confirm" | "success";
+type BookingStep = "service" | "date" | "time" | "details" | "confirm" | "success";
 
 export function BookingFlow({
   companySlug,
   services,
   initialServiceId,
+  user,
 }: BookingFlowProps) {
   const t = useTranslations("booking");
   const tCommon = useTranslations("common");
   const router = useRouter();
+
+  const isGuest = !user;
 
   const [step, setStep] = useState<BookingStep>(
     initialServiceId ? "date" : "service"
@@ -60,6 +71,11 @@ export function BookingFlow({
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Guest details
+  const [guestName, setGuestName] = useState(user?.name || "");
+  const [guestEmail, setGuestEmail] = useState(user?.email || "");
+  const [guestPhone, setGuestPhone] = useState(user?.phone || "");
 
   async function loadSlots(date: Date, serviceId: string) {
     setIsLoadingSlots(true);
@@ -78,7 +94,7 @@ export function BookingFlow({
 
       const data = await response.json();
       setSlots(data.slots.filter((s: TimeSlot) => s.available));
-    } catch (error) {
+    } catch {
       toast.error(tCommon("error"));
     } finally {
       setIsLoadingSlots(false);
@@ -100,23 +116,53 @@ export function BookingFlow({
 
   function handleSlotSelect(slot: TimeSlot) {
     setSelectedSlot(slot);
+    // If guest, show details form; otherwise go to confirm
+    if (isGuest) {
+      setStep("details");
+    } else {
+      setStep("confirm");
+    }
+  }
+
+  function handleDetailsSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!guestName.trim() || !guestEmail.trim()) {
+      toast.error(t("detailsRequired"));
+      return;
+    }
     setStep("confirm");
   }
 
   async function handleConfirm() {
     if (!selectedService || !selectedSlot) return;
 
+    // Validate guest details if guest checkout
+    if (isGuest && (!guestName.trim() || !guestEmail.trim())) {
+      toast.error(t("detailsRequired"));
+      setStep("details");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
+      const requestBody: Record<string, unknown> = {
+        serviceId: selectedService.id,
+        startTime: selectedSlot.start,
+        notes: notes || undefined,
+      };
+
+      // Add guest details if guest checkout
+      if (isGuest) {
+        requestBody.guestName = guestName.trim();
+        requestBody.guestEmail = guestEmail.trim();
+        requestBody.guestPhone = guestPhone.trim() || undefined;
+      }
+
       const response = await fetch(`/api/c/${companySlug}/appointments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serviceId: selectedService.id,
-          startTime: selectedSlot.start,
-          notes: notes || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -143,19 +189,30 @@ export function BookingFlow({
       case "time":
         setStep("date");
         break;
-      case "confirm":
+      case "details":
         setStep("time");
+        break;
+      case "confirm":
+        setStep(isGuest ? "details" : "time");
         break;
     }
   }
 
-  // Step indicator
-  const steps = [
-    { key: "service", label: t("selectService") },
-    { key: "date", label: t("selectDate") },
-    { key: "time", label: t("selectTime") },
-    { key: "confirm", label: t("confirmBooking") },
-  ];
+  // Step indicator - different for guests
+  const steps = isGuest
+    ? [
+        { key: "service", label: t("selectService") },
+        { key: "date", label: t("selectDate") },
+        { key: "time", label: t("selectTime") },
+        { key: "details", label: t("yourDetails") },
+        { key: "confirm", label: t("confirmBooking") },
+      ]
+    : [
+        { key: "service", label: t("selectService") },
+        { key: "date", label: t("selectDate") },
+        { key: "time", label: t("selectTime") },
+        { key: "confirm", label: t("confirmBooking") },
+      ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
 
@@ -289,6 +346,61 @@ export function BookingFlow({
               {tCommon("back")}
             </Button>
           </div>
+        </Card>
+      )}
+
+      {/* Guest Details Form */}
+      {step === "details" && selectedService && selectedDate && selectedSlot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("yourDetails")}</CardTitle>
+            <CardDescription>
+              {t("enterContactDetails")}
+            </CardDescription>
+          </CardHeader>
+          <form onSubmit={handleDetailsSubmit}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="guestName">{tCommon("name")} *</Label>
+                <Input
+                  id="guestName"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder={t("namePlaceholder")}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guestEmail">{tCommon("email")} *</Label>
+                <Input
+                  id="guestEmail"
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder={t("emailPlaceholder")}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guestPhone">{tCommon("phone")}</Label>
+                <Input
+                  id="guestPhone"
+                  type="tel"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
+                  placeholder={t("phonePlaceholder")}
+                />
+              </div>
+            </CardContent>
+            <div className="px-6 pb-6 flex gap-2">
+              <Button type="button" variant="outline" onClick={goBack}>
+                {tCommon("back")}
+              </Button>
+              <Button type="submit" className="flex-1">
+                {tCommon("next")}
+              </Button>
+            </div>
+          </form>
         </Card>
       )}
 
