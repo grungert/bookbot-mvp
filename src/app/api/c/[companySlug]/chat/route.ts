@@ -12,7 +12,7 @@ import { z } from "zod";
 
 const chatRequestSchema = z.object({
   message: z.string().min(1),
-  sessionId: z.string().optional(),
+  sessionId: z.string().nullish(), // Allow null, undefined, or string
 });
 
 interface RouteParams {
