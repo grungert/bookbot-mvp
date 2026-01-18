@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, ChevronRight, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslations } from "next-intl";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface Appointment {
   id: string;
@@ -49,6 +50,8 @@ export function AppointmentsCalendar({
   closedDays,
   t,
 }: AppointmentsCalendarProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   // Group appointments by date for calendar indicators
   const appointmentsByDate = useMemo(() => {
     const grouped = new Map<string, Appointment[]>();
@@ -102,7 +105,13 @@ export function AppointmentsCalendar({
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Month Calendar */}
-      <Card className="overflow-hidden">
+      <Card
+        className={cn(
+          "overflow-hidden",
+          !prefersReducedMotion && "animate-fade-in-scale"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
         <CardContent className="p-0">
           <div className="flex items-center justify-center p-6 pb-2">
             <Calendar
@@ -138,13 +147,25 @@ export function AppointmentsCalendar({
 
       {/* Selected Date Appointments */}
       <div className="space-y-4">
-        <div className="flex items-center gap-2 text-lg font-semibold">
+        <div
+          className={cn(
+            "flex items-center gap-2 text-lg font-semibold",
+            !prefersReducedMotion && "animate-fade-up stagger-1"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+        >
           <CalendarDays className="h-5 w-5 text-primary" />
           <span>{format(selectedDate, "EEEE, MMMM d")}</span>
         </div>
 
         {selectedDateAppointments.length === 0 ? (
-          <Card className="border-dashed">
+          <Card
+            className={cn(
+              "border-dashed",
+              !prefersReducedMotion && "animate-fade-in-scale stagger-2"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+          >
             <CardContent className="py-12 text-center">
               <CalendarDays className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-muted-foreground">
@@ -153,13 +174,18 @@ export function AppointmentsCalendar({
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
-            {selectedDateAppointments.map((appointment) => (
+          <div
+            key={selectedDateAppointments.map(a => a.id).join(',')}
+            className="filter-grid"
+          >
+            {selectedDateAppointments.map((appointment, index) => (
               <AppointmentDayCard
                 key={appointment.id}
                 appointment={appointment}
                 onClick={() => onSelectAppointment(appointment)}
                 t={t}
+                animationIndex={index}
+                prefersReducedMotion={prefersReducedMotion}
               />
             ))}
           </div>
@@ -173,10 +199,14 @@ function AppointmentDayCard({
   appointment,
   onClick,
   t,
+  animationIndex = 0,
+  prefersReducedMotion = false,
 }: {
   appointment: Appointment;
   onClick: () => void;
   t: ReturnType<typeof useTranslations<"appointments">>;
+  animationIndex?: number;
+  prefersReducedMotion?: boolean;
 }) {
   const startTime = parseISO(appointment.startTime);
   const isAppointmentPast =
@@ -186,10 +216,16 @@ function AppointmentDayCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group",
-        isAppointmentPast && "opacity-60"
+        "cursor-pointer transition-all hover:shadow-md hover:border-primary/30 group hover-lift press-feedback",
+        isAppointmentPast && "opacity-60",
+        !prefersReducedMotion && "filter-item"
       )}
       onClick={onClick}
+      style={
+        !prefersReducedMotion
+          ? { animationDelay: `${animationIndex * 50}ms` }
+          : undefined
+      }
     >
       <CardContent className="p-4">
         <div className="flex items-center justify-between gap-4">

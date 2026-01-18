@@ -123,3 +123,196 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animation Utilities */
+@layer utilities {
+  /* Stagger delay utilities for sequential animations */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
+
+  /* Animation fill mode to keep final state */
+  .animate-fill-forwards {
+    animation-fill-mode: forwards;
+  }
+
+  /* Initial state for fade-up animations */
+  .animate-initial-hidden {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Custom Keyframes */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes success-bounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Animation classes */
+@layer utilities {
+  .animate-fade-up {
+    animation: fade-up 0.3s ease-out forwards;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out forwards;
+  }
+
+  .animate-fade-in-scale {
+    animation: fade-in-scale 0.25s ease-out forwards;
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out forwards;
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.3s ease-out forwards;
+  }
+
+  .animate-success-bounce {
+    animation: success-bounce 0.5s ease-out forwards;
+  }
+
+  /* Hover lift effect */
+  .hover-lift {
+    @apply transition-all duration-200;
+  }
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-md;
+  }
+
+  /* Press feedback */
+  .press-feedback {
+    @apply transition-transform duration-100;
+  }
+  .press-feedback:active {
+    @apply scale-[0.98];
+  }
+
+  /* Filter animation for list items */
+  .filter-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-item {
+    animation: filter-in 0.3s ease-out forwards;
+  }
+
+  @keyframes filter-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-fade-in-scale,
+  .animate-slide-in-right,
+  .animate-slide-in-left,
+  .animate-success-bounce,
+  .filter-item {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .hover-lift:hover {
+    transform: none !important;
+  }
+}

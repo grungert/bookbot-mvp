@@ -16,6 +16,7 @@ import { Calendar, Clock, ChevronRight, CalendarPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface Appointment {
   id: string;
@@ -57,6 +58,8 @@ export function AppointmentsList({
   companySlug,
   t,
 }: AppointmentsListProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   // Filter appointments based on status filter
   const filteredAppointments = useMemo(() => {
     let filtered = [...appointments];
@@ -145,19 +148,31 @@ export function AppointmentsList({
         </Card>
       ) : (
         <div className="space-y-6">
-          {groupedAppointments.map(({ date, appointments: dayAppointments }) => (
-            <div key={date.toISOString()}>
+          {groupedAppointments.map(({ date, appointments: dayAppointments }, groupIndex) => (
+            <div
+              key={date.toISOString()}
+              className={cn(
+                !prefersReducedMotion && "animate-fade-up",
+                !prefersReducedMotion && groupIndex > 0 && `stagger-${Math.min(groupIndex, 5)}`
+              )}
+              style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+            >
               <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 {format(date, "EEEE, MMMM d, yyyy")}
               </h3>
-              <div className="space-y-3">
-                {dayAppointments.map((appointment) => (
+              <div
+                key={dayAppointments.map(a => a.id).join(',')}
+                className="filter-grid"
+              >
+                {dayAppointments.map((appointment, cardIndex) => (
                   <AppointmentListCard
                     key={appointment.id}
                     appointment={appointment}
                     onClick={() => onSelectAppointment(appointment)}
                     t={t}
+                    animationDelay={!prefersReducedMotion ? cardIndex * 50 : 0}
+                    prefersReducedMotion={prefersReducedMotion}
                   />
                 ))}
               </div>
@@ -173,10 +188,14 @@ function AppointmentListCard({
   appointment,
   onClick,
   t,
+  animationDelay = 0,
+  prefersReducedMotion = false,
 }: {
   appointment: Appointment;
   onClick: () => void;
   t: ReturnType<typeof useTranslations<"appointments">>;
+  animationDelay?: number;
+  prefersReducedMotion?: boolean;
 }) {
   const startTime = parseISO(appointment.startTime);
   const isAppointmentPast =
@@ -186,10 +205,16 @@ function AppointmentListCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md group",
-        isAppointmentPast && "opacity-60"
+        "cursor-pointer transition-all hover:shadow-md group hover-lift press-feedback",
+        isAppointmentPast && "opacity-60",
+        !prefersReducedMotion && "filter-item"
       )}
       onClick={onClick}
+      style={
+        !prefersReducedMotion
+          ? { animationDelay: `${animationDelay}ms` }
+          : undefined
+      }
     >
       <CardContent className="p-4">
         <div className="flex items-center justify-between">

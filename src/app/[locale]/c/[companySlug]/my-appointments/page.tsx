@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { isPast, parseISO } from "date-fns";
 
 import { AppointmentsHeader } from "@/components/customer/appointments-header";
 import { AppointmentsCalendar } from "@/components/customer/appointments-calendar";
@@ -51,6 +52,84 @@ export default function MyAppointmentsPage() {
     useState<Appointment | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[] | null>(null);
+
+  const storageKey = `appointments-service-filter-${companySlug}`;
+
+  // Get unique services with counts for filter badges
+  const servicesWithCounts = useMemo(() => {
+    const serviceMap = new Map<string, { id: string; name: string; color: string | null; count: number }>();
+    appointments
+      .filter(a => !isPast(parseISO(a.startTime)) && a.status !== "CANCELLED")
+      .forEach(apt => {
+        const existing = serviceMap.get(apt.service.id);
+        if (existing) {
+          existing.count++;
+        } else {
+          serviceMap.set(apt.service.id, {
+            id: apt.service.id,
+            name: apt.service.name,
+            color: apt.service.color,
+            count: 1,
+          });
+        }
+      });
+    return Array.from(serviceMap.values());
+  }, [appointments]);
+
+  // Get all service IDs for "all active" default
+  const allServiceIds = useMemo(() =>
+    servicesWithCounts.map(s => s.id),
+    [servicesWithCounts]
+  );
+
+  // Initialize selected services from localStorage or default to all
+  useEffect(() => {
+    if (servicesWithCounts.length === 0) return;
+
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as string[];
+        // Filter to only include services that still exist
+        const validIds = parsed.filter(id => allServiceIds.includes(id));
+        setSelectedServiceIds(validIds.length > 0 ? validIds : allServiceIds);
+      } else {
+        // Default: all services selected
+        setSelectedServiceIds(allServiceIds);
+      }
+    } catch {
+      setSelectedServiceIds(allServiceIds);
+    }
+  }, [servicesWithCounts, allServiceIds, storageKey]);
+
+  // Save to localStorage when selection changes
+  useEffect(() => {
+    if (selectedServiceIds !== null) {
+      localStorage.setItem(storageKey, JSON.stringify(selectedServiceIds));
+    }
+  }, [selectedServiceIds, storageKey]);
+
+  // Filter appointments based on selected services
+  const filteredAppointments = useMemo(() => {
+    // While loading settings, show all appointments
+    if (selectedServiceIds === null) return appointments;
+    // If all selected or none selected, show all
+    if (selectedServiceIds.length === 0 || selectedServiceIds.length === allServiceIds.length) {
+      return appointments;
+    }
+    return appointments.filter(a => selectedServiceIds.includes(a.service.id));
+  }, [appointments, selectedServiceIds, allServiceIds]);
+
+  // Toggle service filter
+  const handleServiceToggle = (serviceId: string) => {
+    setSelectedServiceIds(prev => {
+      if (prev === null) return [serviceId];
+      return prev.includes(serviceId)
+        ? prev.filter(id => id !== serviceId)
+        : [...prev, serviceId];
+    });
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -137,13 +216,16 @@ export default function MyAppointmentsPage() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         companySlug={companySlug}
+        servicesWithCounts={servicesWithCounts}
+        selectedServiceIds={selectedServiceIds}
+        onServiceToggle={handleServiceToggle}
         t={t}
       />
 
       <div className="container mx-auto px-4 py-6">
         {viewMode === "calendar" ? (
           <AppointmentsCalendar
-            appointments={appointments}
+            appointments={filteredAppointments}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             onSelectAppointment={handleSelectAppointment}
@@ -152,7 +234,7 @@ export default function MyAppointmentsPage() {
           />
         ) : (
           <AppointmentsList
-            appointments={appointments}
+            appointments={filteredAppointments}
             onSelectAppointment={handleSelectAppointment}
             filterStatus={filterStatus}
             onFilterStatusChange={setFilterStatus}
