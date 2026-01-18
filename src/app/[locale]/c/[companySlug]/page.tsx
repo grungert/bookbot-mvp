@@ -4,11 +4,12 @@ import { setRequestLocale } from "next-intl/server";
 import { getCompanyWithServices } from "@/lib/db/tenant";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, DollarSign } from "lucide-react";
+import { Clock } from "lucide-react";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { AboutSection } from "@/components/customer/about-section";
+import { cn } from "@/lib/utils";
 
 interface CompanyPageProps {
   params: Promise<{ locale: string; companySlug: string }>;
@@ -35,39 +36,28 @@ interface CompanyContentProps {
 function CompanyContent({ company, companySlug }: CompanyContentProps) {
   const t = useTranslations("booking");
   const tServices = useTranslations("services");
-  const tCommon = useTranslations("common");
+  const tAbout = useTranslations("about");
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card animate-fade-up">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {company.logoUrl && (
-                <img
-                  src={company.logoUrl}
-                  alt={company.name}
-                  className="h-12 w-12 rounded-lg object-cover"
-                />
-              )}
-              <div>
-                <h1 className="text-2xl font-bold">{company.name}</h1>
-                {company.description && (
-                  <p className="text-muted-foreground">{company.description}</p>
-                )}
-              </div>
-            </div>
-            <Link href={`/c/${companySlug}/book`}>
-              <Button size="lg" className="press-feedback">{t("title")}</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* About Us Section */}
+      <section className="container mx-auto px-4 pt-12 pb-6 text-center animate-fade-up stagger-1" style={{ opacity: 0 }}>
+        {company.description && (
+          <>
+            <h2 className="text-2xl font-bold mb-4">{tAbout("title")}</h2>
+            <p className="text-muted-foreground whitespace-pre-wrap max-w-3xl mx-auto mb-8">{company.description}</p>
+          </>
+        )}
+        <Link href={`/c/${companySlug}/book`}>
+          <Button size="lg" className="cursor-pointer press-feedback shadow-md hover:shadow-lg transition-shadow">
+            {t("title")}
+          </Button>
+        </Link>
+      </section>
 
       {/* Services Section */}
       <section className="container mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold mb-6 animate-fade-up stagger-1" style={{ opacity: 0 }}>
+        <h2 className="text-2xl font-bold mb-6 text-center animate-fade-up stagger-1" style={{ opacity: 0 }}>
           {tServices("title")}
         </h2>
 
@@ -78,19 +68,33 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
             {company.services.map((service, index) => (
               <Card
                 key={service.id}
-                className={`overflow-hidden hover-lift animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`}
-                style={{ opacity: 0 }}
+                className={cn(
+                  "overflow-hidden group",
+                  "rounded-xl border",
+                  "shadow-sm hover:shadow-lg",
+                  "transition-all duration-300",
+                  "hover:-translate-y-0.5 hover:border-primary/20",
+                  `animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`
+                )}
+                style={{
+                  opacity: 0,
+                  backgroundImage: `linear-gradient(to bottom right, ${service.color || "#3B82F6"}08, transparent)`
+                }}
               >
-                <div className="flex">
+                <div className="flex p-4 gap-4">
                   <div
-                    className="w-1 shrink-0"
-                    style={{ backgroundColor: service.color || "#3B82F6" }}
+                    className="w-1.5 shrink-0 rounded-full self-stretch transition-all duration-300 group-hover:shadow-[0_0_8px_0px]"
+                    style={{
+                      backgroundColor: service.color || "#3B82F6",
+                      "--tw-shadow-color": service.color || "#3B82F6",
+                    } as React.CSSProperties}
                   />
-                  <div className="flex-1">
-                    <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
-                        {service.name}
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold truncate">{service.name}</span>
                         <Badge
+                          className="shrink-0 shadow-sm"
                           style={{
                             backgroundColor: service.color || undefined,
                             borderColor: service.color || undefined,
@@ -99,24 +103,37 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                         >
                           {service.currency} {Number(service.price).toLocaleString()}
                         </Badge>
-                      </CardTitle>
-                      {service.description && (
-                        <CardDescription>{service.description}</CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          <span>{t("minutes", { count: service.duration })}</span>
-                        </div>
                       </div>
-                      <Link href={`/c/${companySlug}/book?service=${service.id}`}>
-                        <Button className="w-full mt-4 press-feedback" variant="outline">
-                          {t("title")}
-                        </Button>
-                      </Link>
-                    </CardContent>
+                      {service.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="p-1.5 rounded-md"
+                          style={{ backgroundColor: `${service.color || "#3B82F6"}15` }}
+                        >
+                          <Clock
+                            className="h-3.5 w-3.5"
+                            style={{ color: service.color || "#3B82F6" }}
+                          />
+                        </div>
+                        <span>{t("minutes", { count: service.duration })}</span>
+                      </div>
+                    </div>
+                    <Link href={`/c/${companySlug}/book?service=${service.id}`}>
+                      <Button
+                        className="w-full cursor-pointer press-feedback transition-colors duration-300"
+                        variant="outline"
+                        style={{
+                          "--hover-bg": `${service.color || "#3B82F6"}10`,
+                          "--hover-border": service.color || "#3B82F6",
+                        } as React.CSSProperties}
+                      >
+                        {t("title")}
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               </Card>
@@ -125,9 +142,8 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
         )}
       </section>
 
-      {/* About Section */}
+      {/* Contact Section */}
       <AboutSection
-        description={company.description}
         businessPhone={company.businessPhone}
         businessEmail={company.businessEmail}
         businessAddress={company.businessAddress}
