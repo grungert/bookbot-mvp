@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Clock, DollarSign } from "lucide-react";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { AboutSection } from "@/components/customer/about-section";
 
 interface CompanyPageProps {
   params: Promise<{ locale: string; companySlug: string }>;
@@ -39,7 +40,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card">
+      <header className="border-b bg-card animate-fade-up">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -58,7 +59,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
               </div>
             </div>
             <Link href={`/c/${companySlug}/book`}>
-              <Button size="lg">{t("title")}</Button>
+              <Button size="lg" className="press-feedback">{t("title")}</Button>
             </Link>
           </div>
         </div>
@@ -66,14 +67,20 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
 
       {/* Services Section */}
       <section className="container mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold mb-6">{tServices("title")}</h2>
+        <h2 className="text-2xl font-bold mb-6 animate-fade-up stagger-1" style={{ opacity: 0 }}>
+          {tServices("title")}
+        </h2>
 
         {company.services.length === 0 ? (
           <p className="text-muted-foreground">{tServices("noServices")}</p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {company.services.map((service) => (
-              <Card key={service.id} className="overflow-hidden">
+            {company.services.map((service, index) => (
+              <Card
+                key={service.id}
+                className={`overflow-hidden hover-lift animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`}
+                style={{ opacity: 0 }}
+              >
                 <div className="flex">
                   <div
                     className="w-1 shrink-0"
@@ -105,7 +112,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                         </div>
                       </div>
                       <Link href={`/c/${companySlug}/book?service=${service.id}`}>
-                        <Button className="w-full mt-4" variant="outline">
+                        <Button className="w-full mt-4 press-feedback" variant="outline">
                           {t("title")}
                         </Button>
                       </Link>
@@ -117,6 +124,15 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
           </div>
         )}
       </section>
+
+      {/* About Section */}
+      <AboutSection
+        description={company.description}
+        businessPhone={company.businessPhone}
+        businessEmail={company.businessEmail}
+        businessAddress={company.businessAddress}
+        workingHours={company.workingHours}
+      />
 
       {/* Chat Widget */}
       <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
