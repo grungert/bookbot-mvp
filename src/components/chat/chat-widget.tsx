@@ -178,8 +178,9 @@ export function ChatWidget({ companySlug, primaryColor }: ChatWidgetProps) {
   );
 
   const handleTimeSelect = useCallback(
-    (slot: ChatTimeSlot, _serviceId: string, _dateISO: string, serviceName: string) => {
-      sendMessage(`I'd like the ${slot.displayTime} slot for ${serviceName}`);
+    (slot: ChatTimeSlot, _serviceId: string, dateISO: string, serviceName: string) => {
+      const formattedDate = format(parseISO(dateISO), "MMMM d, yyyy");
+      sendMessage(`I'd like the ${slot.displayTime} slot for ${serviceName} on ${formattedDate}`);
     },
     [sendMessage]
   );

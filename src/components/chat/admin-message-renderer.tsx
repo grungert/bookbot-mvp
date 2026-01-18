@@ -6,46 +6,54 @@ import { ChatServiceSelector } from "./ui/chat-service-selector";
 import { ChatDatePicker } from "./ui/chat-date-picker";
 import { ChatTimeSlots } from "./ui/chat-time-slots";
 import { ChatBookingCard } from "./ui/chat-booking-card";
-import type { ChatMessage, ChatUICallbacks, ChatService, ChatTimeSlot } from "./types";
+import type { ChatMessage } from "./types";
 
-interface ChatMessageRendererProps {
+interface AdminMessageRendererProps {
   message: ChatMessage;
-  isLatest: boolean;
-  callbacks?: ChatUICallbacks;
+  timestamp?: string;
 }
 
-export function ChatMessageRenderer({
+/**
+ * Admin-specific message renderer for viewing conversation history.
+ * All UI components are rendered in read-only/disabled mode.
+ */
+export function AdminMessageRenderer({
   message,
-  isLatest,
-  callbacks,
-}: ChatMessageRendererProps) {
+  timestamp,
+}: AdminMessageRendererProps) {
   const parsed = parseMessage(message);
   const isUser = parsed.role === "user";
-  const isInteractive = isLatest && !isUser && callbacks;
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[85%] rounded-lg text-sm",
-          isUser ? "bg-primary text-primary-foreground px-4 py-2" : "bg-muted"
+          "max-w-[80%] rounded-lg",
+          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
         )}
       >
         {/* Text content */}
-        <div className={cn(!isUser && "px-4 py-2")}>{parsed.text}</div>
+        <div className="px-4 py-2">
+          <p className="text-sm whitespace-pre-wrap">{parsed.text}</p>
+          {timestamp && (
+            <p
+              className={cn(
+                "text-xs mt-1",
+                isUser ? "text-primary-foreground/70" : "text-muted-foreground"
+              )}
+            >
+              {timestamp}
+            </p>
+          )}
+        </div>
 
-        {/* UI Component */}
+        {/* UI Component (read-only in admin view) */}
         {parsed.ui && (
-          <div className={cn(!isUser && "px-2 pb-2")}>
+          <div className="px-2 pb-2">
             {parsed.ui.component === "service-selector" && (
               <ChatServiceSelector
                 services={parsed.ui.props.services}
-                onSelect={
-                  isInteractive
-                    ? (service: ChatService) => callbacks?.onServiceSelect?.(service)
-                    : undefined
-                }
-                disabled={!isInteractive}
+                disabled={true}
               />
             )}
 
@@ -54,13 +62,7 @@ export function ChatMessageRenderer({
                 serviceId={parsed.ui.props.serviceId}
                 serviceName={parsed.ui.props.serviceName}
                 closedDays={parsed.ui.props.closedDays}
-                onSelect={
-                  isInteractive
-                    ? (date: Date, serviceId: string, serviceName: string) =>
-                        callbacks?.onDateSelect?.(date, serviceId, serviceName)
-                    : undefined
-                }
-                disabled={!isInteractive}
+                disabled={true}
               />
             )}
 
@@ -71,21 +73,13 @@ export function ChatMessageRenderer({
                 date={parsed.ui.props.date}
                 dateISO={parsed.ui.props.dateISO}
                 slots={parsed.ui.props.slots}
-                onSelect={
-                  isInteractive
-                    ? (slot: ChatTimeSlot, serviceId: string, dateISO: string, serviceName: string) =>
-                        callbacks?.onTimeSelect?.(slot, serviceId, dateISO, serviceName)
-                    : undefined
-                }
-                disabled={!isInteractive}
+                disabled={true}
               />
             )}
 
             {parsed.ui.component === "booking-card" && (
               <ChatBookingCard booking={parsed.ui.props} />
             )}
-
-            {/* Note: Unknown components are filtered out by the message parser */}
           </div>
         )}
       </div>
