@@ -167,7 +167,8 @@
     "upcomingCount": "{count} upcoming",
     "appointmentDetails": "Appointment Details",
     "reschedule": "Reschedule",
-    "filterByStatus": "Filter by status"
+    "filterByStatus": "Filter by status",
+    "selectDateRange": "Select dates"
   },
   "invoices": {
     "title": "Invoices",
@@ -198,6 +199,7 @@
     "startTime": "Open",
     "endTime": "Close",
     "closed": "Closed",
+    "closedToday": "Closed today",
     "open": "Open",
     "closedAllDay": "Closed all day",
     "sunday": "Sunday",
@@ -273,7 +275,8 @@
     "hours": "Working Hours",
     "phone": "Phone",
     "email": "Email",
-    "address": "Address"
+    "address": "Address",
+    "openToday": "Open today"
   },
   "errors": {
     "notFound": "Page not found",

@@ -167,7 +167,8 @@
     "upcomingCount": "{count} predstojecih",
     "appointmentDetails": "Detalji termina",
     "reschedule": "Promeni termin",
-    "filterByStatus": "Filtriraj po statusu"
+    "filterByStatus": "Filtriraj po statusu",
+    "selectDateRange": "Izaberite datume"
   },
   "invoices": {
     "title": "Fakture",
@@ -198,6 +199,7 @@
     "startTime": "Otvaranje",
     "endTime": "Zatvaranje",
     "closed": "Zatvoreno",
+    "closedToday": "Danas zatvoreno",
     "open": "Otvoreno",
     "closedAllDay": "Zatvoreno ceo dan",
     "sunday": "Nedelja",
@@ -273,7 +275,8 @@
     "hours": "Radno vreme",
     "phone": "Telefon",
     "email": "Email",
-    "address": "Adresa"
+    "address": "Adresa",
+    "openToday": "Danas otvoreno"
   },
   "errors": {
     "notFound": "Stranica nije pronadjena",

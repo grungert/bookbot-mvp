@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { isPast, parseISO } from "date-fns";
+import { isPast, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { DateRange } from "react-day-picker";
 
 import { AppointmentsHeader } from "@/components/customer/appointments-header";
 import { AppointmentsCalendar } from "@/components/customer/appointments-calendar";
@@ -53,6 +54,7 @@ export default function MyAppointmentsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[] | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const storageKey = `appointments-service-filter-${companySlug}`;
 
@@ -110,16 +112,32 @@ export default function MyAppointmentsPage() {
     }
   }, [selectedServiceIds, storageKey]);
 
-  // Filter appointments based on selected services
+  // Filter appointments based on selected services and date range
   const filteredAppointments = useMemo(() => {
-    // While loading settings, show all appointments
-    if (selectedServiceIds === null) return appointments;
-    // If all selected or none selected, show all
-    if (selectedServiceIds.length === 0 || selectedServiceIds.length === allServiceIds.length) {
-      return appointments;
+    let filtered = appointments;
+
+    // Service filter
+    if (selectedServiceIds !== null && selectedServiceIds.length > 0 &&
+        selectedServiceIds.length !== allServiceIds.length) {
+      filtered = filtered.filter(a => selectedServiceIds.includes(a.service.id));
     }
-    return appointments.filter(a => selectedServiceIds.includes(a.service.id));
-  }, [appointments, selectedServiceIds, allServiceIds]);
+
+    // Date range filter
+    if (dateRange?.from) {
+      filtered = filtered.filter(apt => {
+        const aptDate = parseISO(apt.startTime);
+        if (dateRange.to) {
+          return isWithinInterval(aptDate, {
+            start: startOfDay(dateRange.from!),
+            end: endOfDay(dateRange.to)
+          });
+        }
+        return aptDate >= startOfDay(dateRange.from!);
+      });
+    }
+
+    return filtered;
+  }, [appointments, selectedServiceIds, allServiceIds, dateRange]);
 
   // Toggle service filter
   const handleServiceToggle = (serviceId: string) => {
@@ -201,7 +219,7 @@ export default function MyAppointmentsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-muted/30">
+      <div className="min-h-screen bg-gradient-to-b from-muted/30 via-background to-background">
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -210,15 +228,12 @@ export default function MyAppointmentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gradient-to-b from-muted/30 via-background to-background">
       <AppointmentsHeader
         appointments={appointments}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         companySlug={companySlug}
-        servicesWithCounts={servicesWithCounts}
-        selectedServiceIds={selectedServiceIds}
-        onServiceToggle={handleServiceToggle}
         t={t}
       />
 
@@ -230,6 +245,13 @@ export default function MyAppointmentsPage() {
             onSelectDate={setSelectedDate}
             onSelectAppointment={handleSelectAppointment}
             closedDays={closedDays}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            servicesWithCounts={servicesWithCounts}
+            selectedServiceIds={selectedServiceIds}
+            onServiceToggle={handleServiceToggle}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
             t={t}
           />
         ) : (
@@ -239,6 +261,11 @@ export default function MyAppointmentsPage() {
             filterStatus={filterStatus}
             onFilterStatusChange={setFilterStatus}
             companySlug={companySlug}
+            servicesWithCounts={servicesWithCounts}
+            selectedServiceIds={selectedServiceIds}
+            onServiceToggle={handleServiceToggle}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
             t={t}
           />
         )}
