@@ -105,7 +105,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
 
   const basePath = `/c/${companySlug}/admin`;
 
-  return [
+  const mainItems: NavItem[] = [
     {
       href: basePath,
       label: tAdmin("dashboard"),
@@ -143,16 +143,22 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       label: tAdmin("documents"),
       icon: FileArchive,
     },
+  ];
+
+  const bottomItems: NavItem[] = [
     {
       href: `${basePath}/settings`,
       label: t("settings"),
       icon: Settings,
     },
   ];
+
+  return { mainItems, bottomItems };
 }
 
 function NavContent({
-  navItems,
+  mainItems,
+  bottomItems,
   pathname,
   basePath,
   companySlug,
@@ -161,7 +167,8 @@ function NavContent({
   onItemClick,
   isCollapsed = false,
 }: {
-  navItems: NavItem[];
+  mainItems: NavItem[];
+  bottomItems: NavItem[];
   pathname: string;
   basePath: string;
   companySlug: string;
@@ -171,6 +178,62 @@ function NavContent({
   isCollapsed?: boolean;
 }) {
   const tNav = useTranslations("nav");
+
+  const renderNavItem = (item: NavItem) => {
+    const isActive =
+      pathname.endsWith(item.href) ||
+      (item.href !== basePath && pathname.includes(item.href));
+
+    const navLink = (
+      <Link key={item.href} href={item.href} onClick={onItemClick}>
+        <div
+          className={cn(
+            "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
+            "hover:bg-muted/80",
+            isActive
+              ? "bg-primary/10 text-primary font-medium"
+              : "text-muted-foreground hover:text-foreground",
+            isCollapsed && "justify-center px-2"
+          )}
+        >
+          <span className={cn(isActive && "text-primary")}>
+            <item.icon className="h-4 w-4 shrink-0" />
+          </span>
+          {!isCollapsed && (
+            <span className={cn(isActive && "text-primary")}>
+              {item.label}
+            </span>
+          )}
+          {!isCollapsed && item.badge !== undefined && item.badge > 0 && (
+            <Badge className="ml-auto h-5 min-w-5 px-1.5">
+              {item.badge}
+            </Badge>
+          )}
+          {isCollapsed && item.badge !== undefined && item.badge > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground px-1">
+              {item.badge > 9 ? "9+" : item.badge}
+            </span>
+          )}
+        </div>
+      </Link>
+    );
+
+    if (isCollapsed) {
+      return (
+        <Tooltip key={item.href}>
+          <TooltipTrigger asChild>{navLink}</TooltipTrigger>
+          <TooltipContent side="right" className="flex items-center gap-2">
+            {item.label}
+            {item.badge !== undefined && item.badge > 0 && (
+              <Badge className="h-5 min-w-5 px-1.5">{item.badge}</Badge>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return navLink;
+  };
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -202,70 +265,21 @@ function NavContent({
           </>
         )}
       </div>
-      <nav className={cn("p-2 flex-1", isCollapsed && "p-1")}>
-        {navItems.map((item) => {
-          const isActive =
-            pathname.endsWith(item.href) ||
-            (item.href !== basePath && pathname.includes(item.href));
-
-          const navLink = (
-            <Link key={item.href} href={item.href} onClick={onItemClick}>
-              <div
-                className={cn(
-                  "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
-                  "hover:bg-muted/80",
-                  isActive
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground",
-                  isCollapsed && "justify-center px-2"
-                )}
-              >
-                <span className={cn(isActive && "text-primary")}>
-                  <item.icon className="h-4 w-4 shrink-0" />
-                </span>
-                {!isCollapsed && (
-                  <span className={cn(isActive && "text-primary")}>
-                    {item.label}
-                  </span>
-                )}
-                {!isCollapsed && item.badge !== undefined && item.badge > 0 && (
-                  <Badge className="ml-auto h-5 min-w-5 px-1.5">
-                    {item.badge}
-                  </Badge>
-                )}
-                {isCollapsed && item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground px-1">
-                    {item.badge > 9 ? "9+" : item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-
-          if (isCollapsed) {
-            return (
-              <Tooltip key={item.href}>
-                <TooltipTrigger asChild>{navLink}</TooltipTrigger>
-                <TooltipContent side="right" className="flex items-center gap-2">
-                  {item.label}
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <Badge className="h-5 min-w-5 px-1.5">{item.badge}</Badge>
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            );
-          }
-
-          return navLink;
-        })}
-      </nav>
+      <div className="flex flex-col flex-1">
+        <nav className={cn("p-2", isCollapsed && "p-1")}>
+          {mainItems.map(renderNavItem)}
+        </nav>
+        <div className={cn("mt-auto p-2", isCollapsed && "p-1")}>
+          {bottomItems.map(renderNavItem)}
+        </div>
+      </div>
     </TooltipProvider>
   );
 }
 
 export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAppointmentsCount, actionableInvoicesCount }: AdminSidebarProps) {
   const pathname = usePathname();
-  const navItems = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
   const basePath = `/c/${companySlug}/admin`;
   const { isCollapsed, setIsCollapsed } = useSidebar();
 
@@ -279,7 +293,8 @@ export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAp
         )}
       >
         <NavContent
-          navItems={navItems}
+          mainItems={mainItems}
+          bottomItems={bottomItems}
           pathname={pathname}
           basePath={basePath}
           companySlug={companySlug}
@@ -323,7 +338,7 @@ export function AdminMobileNav({
 }: AdminSidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const navItems = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
   const basePath = `/c/${companySlug}/admin`;
 
   return (
@@ -339,7 +354,8 @@ export function AdminMobileNav({
           <SheetTitle>Admin Navigation</SheetTitle>
         </SheetHeader>
         <NavContent
-          navItems={navItems}
+          mainItems={mainItems}
+          bottomItems={bottomItems}
           pathname={pathname}
           basePath={basePath}
           companySlug={companySlug}
