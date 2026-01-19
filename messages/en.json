@@ -357,6 +357,26 @@
     "apply": "Apply",
     "vsLastPeriod": "vs last period",
     "noData": "No data available",
-    "appointments": "appointments"
+    "appointments": "appointments",
+    "quickActions": "Action Required",
+    "overdueInvoices": "Overdue Invoices",
+    "unreadConversations": "Unread Conversations",
+    "viewAll": "View All",
+    "noActionsNeeded": "No actions needed",
+    "todaySummary": "Today's Summary",
+    "appointmentsToday": "Today",
+    "revenueToday": "Revenue Today",
+    "nextAppointment": "Next Appointment",
+    "noAppointmentsToday": "No more appointments today",
+    "with": "with",
+    "recentActivity": "Recent Activity",
+    "noRecentActivity": "No recent activity",
+    "recentBookings": "Bookings",
+    "recentConversations": "Conversations",
+    "noRecentBookings": "No recent bookings",
+    "noRecentConversations": "No recent conversations",
+    "unread": "New",
+    "loadMore": "Load more",
+    "loading": "Loading..."
   }
 }

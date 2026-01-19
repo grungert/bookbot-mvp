@@ -587,3 +587,311 @@ function formatChatActivityTrendData(
 
   return result;
 }
+
+// Get today's summary for dashboard
+export async function getTodaySummary(companyId: string) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const [
+    appointmentsToday,
+    confirmedToday,
+    pendingToday,
+    completedToday,
+    revenueToday,
+    nextAppointment,
+  ] = await Promise.all([
+    // Total appointments today
+    prisma.appointment.count({
+      where: {
+        companyId,
+        startTime: { gte: today, lt: tomorrow },
+      },
+    }),
+
+    // Confirmed appointments today
+    prisma.appointment.count({
+      where: {
+        companyId,
+        startTime: { gte: today, lt: tomorrow },
+        status: "CONFIRMED",
+      },
+    }),
+
+    // Pending appointments today
+    prisma.appointment.count({
+      where: {
+        companyId,
+        startTime: { gte: today, lt: tomorrow },
+        status: "PENDING",
+      },
+    }),
+
+    // Completed appointments today
+    prisma.appointment.count({
+      where: {
+        companyId,
+        startTime: { gte: today, lt: tomorrow },
+        status: "COMPLETED",
+      },
+    }),
+
+    // Revenue from paid invoices today
+    prisma.invoice.aggregate({
+      _sum: { total: true },
+      where: {
+        companyId,
+        status: "PAID",
+        createdAt: { gte: today, lt: tomorrow },
+      },
+    }),
+
+    // Next upcoming appointment
+    prisma.appointment.findFirst({
+      where: {
+        companyId,
+        startTime: { gte: new Date() },
+        status: { in: ["PENDING", "CONFIRMED"] },
+      },
+      orderBy: { startTime: "asc" },
+      include: {
+        service: { select: { name: true } },
+        user: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  return {
+    appointmentsToday,
+    confirmedToday,
+    pendingToday,
+    completedToday,
+    revenueToday: revenueToday._sum.total?.toNumber() || 0,
+    nextAppointment: nextAppointment
+      ? {
+          time: nextAppointment.startTime.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          serviceName: nextAppointment.service.name,
+          customerName: nextAppointment.user?.name || "Guest",
+        }
+      : undefined,
+  };
+}
+
+// Activity item type for recent activity feed
+export interface ActivityItem {
+  id: string;
+  type: "booking" | "cancellation" | "payment" | "customer" | "chat";
+  title: string;
+  description: string;
+  timestamp: Date;
+}
+
+// Get recent activity for dashboard
+export async function getRecentActivity(
+  companyId: string,
+  limit = 10
+): Promise<ActivityItem[]> {
+  const [recentAppointments, recentInvoices, recentChatSessions] = await Promise.all([
+    // Recent appointments (bookings and cancellations)
+    prisma.appointment.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        service: { select: { name: true } },
+        user: { select: { name: true, email: true } },
+      },
+    }),
+
+    // Recent paid invoices
+    prisma.invoice.findMany({
+      where: { companyId, status: "PAID" },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        user: { select: { name: true, email: true } },
+      },
+    }),
+
+    // Recent chat sessions
+    prisma.chatSession.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        user: { select: { name: true, email: true } },
+      },
+    }),
+  ]);
+
+  const activities: ActivityItem[] = [];
+
+  // Process appointments
+  recentAppointments.forEach((apt) => {
+    const customerName = apt.user?.name || apt.user?.email || "Guest";
+    if (apt.status === "CANCELLED") {
+      activities.push({
+        id: `apt-cancel-${apt.id}`,
+        type: "cancellation",
+        title: "Appointment Cancelled",
+        description: `${customerName} - ${apt.service.name}`,
+        timestamp: apt.updatedAt,
+      });
+    } else {
+      activities.push({
+        id: `apt-${apt.id}`,
+        type: "booking",
+        title: "New Booking",
+        description: `${customerName} - ${apt.service.name}`,
+        timestamp: apt.createdAt,
+      });
+    }
+  });
+
+  // Process invoices
+  recentInvoices.forEach((inv) => {
+    const customerName = inv.user?.name || inv.user?.email || "Guest";
+    activities.push({
+      id: `inv-${inv.id}`,
+      type: "payment",
+      title: "Payment Received",
+      description: `${customerName} - ${inv.total.toNumber().toLocaleString()}`,
+      timestamp: inv.createdAt,
+    });
+  });
+
+  // Process chat sessions
+  recentChatSessions.forEach((session) => {
+    const customerName = session.user?.name || session.user?.email || "Guest";
+    activities.push({
+      id: `chat-${session.id}`,
+      type: "chat",
+      title: "New Chat Session",
+      description: customerName,
+      timestamp: session.createdAt,
+    });
+  });
+
+  // Sort by timestamp and take the most recent
+  return activities
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .slice(0, limit);
+}
+
+// Get unread conversations count
+export async function getUnreadConversationsCount(companyId: string): Promise<number> {
+  // Count chat sessions that have unread messages
+  const unreadCount = await prisma.chatSession.count({
+    where: {
+      companyId,
+      isRead: false,
+    },
+  });
+
+  return unreadCount;
+}
+
+// Get overdue invoices count
+export async function getOverdueInvoicesCount(companyId: string): Promise<number> {
+  const now = new Date();
+
+  const overdueCount = await prisma.invoice.count({
+    where: {
+      companyId,
+      status: { in: ["DRAFT", "SENT"] },
+      dueDate: { lt: now },
+    },
+  });
+
+  return overdueCount;
+}
+
+// Recent booking type
+export interface RecentBooking {
+  id: string;
+  customerName: string;
+  serviceName: string;
+  serviceColor: string | null;
+  serviceDuration: number;
+  servicePrice: number;
+  serviceCurrency: string;
+  status: "PENDING" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+  startTime: Date;
+  createdAt: Date;
+}
+
+// Get recent bookings for dashboard
+export async function getRecentBookings(
+  companyId: string,
+  limit = 10
+): Promise<RecentBooking[]> {
+  const bookings = await prisma.appointment.findMany({
+    where: { companyId },
+    orderBy: { startTime: "asc" },
+    take: limit,
+    include: {
+      service: { select: { name: true, color: true, duration: true, price: true, currency: true } },
+      user: { select: { name: true, email: true } },
+    },
+  });
+
+  return bookings.map((booking) => ({
+    id: booking.id,
+    customerName: booking.user?.name || booking.user?.email || "Guest",
+    serviceName: booking.service.name,
+    serviceColor: booking.service.color,
+    serviceDuration: booking.service.duration,
+    servicePrice: booking.service.price.toNumber(),
+    serviceCurrency: booking.service.currency,
+    status: booking.status as RecentBooking["status"],
+    startTime: booking.startTime,
+    createdAt: booking.createdAt,
+  }));
+}
+
+// Recent conversation type
+export interface RecentConversation {
+  id: string;
+  customerName: string;
+  lastMessage: string;
+  messageCount: number;
+  isRead: boolean;
+  createdAt: Date;
+}
+
+// Get recent conversations for dashboard
+export async function getRecentConversations(
+  companyId: string,
+  limit = 10
+): Promise<RecentConversation[]> {
+  const sessions = await prisma.chatSession.findMany({
+    where: { companyId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      user: { select: { name: true, email: true } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { content: true },
+      },
+      _count: {
+        select: { messages: true },
+      },
+    },
+  });
+
+  return sessions.map((session) => ({
+    id: session.id,
+    customerName: session.user?.name || session.user?.email || "Guest",
+    lastMessage: session.messages[0]?.content?.slice(0, 50) || "",
+    messageCount: session._count.messages,
+    isRead: session.isRead,
+    createdAt: session.createdAt,
+  }));
+}

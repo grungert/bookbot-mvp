@@ -35,6 +35,30 @@ export function AppointmentsTrendChart({
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
+  const CustomTooltip = ({ active, payload }: {
+    active?: boolean;
+    payload?: Array<{ value: number; payload: { date: string } }>;
+  }) => {
+    if (!active || !payload || !payload.length) return null;
+
+    const data = payload[0];
+
+    return (
+      <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+        <div className="text-sm font-medium">{formatDate(data.payload.date)}</div>
+        <div className="flex items-center gap-2 mt-1">
+          <span
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: primaryColor || "hsl(var(--primary))" }}
+          />
+          <span className="text-sm text-muted-foreground">
+            {data.value} {appointmentsLabel}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       className={cn(
@@ -71,19 +95,7 @@ export function AppointmentsTrendChart({
                 width={30}
                 allowDecimals={false}
               />
-              <Tooltip
-                formatter={(value) => [
-                  `${value} ${appointmentsLabel}`,
-                  "",
-                ]}
-                labelFormatter={formatDate}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
-              />
+              <Tooltip content={<CustomTooltip />} />
               <Bar
                 dataKey="value"
                 fill={primaryColor || "hsl(var(--primary))"}

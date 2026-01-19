@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Calendar, Users, DollarSign, CheckCircle, Clock, MessageSquare } from "lucide-react";
 import { StatsCard } from "./stats-card";
 import { PeriodSelector } from "./period-selector";
@@ -9,6 +10,12 @@ import { ServicesChart } from "./services-chart";
 import { AppointmentsTrendChart } from "./appointments-trend-chart";
 import { ChatSessionsChart } from "./chat-sessions-chart";
 import { ChatActivityChart } from "./chat-activity-chart";
+import { TodaySummary } from "./today-summary";
+import {
+  RecentActivity,
+  type RecentBooking,
+  type RecentConversation,
+} from "./recent-activity";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import type { DashboardPeriod } from "@/lib/db/tenant";
@@ -47,6 +54,29 @@ interface DashboardContentProps {
     }>;
     chatActivityTrendData: Array<{ date: string; sessions: number; messages: number }>;
   };
+  todaySummary: {
+    appointmentsToday: number;
+    confirmedToday: number;
+    pendingToday: number;
+    completedToday: number;
+    revenueToday: number;
+    nextAppointment?: {
+      time: string;
+      serviceName: string;
+      customerName: string;
+    };
+  };
+  quickActionsData: {
+    pendingAppointments: number;
+    overdueInvoices: number;
+    unreadConversations: number;
+  };
+  recentActivity: {
+    bookings: RecentBooking[];
+    conversations: RecentConversation[];
+  };
+  companySlug: string;
+  locale: string;
   period: DashboardPeriod | "custom";
   customStartDate?: string;
   customEndDate?: string;
@@ -82,6 +112,29 @@ interface DashboardContentProps {
     vsLastPeriod: string;
     noData: string;
     appointments: string;
+    // Quick actions
+    overdueInvoices: string;
+    unreadConversations: string;
+    // Today summary
+    todaySummary: string;
+    appointmentsToday: string;
+    confirmed: string;
+    pending: string;
+    completed: string;
+    revenueToday: string;
+    nextAppointment: string;
+    noAppointmentsToday: string;
+    at: string;
+    // Recent activity
+    recentActivity: string;
+    recentBookings: string;
+    recentConversations: string;
+    viewAll: string;
+    noRecentBookings: string;
+    noRecentConversations: string;
+    unread: string;
+    loadMore: string;
+    loading: string;
   };
   statusLabels: {
     pending: string;
@@ -95,6 +148,11 @@ interface DashboardContentProps {
 
 export function DashboardContent({
   stats,
+  todaySummary,
+  quickActionsData,
+  recentActivity,
+  companySlug,
+  locale,
   period,
   customStartDate,
   customEndDate,
@@ -108,7 +166,8 @@ export function DashboardContent({
   // Create animation key based on period for re-triggering animations
   const animationKey = `${period}-${customStartDate || ""}-${customEndDate || ""}`;
 
-  const statCards = [
+  // Main stats - organized in 2 rows
+  const statsRow1 = [
     {
       title: translations.totalAppointments,
       value: stats.totalAppointments,
@@ -116,20 +175,6 @@ export function DashboardContent({
       iconBg: "bg-primary/10",
       iconColor: "text-primary",
       trend: stats.appointmentTrend,
-    },
-    {
-      title: translations.pendingAppointments,
-      value: stats.pendingAppointments,
-      icon: Clock,
-      iconBg: "bg-amber-500/10",
-      iconColor: "text-amber-500",
-    },
-    {
-      title: translations.completedAppointments,
-      value: stats.completedAppointments,
-      icon: CheckCircle,
-      iconBg: "bg-green-500/10",
-      iconColor: "text-green-500",
     },
     {
       title: translations.totalRevenue,
@@ -154,6 +199,23 @@ export function DashboardContent({
       iconColor: "text-violet-500",
       trend: stats.chatSessionTrend,
     },
+  ];
+
+  const statsRow2 = [
+    {
+      title: translations.pendingAppointments,
+      value: stats.pendingAppointments,
+      icon: Clock,
+      iconBg: "bg-amber-500/10",
+      iconColor: "text-amber-500",
+    },
+    {
+      title: translations.completedAppointments,
+      value: stats.completedAppointments,
+      icon: CheckCircle,
+      iconBg: "bg-green-500/10",
+      iconColor: "text-green-500",
+    },
     {
       title: translations.totalChatMessages,
       value: stats.totalChatMessages,
@@ -165,11 +227,11 @@ export function DashboardContent({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Page Header */}
       <div
         className={cn(
-          "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+          "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
           !prefersReducedMotion && "animate-fade-up"
         )}
         style={!prefersReducedMotion ? { opacity: 0 } : undefined}
@@ -180,58 +242,155 @@ export function DashboardContent({
             {translations.subtitle}
           </p>
         </div>
-        <PeriodSelector
-          currentPeriod={period}
-          customStartDate={customStartDate}
-          customEndDate={customEndDate}
-          primaryColor={primaryColor}
-          translations={{
-            period7d: translations.period7d,
-            period30d: translations.period30d,
-            period90d: translations.period90d,
-            period1y: translations.period1y,
-            periodCustom: translations.periodCustom,
-            selectDateRange: translations.selectDateRange,
-            from: translations.from,
-            to: translations.to,
-            apply: translations.apply,
-          }}
-        />
-      </div>
-
-      {/* Stats Grid - Key triggers re-animation on period change */}
-      <div
-        key={`stats-${animationKey}`}
-        className={cn(
-          "rounded-xl border bg-card p-4",
-          !prefersReducedMotion && "animate-fade-up stagger-1"
-        )}
-        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
-      >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          {statCards.map((stat, index) => (
-            <StatsCard
-              key={`${stat.title}-${animationKey}`}
-              title={stat.title}
-              value={stat.value}
-              icon={stat.icon}
-              iconBg={stat.iconBg}
-              iconColor={stat.iconColor}
-              trend={stat.trend}
-              trendLabel={stat.trend !== undefined ? translations.vsLastPeriod : undefined}
-              animationIndex={index}
-              prefersReducedMotion={prefersReducedMotion}
-            />
-          ))}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          {/* Quick Action Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {quickActionsData.pendingAppointments > 0 && (
+              <Link
+                href={`/${locale}/c/${companySlug}/admin/appointments?status=PENDING`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                <span>{translations.pendingAppointments}</span>
+                <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs">
+                  {quickActionsData.pendingAppointments}
+                </span>
+              </Link>
+            )}
+            {quickActionsData.unreadConversations > 0 && (
+              <Link
+                href={`/${locale}/c/${companySlug}/admin/conversations?unread=true`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                <span>{translations.unreadConversations}</span>
+                <span className="bg-white/20 px-1.5 py-0.5 rounded-full text-xs">
+                  {quickActionsData.unreadConversations}
+                </span>
+              </Link>
+            )}
+          </div>
+          <PeriodSelector
+            currentPeriod={period}
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            primaryColor={primaryColor}
+            translations={{
+              period7d: translations.period7d,
+              period30d: translations.period30d,
+              period90d: translations.period90d,
+              period1y: translations.period1y,
+              periodCustom: translations.periodCustom,
+              selectDateRange: translations.selectDateRange,
+              from: translations.from,
+              to: translations.to,
+              apply: translations.apply,
+            }}
+          />
         </div>
       </div>
 
-      {/* Charts Row 1 - Key triggers re-animation on period change */}
+      {/* Today's Summary Strip */}
+      <TodaySummary
+        appointmentsToday={todaySummary.appointmentsToday}
+        confirmedToday={todaySummary.confirmedToday}
+        pendingToday={todaySummary.pendingToday}
+        completedToday={todaySummary.completedToday}
+        revenueToday={todaySummary.revenueToday}
+        nextAppointment={todaySummary.nextAppointment}
+        currency={currency}
+        translations={{
+          todaySummary: translations.todaySummary,
+          appointmentsToday: translations.appointmentsToday,
+          confirmed: translations.confirmed,
+          pending: translations.pending,
+          completed: translations.completed,
+          revenueToday: translations.revenueToday,
+          nextAppointment: translations.nextAppointment,
+          noAppointmentsToday: translations.noAppointmentsToday,
+          at: translations.at,
+        }}
+        prefersReducedMotion={prefersReducedMotion}
+      />
+
+      {/* Recent Activity (Collapsible) */}
+      <RecentActivity
+        bookings={recentActivity.bookings}
+        conversations={recentActivity.conversations}
+        companySlug={companySlug}
+        locale={locale}
+        primaryColor={primaryColor}
+        translations={{
+          recentActivity: translations.recentActivity,
+          recentBookings: translations.recentBookings,
+          recentConversations: translations.recentConversations,
+          viewAll: translations.viewAll,
+          noRecentBookings: translations.noRecentBookings,
+          noRecentConversations: translations.noRecentConversations,
+          messages: translations.messages,
+          unread: translations.unread,
+          loadMore: translations.loadMore,
+          loading: translations.loading,
+        }}
+        prefersReducedMotion={prefersReducedMotion}
+      />
+
+      {/* Stats Grid - Row 1: Main Metrics */}
+      <div
+        key={`stats-row1-${animationKey}`}
+        className={cn(
+          "grid gap-4 grid-cols-2 lg:grid-cols-4",
+          !prefersReducedMotion && "animate-fade-up stagger-2"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        {statsRow1.map((stat, index) => (
+          <StatsCard
+            key={`${stat.title}-${animationKey}`}
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            iconBg={stat.iconBg}
+            iconColor={stat.iconColor}
+            trend={stat.trend}
+            trendLabel={stat.trend !== undefined ? translations.vsLastPeriod : undefined}
+            animationIndex={index}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+        ))}
+      </div>
+
+      {/* Stats Grid - Row 2: Secondary Metrics */}
+      <div
+        key={`stats-row2-${animationKey}`}
+        className={cn(
+          "grid gap-4 grid-cols-3",
+          !prefersReducedMotion && "animate-fade-up stagger-3"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        {statsRow2.map((stat, index) => (
+          <StatsCard
+            key={`${stat.title}-${animationKey}`}
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            iconBg={stat.iconBg}
+            iconColor={stat.iconColor}
+            trend={stat.trend}
+            trendLabel={stat.trend !== undefined ? translations.vsLastPeriod : undefined}
+            animationIndex={index}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+        ))}
+      </div>
+
+      {/* Charts Row 1 */}
       <div
         key={`charts-row1-${animationKey}`}
         className={cn(
-          "grid gap-6 lg:grid-cols-2",
-          !prefersReducedMotion && "animate-fade-up stagger-3"
+          "grid gap-4 lg:grid-cols-2",
+          !prefersReducedMotion && "animate-fade-up stagger-4"
         )}
         style={!prefersReducedMotion ? { opacity: 0 } : undefined}
       >
@@ -248,6 +407,7 @@ export function DashboardContent({
           title={translations.appointmentsByStatus}
           noDataMessage={translations.noData}
           labels={statusLabels}
+          companySlug={companySlug}
           prefersReducedMotion={prefersReducedMotion}
         />
       </div>
@@ -256,8 +416,8 @@ export function DashboardContent({
       <div
         key={`charts-row2-${animationKey}`}
         className={cn(
-          "grid gap-6 lg:grid-cols-2",
-          !prefersReducedMotion && "animate-fade-up stagger-4"
+          "grid gap-4 lg:grid-cols-2",
+          !prefersReducedMotion && "animate-fade-up stagger-5"
         )}
         style={!prefersReducedMotion ? { opacity: 0 } : undefined}
       >
@@ -266,6 +426,7 @@ export function DashboardContent({
           title={translations.popularServices}
           noDataMessage={translations.noData}
           appointmentsLabel={translations.appointments}
+          companySlug={companySlug}
           prefersReducedMotion={prefersReducedMotion}
         />
         <AppointmentsTrendChart
@@ -282,8 +443,8 @@ export function DashboardContent({
       <div
         key={`charts-row3-${animationKey}`}
         className={cn(
-          "grid gap-6 lg:grid-cols-2",
-          !prefersReducedMotion && "animate-fade-up stagger-5"
+          "grid gap-4 lg:grid-cols-2",
+          !prefersReducedMotion && "animate-fade-up stagger-6"
         )}
         style={!prefersReducedMotion ? { opacity: 0 } : undefined}
       >

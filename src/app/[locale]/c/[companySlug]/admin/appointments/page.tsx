@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ import {
 export default function AppointmentsPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
+  const searchParams = useSearchParams();
+  const appointmentId = searchParams.get("id"); // For deep-linking from dashboard
   const t = useTranslations("appointments");
   const tCommon = useTranslations("common");
   const tCalendar = useTranslations("calendar");
@@ -53,6 +55,7 @@ export default function AppointmentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const lastOpenedDeepLinkId = useRef<string | null>(null); // Track last opened appointment from URL
 
   const [filters, setFilters] = useState<FilterState>({
     services: [],
@@ -74,6 +77,20 @@ export default function AppointmentsPage() {
       }));
     }
   }, [services]);
+
+  // Auto-open appointment from URL parameter (deep-linking from dashboard)
+  useEffect(() => {
+    if (appointmentId && !isLoading && appointments.length > 0 && lastOpenedDeepLinkId.current !== appointmentId) {
+      const appointment = appointments.find((apt) => apt.id === appointmentId);
+      if (appointment) {
+        lastOpenedDeepLinkId.current = appointmentId;
+        setSelectedAppointment(appointment);
+        setIsDetailModalOpen(true);
+        // Navigate to the appointment's date
+        setCurrentDate(parseISO(appointment.startTime));
+      }
+    }
+  }, [appointmentId, isLoading, appointments]);
 
   async function loadAppointments() {
     try {

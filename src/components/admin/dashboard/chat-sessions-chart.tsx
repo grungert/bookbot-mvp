@@ -23,6 +23,35 @@ const COLORS = {
   authenticated: "#8B5CF6", // Purple for authenticated users
 };
 
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    payload: { type: string };
+  }>;
+}
+
+function CustomTooltip({ active, payload }: CustomTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0];
+  const color = COLORS[data.payload.type as keyof typeof COLORS];
+
+  return (
+    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+      <div className="flex items-center gap-2">
+        <span
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: color }}
+        />
+        <span className="text-sm font-medium">{data.name}</span>
+        <span className="text-sm text-muted-foreground">({data.value})</span>
+      </div>
+    </div>
+  );
+}
+
 export function ChatSessionsChart({
   data,
   title,
@@ -74,15 +103,7 @@ export function ChatSessionsChart({
                   />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(value) => [value, ""]}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
-              />
+              <Tooltip content={<CustomTooltip />} />
               <Legend
                 layout="vertical"
                 verticalAlign="middle"

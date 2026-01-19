@@ -41,6 +41,16 @@ export function RevenueChart({
     return `${currency} ${value.toLocaleString()}`;
   };
 
+  const formatYAxisValue = (value: number) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `${Math.round(value / 1000)}k`;
+    }
+    return value.toString();
+  };
+
   return (
     <div
       className={cn(
@@ -76,12 +86,12 @@ export function RevenueChart({
                 className="text-muted-foreground"
               />
               <YAxis
-                tickFormatter={(v) => `${Math.round(v / 1000)}k`}
+                tickFormatter={formatYAxisValue}
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
                 className="text-muted-foreground"
-                width={40}
+                width={45}
               />
               <Tooltip
                 formatter={(value) => [formatValue(value as number), "Revenue"]}

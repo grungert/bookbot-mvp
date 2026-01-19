@@ -138,11 +138,12 @@ export default function ConversationsPage() {
   const tDashboard = useTranslations("dashboard");
   const prefersReducedMotion = useReducedMotion();
 
-  // URL search params for period filtering
+  // URL search params for period filtering and deep-linking
   const searchParams = useSearchParams();
   const period = (searchParams.get("period") as DashboardPeriod | "custom") || "30d";
   const startDate = searchParams.get("startDate") || "";
   const endDate = searchParams.get("endDate") || "";
+  const conversationId = searchParams.get("id"); // For deep-linking from dashboard
 
   // Get primary color from CSS variable set by parent layout
   const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
@@ -184,6 +185,7 @@ export default function ConversationsPage() {
   const [totalMessageCount, setTotalMessageCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastOpenedDeepLinkId = useRef<string | null>(null); // Track last opened conversation from URL
 
   // Delete state
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
@@ -257,6 +259,16 @@ export default function ConversationsPage() {
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
+
+  // Auto-open conversation from URL parameter (deep-linking from dashboard)
+  useEffect(() => {
+    if (conversationId && !isLoading && lastOpenedDeepLinkId.current !== conversationId) {
+      lastOpenedDeepLinkId.current = conversationId;
+      handleViewConversation(conversationId);
+    }
+    // Only run when conversationId changes or initial load completes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, isLoading]);
 
   // View conversation details
   async function handleViewConversation(sessionId: string) {

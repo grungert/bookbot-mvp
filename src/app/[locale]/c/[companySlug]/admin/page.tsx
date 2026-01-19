@@ -1,5 +1,14 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
-import { getCompanyBySlug, getCompanyDashboardStats, type DashboardPeriod } from "@/lib/db/tenant";
+import {
+  getCompanyBySlug,
+  getCompanyDashboardStats,
+  getTodaySummary,
+  getUnreadConversationsCount,
+  getOverdueInvoicesCount,
+  getRecentBookings,
+  getRecentConversations,
+  type DashboardPeriod,
+} from "@/lib/db/tenant";
 import { DashboardContent } from "@/components/admin/dashboard";
 
 interface AdminDashboardProps {
@@ -25,12 +34,20 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
       : "30d";
 
   // Get stats with custom dates if provided
-  const stats = await getCompanyDashboardStats(
-    company.id,
-    isCustomPeriod ? "30d" : (period as DashboardPeriod),
-    isCustomPeriod ? startDate : undefined,
-    isCustomPeriod ? endDate : undefined
-  );
+  const [stats, todaySummary, unreadConversations, overdueInvoices, recentBookings, recentConversations] =
+    await Promise.all([
+      getCompanyDashboardStats(
+        company.id,
+        isCustomPeriod ? "30d" : (period as DashboardPeriod),
+        isCustomPeriod ? startDate : undefined,
+        isCustomPeriod ? endDate : undefined
+      ),
+      getTodaySummary(company.id),
+      getUnreadConversationsCount(company.id),
+      getOverdueInvoicesCount(company.id),
+      getRecentBookings(company.id, 20),
+      getRecentConversations(company.id, 20),
+    ]);
 
   const t = await getTranslations("dashboard");
   const tAppointments = await getTranslations("appointments");
@@ -38,6 +55,18 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
   return (
     <DashboardContent
       stats={stats}
+      todaySummary={todaySummary}
+      quickActionsData={{
+        pendingAppointments: stats.pendingAppointments,
+        overdueInvoices,
+        unreadConversations,
+      }}
+      recentActivity={{
+        bookings: recentBookings,
+        conversations: recentConversations,
+      }}
+      companySlug={companySlug}
+      locale={locale}
       period={period}
       customStartDate={isCustomPeriod ? startDate : undefined}
       customEndDate={isCustomPeriod ? endDate : undefined}
@@ -75,6 +104,29 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
         vsLastPeriod: t("vsLastPeriod"),
         noData: t("noData"),
         appointments: t("appointments"),
+        // Quick actions translations
+        overdueInvoices: t("overdueInvoices"),
+        unreadConversations: t("unreadConversations"),
+        // Today summary translations
+        todaySummary: t("todaySummary"),
+        appointmentsToday: t("appointmentsToday"),
+        confirmed: tAppointments("confirmed"),
+        pending: tAppointments("pending"),
+        completed: tAppointments("completed"),
+        revenueToday: t("revenueToday"),
+        nextAppointment: t("nextAppointment"),
+        noAppointmentsToday: t("noAppointmentsToday"),
+        at: tAppointments("at"),
+        // Recent activity translations
+        recentActivity: t("recentActivity"),
+        recentBookings: t("recentBookings"),
+        recentConversations: t("recentConversations"),
+        viewAll: t("viewAll"),
+        noRecentBookings: t("noRecentBookings"),
+        noRecentConversations: t("noRecentConversations"),
+        unread: t("unread"),
+        loadMore: t("loadMore"),
+        loading: t("loading"),
       }}
       statusLabels={{
         pending: tAppointments("pending"),

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -24,7 +25,39 @@ interface ServicesChartProps {
   title: string;
   noDataMessage: string;
   appointmentsLabel: string;
+  companySlug?: string;
   prefersReducedMotion?: boolean;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    value: number;
+    payload: ServiceData;
+  }>;
+  appointmentsLabel: string;
+}
+
+function CustomTooltip({ active, payload, appointmentsLabel }: CustomTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+
+  const data = payload[0];
+  const service = data.payload;
+
+  return (
+    <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg">
+      <div className="flex items-center gap-2">
+        <span
+          className="w-3 h-3 rounded-full"
+          style={{ backgroundColor: service.color }}
+        />
+        <span className="text-sm font-medium">{service.name}</span>
+      </div>
+      <div className="text-sm text-muted-foreground mt-1">
+        {data.value} {appointmentsLabel}
+      </div>
+    </div>
+  );
 }
 
 export function ServicesChart({
@@ -32,9 +65,17 @@ export function ServicesChart({
   title,
   noDataMessage,
   appointmentsLabel,
+  companySlug,
   prefersReducedMotion = false,
 }: ServicesChartProps) {
+  const router = useRouter();
   const hasData = data.some((d) => d.count > 0);
+
+  const handleClick = (serviceId: string) => {
+    if (companySlug) {
+      router.push(`/${companySlug}/admin/services/${serviceId}`);
+    }
+  };
 
   return (
     <div
@@ -74,16 +115,7 @@ export function ServicesChart({
                 className="text-muted-foreground"
               />
               <Tooltip
-                formatter={(value) => [
-                  `${value} ${appointmentsLabel}`,
-                  "",
-                ]}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                }}
+                content={<CustomTooltip appointmentsLabel={appointmentsLabel} />}
               />
               <Bar
                 dataKey="count"
@@ -93,9 +125,15 @@ export function ServicesChart({
                 animationBegin={200}
                 animationDuration={800}
                 animationEasing="ease-out"
+                onClick={(barData) => barData.id && handleClick(barData.id)}
+                style={{ cursor: companySlug ? "pointer" : "default" }}
               >
                 {data.map((entry) => (
-                  <Cell key={entry.id} fill={entry.color} />
+                  <Cell
+                    key={entry.id}
+                    fill={entry.color}
+                    className={companySlug ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}
+                  />
                 ))}
               </Bar>
             </BarChart>
