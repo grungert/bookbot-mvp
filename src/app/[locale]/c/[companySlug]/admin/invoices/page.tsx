@@ -3,7 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,7 +46,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface LineItem {
   id?: string;
@@ -79,6 +87,8 @@ interface User {
   email: string;
 }
 
+type DatePeriod = "7d" | "30d" | "90d" | "custom";
+
 export default function InvoicesPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
@@ -98,6 +108,37 @@ export default function InvoicesPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [isViewPanelOpen, setIsViewPanelOpen] = useState(false);
+
+  // Filter state
+  const [datePeriod, setDatePeriod] = useState<DatePeriod>("7d");
+  const [customDateFrom, setCustomDateFrom] = useState("");
+  const [customDateTo, setCustomDateTo] = useState("");
+  const [statusFilters, setStatusFilters] = useState<Set<Invoice["status"]>>(new Set());
+  const [isCustomDateOpen, setIsCustomDateOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    if (customDateFrom && customDateTo) {
+      return {
+        from: new Date(customDateFrom),
+        to: new Date(customDateTo),
+      };
+    }
+    return undefined;
+  });
+
+  // Get primary color from CSS variable set by parent layout
+  const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const el = document.querySelector("[style*='--company-primary']") as HTMLElement;
+    if (el) {
+      const color = getComputedStyle(el).getPropertyValue("--company-primary").trim();
+      if (color) setPrimaryColor(color);
+    }
+  }, []);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Form state
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -111,6 +152,18 @@ export default function InvoicesPage() {
     loadInvoices();
     loadUsers();
   }, [companySlug]);
+
+  // Body scroll lock when panel is open
+  useEffect(() => {
+    if (isViewPanelOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isViewPanelOpen]);
 
   async function loadInvoices() {
     try {
@@ -257,11 +310,42 @@ export default function InvoicesPage() {
     );
   }
 
-  // Sorting helper
-  const sortedInvoices = useMemo(() => {
-    if (!sortColumn) return invoices;
+  // Filtering and sorting helper
+  const filteredAndSortedInvoices = useMemo(() => {
+    let filtered = [...invoices];
 
-    return [...invoices].sort((a, b) => {
+    // Apply status filter (multi-select)
+    if (statusFilters.size > 0) {
+      filtered = filtered.filter((inv) => statusFilters.has(inv.status));
+    }
+
+    // Apply date filter
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDate: Date = endOfDay(now);
+
+    if (datePeriod === "7d") {
+      startDate = startOfDay(subDays(now, 7));
+    } else if (datePeriod === "30d") {
+      startDate = startOfDay(subDays(now, 30));
+    } else if (datePeriod === "90d") {
+      startDate = startOfDay(subDays(now, 90));
+    } else if (datePeriod === "custom" && customDateFrom && customDateTo) {
+      startDate = startOfDay(new Date(customDateFrom));
+      endDate = endOfDay(new Date(customDateTo));
+    }
+
+    if (startDate) {
+      filtered = filtered.filter((inv) => {
+        const invoiceDate = parseISO(inv.issueDate);
+        return isWithinInterval(invoiceDate, { start: startDate!, end: endDate });
+      });
+    }
+
+    // Apply sorting
+    if (!sortColumn) return filtered;
+
+    return filtered.sort((a, b) => {
       let comparison = 0;
 
       if (sortColumn === "invoiceNumber") {
@@ -281,7 +365,54 @@ export default function InvoicesPage() {
 
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [invoices, sortColumn, sortDirection]);
+  }, [invoices, sortColumn, sortDirection, statusFilters, datePeriod, customDateFrom, customDateTo]);
+
+  // Calculate total paid amount for the selected period
+  const paidTotalForPeriod = useMemo(() => {
+    // Get invoices filtered by date only (ignore status filter for this calculation)
+    let dateFiltered = [...invoices];
+
+    const now = new Date();
+    let startDate: Date | null = null;
+    let endDateVal: Date = endOfDay(now);
+
+    if (datePeriod === "7d") {
+      startDate = startOfDay(subDays(now, 7));
+    } else if (datePeriod === "30d") {
+      startDate = startOfDay(subDays(now, 30));
+    } else if (datePeriod === "90d") {
+      startDate = startOfDay(subDays(now, 90));
+    } else if (datePeriod === "custom" && customDateFrom && customDateTo) {
+      startDate = startOfDay(new Date(customDateFrom));
+      endDateVal = endOfDay(new Date(customDateTo));
+    }
+
+    if (startDate) {
+      dateFiltered = dateFiltered.filter((inv) => {
+        const invoiceDate = parseISO(inv.issueDate);
+        return isWithinInterval(invoiceDate, { start: startDate!, end: endDateVal });
+      });
+    }
+
+    // Sum only PAID invoices
+    const paidInvoices = dateFiltered.filter((inv) => inv.status === "PAID");
+    const total = paidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+    const currency = paidInvoices[0]?.currency || "RSD";
+
+    return { total, currency, count: paidInvoices.length };
+  }, [invoices, datePeriod, customDateFrom, customDateTo]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredAndSortedInvoices.length / itemsPerPage);
+  const paginatedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedInvoices.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAndSortedInvoices, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilters, datePeriod, customDateFrom, customDateTo]);
 
   // Selection helpers
   function toggleSelectAll() {
@@ -359,6 +490,12 @@ export default function InvoicesPage() {
     return invoices
       .filter((inv) => selectedIds.has(inv.id))
       .map((inv) => inv.invoiceNumber);
+  }
+
+  // Close panel handler with delayed clearing
+  function closePanel() {
+    setIsViewPanelOpen(false);
+    setTimeout(() => setViewingInvoice(null), 300);
   }
 
   if (isLoading) {
@@ -504,12 +641,176 @@ export default function InvoicesPage() {
         </Dialog>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
+        {/* Status Filter - Multi-select */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-muted-foreground">Status:</span>
+          <div className="flex items-center gap-1.5">
+            {([
+              { value: "DRAFT" as const, label: t("statusDraft"), activeClass: "bg-gray-700 text-white border-gray-700", inactiveClass: "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200" },
+              { value: "SENT" as const, label: t("statusSent"), activeClass: "bg-primary text-primary-foreground border-primary", inactiveClass: "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" },
+              { value: "PAID" as const, label: t("statusPaid"), activeClass: "bg-green-700 text-white border-green-700", inactiveClass: "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" },
+              { value: "CANCELLED" as const, label: t("statusCancelled"), activeClass: "bg-red-700 text-white border-red-700", inactiveClass: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200" },
+            ]).map((status) => (
+              <Badge
+                key={status.value}
+                variant="outline"
+                className={cn(
+                  "cursor-pointer transition-colors",
+                  statusFilters.has(status.value)
+                    ? status.activeClass
+                    : status.inactiveClass
+                )}
+                onClick={() => {
+                  const newFilters = new Set(statusFilters);
+                  if (newFilters.has(status.value)) {
+                    newFilters.delete(status.value);
+                  } else {
+                    newFilters.add(status.value);
+                  }
+                  setStatusFilters(newFilters);
+                }}
+              >
+                {status.label}
+              </Badge>
+            ))}
+            {statusFilters.size > 0 && (
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground ml-1"
+                onClick={() => setStatusFilters(new Set())}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Date Period Filter - Dashboard style */}
+        <div className="inline-flex items-center gap-1 rounded-lg border bg-muted p-1">
+          {([
+            { value: "7d", label: "7 Days" },
+            { value: "30d", label: "30 Days" },
+            { value: "90d", label: "90 Days" },
+          ] as const).map((period) => (
+            <button
+              key={period.value}
+              onClick={() => setDatePeriod(period.value)}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-md transition-all",
+                datePeriod === period.value
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {period.label}
+            </button>
+          ))}
+          <Popover open={isCustomDateOpen} onOpenChange={setIsCustomDateOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-all inline-flex items-center gap-1.5",
+                  datePeriod === "custom"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">
+                  {datePeriod === "custom" && customDateFrom && customDateTo
+                    ? `${format(new Date(customDateFrom), "MMM d")} - ${format(new Date(customDateTo), "MMM d")}`
+                    : "Custom"}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 border-b">
+                <p className="text-sm font-medium">Select date range</p>
+              </div>
+              <div
+                className="[&_[data-selected-single=true]]:!bg-[var(--calendar-primary)] [&_[data-range-start=true]]:!bg-[var(--calendar-primary)] [&_[data-range-end=true]]:!bg-[var(--calendar-primary)] [&_.rdp-range_start]:!bg-[var(--calendar-primary)]/10 [&_.rdp-range_end]:!bg-[var(--calendar-primary)]/10"
+                style={{ "--calendar-primary": primaryColor || "hsl(var(--primary))" } as React.CSSProperties}
+              >
+                <CalendarPicker
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  disabled={{ after: new Date(new Date().setFullYear(new Date().getFullYear() + 1)) }}
+                />
+              </div>
+              <div className="p-3 border-t flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {dateRange?.from && (
+                    <span>
+                      From: {format(dateRange.from, "MMM d, yyyy")}
+                      {dateRange?.to && (
+                        <> → To: {format(dateRange.to, "MMM d, yyyy")}</>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (dateRange?.from && dateRange?.to) {
+                      setCustomDateFrom(format(dateRange.from, "yyyy-MM-dd"));
+                      setCustomDateTo(format(dateRange.to, "yyyy-MM-dd"));
+                      setDatePeriod("custom");
+                      setIsCustomDateOpen(false);
+                    }
+                  }}
+                  disabled={!dateRange?.from || !dateRange?.to}
+                  style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+                >
+                  Apply
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      {/* Paid Total Summary */}
+      {paidTotalForPeriod.count > 0 && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-50 border border-green-200 animate-fade-up" style={{ animationDelay: "75ms" }}>
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-green-100">
+            <span className="text-green-700 text-sm font-semibold">$</span>
+          </div>
+          <div>
+            <p className="text-xs text-green-700 font-medium">
+              Paid in selected period ({paidTotalForPeriod.count} invoice{paidTotalForPeriod.count !== 1 ? "s" : ""})
+            </p>
+            <p className="text-lg font-bold text-green-800">
+              {paidTotalForPeriod.currency} {paidTotalForPeriod.total.toLocaleString()}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Invoices Table Container */}
       <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b flex items-center justify-between">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            All Invoices
+            {filteredAndSortedInvoices.length === invoices.length
+              ? `All Invoices (${invoices.length})`
+              : `Filtered Invoices (${filteredAndSortedInvoices.length} of ${invoices.length})`}
           </h3>
+          {statusFilters.size > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => {
+                setStatusFilters(new Set());
+              }}
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear status filter
+            </Button>
+          )}
         </div>
         {invoices.length === 0 ? (
           <div className="py-16 text-center">
@@ -526,6 +827,25 @@ export default function InvoicesPage() {
               className="mt-2 text-primary"
             >
               {t("createInvoice")}
+            </Button>
+          </div>
+        ) : filteredAndSortedInvoices.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <FileText className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">No invoices match your filters</p>
+            <Button
+              onClick={() => {
+                setStatusFilters(new Set());
+                setDatePeriod("7d");
+                setCustomDateFrom("");
+                setCustomDateTo("");
+              }}
+              variant="link"
+              className="mt-2 text-primary"
+            >
+              Reset filters
             </Button>
           </div>
         ) : (
@@ -611,7 +931,7 @@ export default function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedInvoices.map((invoice, index) => (
+                {paginatedInvoices.map((invoice, index) => (
                   <TableRow
                     key={invoice.id}
                     className={`hover:bg-muted/50 transition-colors cursor-pointer ${
@@ -619,7 +939,10 @@ export default function InvoicesPage() {
                     }`}
                     style={{ animationDelay: `${index * 30}ms` }}
                     data-state={selectedIds.has(invoice.id) ? "selected" : undefined}
-                    onClick={() => setViewingInvoice(invoice)}
+                    onClick={() => {
+                      setViewingInvoice(invoice);
+                      setIsViewPanelOpen(true);
+                    }}
                   >
                     <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
@@ -669,6 +992,58 @@ export default function InvoicesPage() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredAndSortedInvoices.length)} of {filteredAndSortedInvoices.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      // Show first, last, current, and adjacent pages
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .map((page, idx, arr) => (
+                      <span key={page} className="flex items-center">
+                        {idx > 0 && arr[idx - 1] !== page - 1 && (
+                          <span className="px-1 text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="h-8 w-8 p-0"
+                          style={currentPage === page && primaryColor ? { backgroundColor: primaryColor } : undefined}
+                        >
+                          {page}
+                        </Button>
+                      </span>
+                    ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -706,139 +1081,157 @@ export default function InvoicesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* View Invoice Dialog */}
-      <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
-        <DialogContent className="max-w-2xl">
-          {viewingInvoice && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl">
-                    {viewingInvoice.invoiceNumber}
-                  </DialogTitle>
-                  {getStatusBadge(viewingInvoice.status)}
-                </div>
-              </DialogHeader>
-              <div className="space-y-6 py-4">
-                {/* Invoice Header Info */}
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Customer
-                    </h4>
-                    <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
-                    <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
-                  </div>
-                  <div className="text-right">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Dates
-                    </h4>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Issued:</span>{" "}
-                      {format(parseISO(viewingInvoice.issueDate), "MMM d, yyyy")}
-                    </p>
-                    {viewingInvoice.dueDate && (
-                      <p className="text-sm">
-                        <span className="text-muted-foreground">Due:</span>{" "}
-                        {format(parseISO(viewingInvoice.dueDate), "MMM d, yyyy")}
-                      </p>
-                    )}
-                  </div>
-                </div>
+      {/* Backdrop overlay for mobile */}
+      {isViewPanelOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closePanel}
+        />
+      )}
 
-                {/* Line Items */}
-                <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                    {t("lineItems")}
-                  </h4>
-                  <div className="rounded-lg border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-xs">Description</TableHead>
-                          <TableHead className="text-xs text-center w-20">Qty</TableHead>
-                          <TableHead className="text-xs text-right w-28">Unit Price</TableHead>
-                          <TableHead className="text-xs text-right w-28">{t("total")}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {viewingInvoice.lineItems.map((item, index) => (
-                          <TableRow key={item.id || index}>
-                            <TableCell className="font-medium">{item.description}</TableCell>
-                            <TableCell className="text-center">{item.quantity}</TableCell>
-                            <TableCell className="text-right">
-                              {viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {viewingInvoice.currency} {Number(item.total || item.quantity * item.unitPrice).toLocaleString()}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                {/* Totals */}
-                <div className="flex justify-end">
-                  <div className="w-64 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span>{viewingInvoice.currency} {Number(viewingInvoice.subtotal).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tax</span>
-                      <span>{viewingInvoice.currency} {Number(viewingInvoice.tax).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                      <span>{t("total")}</span>
-                      <span>{viewingInvoice.currency} {Number(viewingInvoice.total).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {viewingInvoice.notes && (
-                  <div>
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Notes
-                    </h4>
-                    <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
-                      {viewingInvoice.notes}
-                    </p>
-                  </div>
-                )}
+      {/* Invoice Side Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] lg:w-[520px] bg-background border-l shadow-xl",
+          "transform transition-transform duration-300 ease-in-out",
+          isViewPanelOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        {viewingInvoice && (
+          <div className="flex flex-col h-full">
+            {/* Panel Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold">{viewingInvoice.invoiceNumber}</h2>
+                {getStatusBadge(viewingInvoice.status)}
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setViewingInvoice(null)}>
-                  Close
+              <Button variant="ghost" size="icon" onClick={closePanel}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Panel Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {/* Invoice Header Info */}
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    Customer
+                  </h4>
+                  <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
+                  <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
+                </div>
+                <div className="text-right">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    Dates
+                  </h4>
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Issued:</span>{" "}
+                    {format(parseISO(viewingInvoice.issueDate), "MMM d, yyyy")}
+                  </p>
+                  {viewingInvoice.dueDate && (
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Due:</span>{" "}
+                      {format(parseISO(viewingInvoice.dueDate), "MMM d, yyyy")}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Line Items */}
+              <div>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  {t("lineItems")}
+                </h4>
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Description</TableHead>
+                        <TableHead className="text-xs text-center w-20">Qty</TableHead>
+                        <TableHead className="text-xs text-right w-28">Unit Price</TableHead>
+                        <TableHead className="text-xs text-right w-28">{t("total")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {viewingInvoice.lineItems.map((item, index) => (
+                        <TableRow key={item.id || index}>
+                          <TableCell className="font-medium">{item.description}</TableCell>
+                          <TableCell className="text-center">{item.quantity}</TableCell>
+                          <TableCell className="text-right">
+                            {viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {viewingInvoice.currency} {Number(item.total || item.quantity * item.unitPrice).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Totals */}
+              <div className="flex justify-end">
+                <div className="w-64 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{viewingInvoice.currency} {Number(viewingInvoice.subtotal).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span>{viewingInvoice.currency} {Number(viewingInvoice.tax).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+                    <span>{t("total")}</span>
+                    <span>{viewingInvoice.currency} {Number(viewingInvoice.total).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              {viewingInvoice.notes && (
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    Notes
+                  </h4>
+                  <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                    {viewingInvoice.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Panel Footer */}
+            <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30">
+              <Button variant="outline" onClick={closePanel}>
+                Close
+              </Button>
+              {viewingInvoice.status === "DRAFT" && (
+                <Button
+                  onClick={() => {
+                    updateStatus(viewingInvoice.id, "SENT");
+                    closePanel();
+                  }}
+                >
+                  Send Invoice
                 </Button>
-                {viewingInvoice.status === "DRAFT" && (
-                  <Button
-                    onClick={() => {
-                      updateStatus(viewingInvoice.id, "SENT");
-                      setViewingInvoice(null);
-                    }}
-                  >
-                    Send Invoice
-                  </Button>
-                )}
-                {viewingInvoice.status === "SENT" && (
-                  <Button
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => {
-                      updateStatus(viewingInvoice.id, "PAID");
-                      setViewingInvoice(null);
-                    }}
-                  >
-                    Mark as Paid
-                  </Button>
-                )}
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+              )}
+              {viewingInvoice.status === "SENT" && (
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    updateStatus(viewingInvoice.id, "PAID");
+                    closePanel();
+                  }}
+                >
+                  Mark as Paid
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
