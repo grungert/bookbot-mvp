@@ -3,20 +3,12 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { useTheme } from "next-themes";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +29,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import MDEditor from "@uiw/react-md-editor";
 
 interface Document {
   id: string;
@@ -52,10 +46,11 @@ export default function DocumentsPage() {
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const { resolvedTheme } = useTheme();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
@@ -88,18 +83,42 @@ export default function DocumentsPage() {
     loadDocuments();
   }, [loadDocuments]);
 
-  function openCreateDialog() {
-    setEditingDocument(null);
+  // Body scroll lock when panel is open
+  useEffect(() => {
+    if (isPanelOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isPanelOpen]);
+
+  function resetForm() {
     setTitle("");
     setContent("");
-    setIsDialogOpen(true);
   }
 
-  function openEditDialog(doc: Document) {
+  function openCreatePanel() {
+    resetForm();
+    setEditingDocument(null);
+    setIsPanelOpen(true);
+  }
+
+  function openEditPanel(doc: Document) {
     setEditingDocument(doc);
     setTitle(doc.title);
     setContent(doc.content);
-    setIsDialogOpen(true);
+    setIsPanelOpen(true);
+  }
+
+  function closePanel() {
+    setIsPanelOpen(false);
+    setTimeout(() => {
+      setEditingDocument(null);
+      resetForm();
+    }, 300);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -128,7 +147,7 @@ export default function DocumentsPage() {
       }
 
       toast.success(editingDocument ? "Document updated" : "Document created");
-      setIsDialogOpen(false);
+      closePanel();
       loadDocuments();
     } catch {
       toast.error("Failed to save document. Please try again.");
@@ -274,61 +293,10 @@ export default function DocumentsPage() {
             Add documents to your knowledge base for the AI chatbot
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("uploadDocument")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editingDocument ? "Edit Document" : "Add Document"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="FAQ, Pricing, About Us, etc."
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="content">Content</Label>
-                  <Textarea
-                    id="content"
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Enter the document content that will be used by the AI..."
-                    rows={12}
-                    required
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  {tCommon("cancel")}
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  )}
-                  {tCommon("save")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={openCreatePanel} className="bg-primary hover:bg-primary/90">
+          <Plus className="h-4 w-4 mr-2" />
+          {t("uploadDocument")}
+        </Button>
       </div>
 
       {/* Documents Table Container */}
@@ -346,7 +314,7 @@ export default function DocumentsPage() {
             <p className="text-muted-foreground mb-2">
               No documents in your knowledge base yet
             </p>
-            <Button onClick={openCreateDialog} variant="link" className="text-primary">
+            <Button onClick={openCreatePanel} variant="link" className="text-primary">
               Add your first document
             </Button>
           </div>
@@ -407,13 +375,15 @@ export default function DocumentsPage() {
                 {sortedDocuments.map((doc, index) => (
                   <TableRow
                     key={doc.id}
-                    className={`hover:bg-muted/50 transition-colors ${
-                      selectedIds.has(doc.id) ? "bg-primary/5" : ""
-                    }`}
+                    className={cn(
+                      "hover:bg-muted/50 transition-colors cursor-pointer",
+                      selectedIds.has(doc.id) && "bg-primary/5"
+                    )}
                     style={{ animationDelay: `${index * 30}ms` }}
                     data-state={selectedIds.has(doc.id) ? "selected" : undefined}
+                    onClick={() => openEditPanel(doc)}
                   >
-                    <TableCell className="w-12">
+                    <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(doc.id)}
                         onCheckedChange={() => toggleSelectOne(doc.id)}
@@ -427,13 +397,13 @@ export default function DocumentsPage() {
                     <TableCell>
                       <span className="text-sm">{format(parseISO(doc.updatedAt), "MMM d, yyyy")}</span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                          onClick={() => openEditDialog(doc)}
+                          onClick={() => openEditPanel(doc)}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -487,8 +457,8 @@ export default function DocumentsPage() {
             <AlertDialogDescription>
               This action cannot be undone. The following documents will be permanently deleted:
               <ul className="mt-2 list-disc list-inside text-sm">
-                {getSelectedDocumentTitles().slice(0, 5).map((title) => (
-                  <li key={title}>{title}</li>
+                {getSelectedDocumentTitles().slice(0, 5).map((docTitle) => (
+                  <li key={docTitle}>{docTitle}</li>
                 ))}
                 {selectedIds.size > 5 && (
                   <li>...and {selectedIds.size - 5} more</li>
@@ -511,6 +481,78 @@ export default function DocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Backdrop overlay for mobile */}
+      {isPanelOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closePanel}
+        />
+      )}
+
+      {/* Document Editor Slide-in Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 w-full sm:w-[560px] lg:w-[640px] bg-background border-l shadow-xl",
+          "transform transition-transform duration-300 ease-in-out",
+          isPanelOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Panel Header */}
+          <div className="flex items-center justify-between p-4 border-b shrink-0">
+            <h2 className="text-xl font-semibold">
+              {editingDocument ? "Edit Document" : "Add Document"}
+            </h2>
+            <Button type="button" variant="ghost" size="icon" onClick={closePanel}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Panel Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="FAQ, Pricing, About Us, etc."
+                required
+              />
+            </div>
+
+            <div className="space-y-2" data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
+              <Label htmlFor="content">Content</Label>
+              <MDEditor
+                value={content}
+                onChange={(value) => setContent(value || "")}
+                height={500}
+                preview="edit"
+                textareaProps={{
+                  placeholder: "Enter the document content that will be used by the AI...",
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Supports Markdown formatting (headings, bold, lists, etc.)
+              </p>
+            </div>
+          </div>
+
+          {/* Panel Footer */}
+          <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30 shrink-0">
+            <Button type="button" variant="outline" onClick={closePanel}>
+              {tCommon("cancel")}
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              {tCommon("save")}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
