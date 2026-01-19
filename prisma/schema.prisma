@@ -37,11 +37,12 @@ enum PromotionalBadge {
 // Company (Tenant)
 model Company {
   id           String   @id @default(cuid())
-  slug         String   @unique
-  name         String
-  description  String?
-  logoUrl      String?
-  primaryColor String   @default("#3B82F6")
+  slug              String   @unique
+  name              String
+  description       String?
+  logoUrl           String?
+  headerDisplayMode String   @default("both") // "both" | "logo" | "name"
+  primaryColor      String   @default("#3B82F6")
   timezone     String   @default("Europe/Belgrade")
 
   // AI Configuration
@@ -262,6 +263,12 @@ model InvoiceLineItem {
   quantity    Int     @default(1)
   unitPrice   Decimal @db.Decimal(10, 2)
   total       Decimal @db.Decimal(10, 2)
+
+  // Discount tracking fields
+  originalUnitPrice   Decimal?  @db.Decimal(10, 2)  // Price before discount
+  discountType        String?                       // "percentage" | "fixed"
+  discountValue       Decimal?  @db.Decimal(10, 2)  // Discount value applied
+  discountPercentage  Int?                          // Calculated percentage for display
 
   @@index([invoiceId])
 }

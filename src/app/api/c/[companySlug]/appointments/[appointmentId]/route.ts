@@ -148,6 +148,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             duration: true,
             price: true,
             currency: true,
+            discountType: true,
+            discountValue: true,
+            discountStartDate: true,
+            discountEndDate: true,
           },
         },
         user: {
@@ -183,6 +187,10 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           servicePrice: updated.service.price,
           serviceCurrency: updated.service.currency,
           taxRate: company.taxRate,
+          discountType: updated.service.discountType,
+          discountValue: updated.service.discountValue,
+          discountStartDate: updated.service.discountStartDate,
+          discountEndDate: updated.service.discountEndDate,
         });
       } catch (invoiceError) {
         console.error("Error auto-generating invoice:", invoiceError);

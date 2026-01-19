@@ -45,6 +45,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { calculateDiscountedPrice } from "@/lib/utils/discount";
 
 interface Service {
   id: string;
@@ -54,6 +55,10 @@ interface Service {
   price: number;
   currency: string;
   color: string | null;
+  discountType: string | null;
+  discountValue: number | null;
+  discountStartDate: string | null;
+  discountEndDate: string | null;
 }
 
 interface LineItem {
@@ -63,6 +68,11 @@ interface LineItem {
   quantity: number;
   unitPrice: number;
   total?: number;
+  // Discount fields
+  originalUnitPrice?: number | null;
+  discountType?: string | null;
+  discountValue?: number | null;
+  discountPercentage?: number | null;
 }
 
 interface Invoice {
@@ -261,9 +271,14 @@ export default function InvoicesPage() {
             dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
             notes: notes || undefined,
             lineItems: lineItems.map((item) => ({
+              serviceId: item.serviceId,
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
+              originalUnitPrice: item.originalUnitPrice,
+              discountType: item.discountType,
+              discountValue: item.discountValue,
+              discountPercentage: item.discountPercentage,
             })),
           }),
         });
@@ -283,9 +298,14 @@ export default function InvoicesPage() {
             dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
             notes: notes || undefined,
             lineItems: lineItems.map((item) => ({
+              serviceId: item.serviceId,
               description: item.description,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
+              originalUnitPrice: item.originalUnitPrice,
+              discountType: item.discountType,
+              discountValue: item.discountValue,
+              discountPercentage: item.discountPercentage,
             })),
           }),
         });
@@ -1259,10 +1279,30 @@ export default function InvoicesPage() {
                     <TableBody>
                       {viewingInvoice.lineItems.map((item, index) => (
                         <TableRow key={item.id || index}>
-                          <TableCell className="font-medium">{item.description}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span>{item.description}</span>
+                              {item.discountPercentage && item.discountPercentage > 0 && (
+                                <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] px-1.5 py-0">
+                                  -{item.discountPercentage}%
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-center">{item.quantity}</TableCell>
                           <TableCell className="text-right">
-                            {viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}
+                            {item.originalUnitPrice && Number(item.originalUnitPrice) > Number(item.unitPrice) ? (
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs text-muted-foreground line-through">
+                                  {viewingInvoice.currency} {Number(item.originalUnitPrice).toLocaleString()}
+                                </span>
+                                <span className="text-green-600 font-medium">
+                                  {viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}
+                                </span>
+                              </div>
+                            ) : (
+                              <span>{viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             {viewingInvoice.currency} {Number(item.total || item.quantity * item.unitPrice).toLocaleString()}
@@ -1461,15 +1501,45 @@ export default function InvoicesPage() {
                               serviceId: undefined,
                               description: "",
                               unitPrice: 0,
+                              originalUnitPrice: undefined,
+                              discountType: undefined,
+                              discountValue: undefined,
+                              discountPercentage: undefined,
                             });
                           } else {
                             const service = services.find((s) => s.id === value);
                             if (service) {
-                              updateLineItem(index, {
-                                serviceId: service.id,
-                                description: service.name,
-                                unitPrice: service.price,
+                              // Calculate discounted price if discount is active
+                              const discountResult = calculateDiscountedPrice({
+                                price: service.price,
+                                currency: service.currency,
+                                discountType: service.discountType as "percentage" | "fixed" | null,
+                                discountValue: service.discountValue,
+                                discountStartDate: service.discountStartDate,
+                                discountEndDate: service.discountEndDate,
                               });
+
+                              if (discountResult.isDiscounted) {
+                                updateLineItem(index, {
+                                  serviceId: service.id,
+                                  description: service.name,
+                                  unitPrice: discountResult.finalPrice,
+                                  originalUnitPrice: discountResult.originalPrice,
+                                  discountType: service.discountType,
+                                  discountValue: service.discountValue,
+                                  discountPercentage: discountResult.discountPercentage,
+                                });
+                              } else {
+                                updateLineItem(index, {
+                                  serviceId: service.id,
+                                  description: service.name,
+                                  unitPrice: service.price,
+                                  originalUnitPrice: undefined,
+                                  discountType: undefined,
+                                  discountValue: undefined,
+                                  discountPercentage: undefined,
+                                });
+                              }
                             }
                           }
                         }}
@@ -1478,16 +1548,41 @@ export default function InvoicesPage() {
                           <SelectValue placeholder="Select service or custom" />
                         </SelectTrigger>
                         <SelectContent>
-                          {services.map((service) => (
-                            <SelectItem key={service.id} value={service.id}>
-                              <div className="flex items-center justify-between gap-4">
-                                <span>{service.name}</span>
-                                <span className="text-muted-foreground text-xs">
-                                  {service.currency} {service.price.toLocaleString()}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {services.map((service) => {
+                            const discountResult = calculateDiscountedPrice({
+                              price: service.price,
+                              currency: service.currency,
+                              discountType: service.discountType as "percentage" | "fixed" | null,
+                              discountValue: service.discountValue,
+                              discountStartDate: service.discountStartDate,
+                              discountEndDate: service.discountEndDate,
+                            });
+
+                            return (
+                              <SelectItem key={service.id} value={service.id}>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span>{service.name}</span>
+                                  {discountResult.isDiscounted ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground text-xs line-through">
+                                        {service.currency} {service.price.toLocaleString()}
+                                      </span>
+                                      <span className="text-green-600 text-xs font-medium">
+                                        {service.currency} {discountResult.finalPrice.toLocaleString()}
+                                      </span>
+                                      <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] px-1 py-0">
+                                        -{discountResult.discountPercentage}%
+                                      </Badge>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">
+                                      {service.currency} {service.price.toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                           <SelectItem value="custom">
                             <span className="text-muted-foreground">+ Custom Item</span>
                           </SelectItem>
@@ -1529,16 +1624,27 @@ export default function InvoicesPage() {
                     </div>
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Unit Price</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateLineItem(index, { unitPrice: parseFloat(e.target.value) || 0 })
-                        }
-                        disabled={!!item.serviceId}
-                      />
+                      {item.discountPercentage && item.originalUnitPrice ? (
+                        <div className="h-9 px-3 py-1 text-sm bg-muted rounded-md flex flex-col justify-center">
+                          <span className="text-[10px] text-muted-foreground line-through leading-none">
+                            {item.originalUnitPrice.toLocaleString()}
+                          </span>
+                          <span className="text-green-600 font-medium leading-none">
+                            {item.unitPrice.toLocaleString()}
+                          </span>
+                        </div>
+                      ) : (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unitPrice}
+                          onChange={(e) =>
+                            updateLineItem(index, { unitPrice: parseFloat(e.target.value) || 0 })
+                          }
+                          disabled={!!item.serviceId}
+                        />
+                      )}
                     </div>
                     <div className="flex-1">
                       <Label className="text-xs text-muted-foreground">Total</Label>
@@ -1547,6 +1653,16 @@ export default function InvoicesPage() {
                       </div>
                     </div>
                   </div>
+                  {item.discountPercentage && item.discountPercentage > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-green-600">
+                      <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] px-1.5 py-0">
+                        -{item.discountPercentage}% discount applied
+                      </Badge>
+                      <span>
+                        You save {((item.originalUnitPrice || 0) - item.unitPrice).toLocaleString()} per item
+                      </span>
+                    </div>
+                  )}
                 </div>
               ))}
               <div className="text-right text-sm font-medium pt-2 border-t">

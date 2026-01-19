@@ -4,11 +4,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
 import { z } from "zod";
 import { InvoiceStatus, Prisma } from "@prisma/client";
+import { calculateDiscountedPrice } from "@/lib/utils/discount";
 
 const lineItemSchema = z.object({
+  serviceId: z.string().optional(),
   description: z.string().min(1),
   quantity: z.number().int().min(1),
   unitPrice: z.number().min(0),
+  // Discount fields (optional, populated when serviceId is provided)
+  originalUnitPrice: z.number().optional(),
+  discountType: z.string().optional(),
+  discountValue: z.number().optional(),
+  discountPercentage: z.number().optional(),
 });
 
 const createInvoiceSchema = z.object({
@@ -132,9 +139,65 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const { userId, appointmentId, dueDate, notes, lineItems } = parsed.data;
 
-    // Calculate totals
-    const subtotal = lineItems.reduce(
-      (sum, item) => sum + item.quantity * item.unitPrice,
+    // Process line items - fetch services if serviceId provided to apply discounts
+    const processedLineItems = await Promise.all(
+      lineItems.map(async (item) => {
+        // If serviceId is provided, fetch the service to check for discounts
+        if (item.serviceId) {
+          const service = await prisma.service.findUnique({
+            where: { id: item.serviceId },
+            select: {
+              price: true,
+              currency: true,
+              discountType: true,
+              discountValue: true,
+              discountStartDate: true,
+              discountEndDate: true,
+            },
+          });
+
+          if (service) {
+            const discountResult = calculateDiscountedPrice({
+              price: Number(service.price),
+              currency: service.currency,
+              discountType: service.discountType as "percentage" | "fixed" | null,
+              discountValue: service.discountValue ? Number(service.discountValue) : null,
+              discountStartDate: service.discountStartDate,
+              discountEndDate: service.discountEndDate,
+            });
+
+            if (discountResult.isDiscounted) {
+              return {
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: discountResult.finalPrice,
+                total: item.quantity * discountResult.finalPrice,
+                originalUnitPrice: discountResult.originalPrice,
+                discountType: service.discountType,
+                discountValue: service.discountValue ? Number(service.discountValue) : null,
+                discountPercentage: discountResult.discountPercentage,
+              };
+            }
+          }
+        }
+
+        // No service or no discount - use provided values
+        return {
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+          originalUnitPrice: item.originalUnitPrice || null,
+          discountType: item.discountType || null,
+          discountValue: item.discountValue || null,
+          discountPercentage: item.discountPercentage || null,
+        };
+      })
+    );
+
+    // Calculate totals using processed (potentially discounted) prices
+    const subtotal = processedLineItems.reduce(
+      (sum, item) => sum + item.total,
       0
     );
     const tax = subtotal * 0.2; // 20% tax (typical VAT)
@@ -154,11 +217,15 @@ export async function POST(request: Request, { params }: RouteParams) {
         tax,
         total,
         lineItems: {
-          create: lineItems.map((item) => ({
+          create: processedLineItems.map((item) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
-            total: item.quantity * item.unitPrice,
+            total: item.total,
+            originalUnitPrice: item.originalUnitPrice,
+            discountType: item.discountType,
+            discountValue: item.discountValue,
+            discountPercentage: item.discountPercentage,
           })),
         },
       },
