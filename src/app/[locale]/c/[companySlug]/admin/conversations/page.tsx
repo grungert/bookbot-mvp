@@ -44,6 +44,7 @@ import { toast } from "sonner";
 import {
   Loader2,
   MessageSquare,
+  MessageCircle,
   Users,
   UserCheck,
   User,
@@ -61,6 +62,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminMessageRenderer } from "@/components/chat/admin-message-renderer";
+import { StatsCard } from "@/components/admin/dashboard/stats-card";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface ChatUser {
   id: string;
@@ -109,6 +112,7 @@ export default function ConversationsPage() {
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const prefersReducedMotion = useReducedMotion();
 
   // Data state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -407,64 +411,78 @@ export default function ConversationsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="animate-fade-up">
-        <h1 className="text-2xl font-bold">{t("conversations")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("conversationsSubtitle")}
-        </p>
+      <div
+        className={cn(
+          "flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
+          !prefersReducedMotion && "animate-fade-up"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        <div>
+          <h1 className="text-2xl font-bold">{t("conversations")}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t("conversationsSubtitle")}
+          </p>
+        </div>
       </div>
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
-          <div className="rounded-xl border bg-card p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">{t("totalSessions")}</p>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{stats.totalSessions}</p>
-              {stats.unreadSessions > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  {stats.unreadSessions} {t("unread")}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl border bg-card p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">{t("totalMessages")}</p>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{stats.totalMessages}</p>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-card p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">{t("guestSessions")}</p>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{stats.guestSessions}</p>
-            </div>
-          </div>
-          <div className="rounded-xl border bg-card p-6">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">{t("authenticatedSessions")}</p>
-              <UserCheck className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="mt-2">
-              <p className="text-2xl font-bold">{stats.authenticatedSessions}</p>
-            </div>
+        <div
+          className={cn(
+            "rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/10",
+            !prefersReducedMotion && "animate-fade-up"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "50ms" } : undefined}
+        >
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+              title={t("totalSessions")}
+              value={stats.totalSessions}
+              icon={MessageSquare}
+              iconBg="bg-primary/10"
+              iconColor="text-primary"
+              animationIndex={0}
+              prefersReducedMotion={prefersReducedMotion}
+            />
+            <StatsCard
+              title={t("totalMessages")}
+              value={stats.totalMessages}
+              icon={MessageCircle}
+              iconBg="bg-cyan-500/10"
+              iconColor="text-cyan-500"
+              animationIndex={1}
+              prefersReducedMotion={prefersReducedMotion}
+            />
+            <StatsCard
+              title={t("guestSessions")}
+              value={stats.guestSessions}
+              icon={User}
+              iconBg="bg-amber-500/10"
+              iconColor="text-amber-500"
+              animationIndex={2}
+              prefersReducedMotion={prefersReducedMotion}
+            />
+            <StatsCard
+              title={t("authenticatedSessions")}
+              value={stats.authenticatedSessions}
+              icon={UserCheck}
+              iconBg="bg-green-500/10"
+              iconColor="text-green-500"
+              animationIndex={3}
+              prefersReducedMotion={prefersReducedMotion}
+            />
           </div>
         </div>
       )}
 
       {/* Filters */}
       <div
-        className="flex flex-col sm:flex-row gap-4 animate-fade-up"
-        style={{ animationDelay: "100ms" }}
+        className={cn(
+          "flex flex-col sm:flex-row gap-4",
+          !prefersReducedMotion && "animate-fade-up"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
       >
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -512,8 +530,11 @@ export default function ConversationsPage() {
 
       {/* Table Container */}
       <div
-        className="rounded-xl border bg-card overflow-hidden animate-fade-up"
-        style={{ animationDelay: "150ms" }}
+        className={cn(
+          "rounded-xl border bg-card/80 backdrop-blur-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/10",
+          !prefersReducedMotion && "animate-fade-up"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
       >
         {sessions.length === 0 ? (
           <div className="py-16 text-center">
@@ -747,13 +768,21 @@ export default function ConversationsPage() {
             </div>
           ) : viewingSession ? (
             <div className="flex-1 overflow-y-auto space-y-4 py-4">
-              {viewingSession.messages.map((message) => (
+              {viewingSession.messages.map((message, index) => (
                 <AdminMessageRenderer
                   key={message.id}
                   message={{
                     role: message.role as "user" | "assistant",
                     content: message.content,
                   }}
+                  nextMessage={
+                    viewingSession.messages[index + 1]
+                      ? {
+                          role: viewingSession.messages[index + 1].role as "user" | "assistant",
+                          content: viewingSession.messages[index + 1].content,
+                        }
+                      : undefined
+                  }
                   timestamp={format(parseISO(message.createdAt), "HH:mm")}
                 />
               ))}
