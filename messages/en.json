@@ -278,7 +278,9 @@
     "conversationsLabel": "conversations",
     "failedToDelete": "failed to delete",
     "conversationDeleted": "Conversation deleted",
-    "started": "Started"
+    "started": "Started",
+    "showing": "Showing",
+    "of": "of"
   },
   "landing": {
     "heroTitle": "Smart Booking for Your Business",

@@ -278,7 +278,9 @@
     "conversationsLabel": "razgovora",
     "failedToDelete": "neuspesno obrisano",
     "conversationDeleted": "Razgovor obrisan",
-    "started": "Zapoceto"
+    "started": "Zapoceto",
+    "showing": "Prikazano",
+    "of": "od"
   },
   "landing": {
     "heroTitle": "Pametno zakazivanje za vas biznis",

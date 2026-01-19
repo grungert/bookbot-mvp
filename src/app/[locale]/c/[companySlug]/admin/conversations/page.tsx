@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { PeriodSelector } from "@/components/admin/dashboard/period-selector";
+import type { DashboardPeriod } from "@/lib/db/tenant";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -58,7 +60,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminMessageRenderer } from "@/components/chat/admin-message-renderer";
@@ -112,7 +115,25 @@ export default function ConversationsPage() {
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const tDashboard = useTranslations("dashboard");
   const prefersReducedMotion = useReducedMotion();
+
+  // URL search params for period filtering
+  const searchParams = useSearchParams();
+  const period = (searchParams.get("period") as DashboardPeriod | "custom") || "30d";
+  const startDate = searchParams.get("startDate") || "";
+  const endDate = searchParams.get("endDate") || "";
+
+  // Get primary color from CSS variable set by parent layout
+  const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // The variable is set on a parent div, so we need to find it by querying an element with the style
+    const el = document.querySelector("[style*='--company-primary']") as HTMLElement;
+    if (el) {
+      const color = getComputedStyle(el).getPropertyValue("--company-primary").trim();
+      if (color) setPrimaryColor(color);
+    }
+  }, []);
 
   // Data state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -121,8 +142,6 @@ export default function ConversationsPage() {
 
   // Filter state
   const [userType, setUserType] = useState<"all" | "guest" | "authenticated">("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [searchEmail, setSearchEmail] = useState("");
 
   // Selection and sorting state
@@ -141,14 +160,31 @@ export default function ConversationsPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const loadConversations = useCallback(async () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
       if (userType !== "all") queryParams.set("userType", userType);
-      if (startDate) queryParams.set("startDate", startDate);
-      if (endDate) queryParams.set("endDate", endDate);
       if (searchEmail) queryParams.set("search", searchEmail);
+
+      // Compute dates from period when not custom
+      let computedStartDate = startDate;
+      let computedEndDate = endDate;
+
+      if (period !== "custom") {
+        const days = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[period] || 30;
+        const start = new Date();
+        start.setDate(start.getDate() - days);
+        computedStartDate = start.toISOString().split("T")[0];
+        computedEndDate = ""; // No end date for preset periods
+      }
+
+      if (computedStartDate) queryParams.set("startDate", computedStartDate);
+      if (computedEndDate) queryParams.set("endDate", computedEndDate);
 
       const response = await fetch(
         `/api/c/${companySlug}/conversations?${queryParams.toString()}`
@@ -166,7 +202,7 @@ export default function ConversationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [companySlug, userType, startDate, endDate, searchEmail, tCommon]);
+  }, [companySlug, userType, period, startDate, endDate, searchEmail, tCommon]);
 
   useEffect(() => {
     loadConversations();
@@ -351,6 +387,18 @@ export default function ConversationsPage() {
     });
   }, [sessions, sortColumn, sortDirection]);
 
+  // Pagination
+  const totalPages = Math.ceil(sortedSessions.length / itemsPerPage);
+  const paginatedSessions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return sortedSessions.slice(startIndex, startIndex + itemsPerPage);
+  }, [sortedSessions, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [userType, searchEmail, period, startDate, endDate]);
+
   // Selection helpers
   function toggleSelectAll() {
     if (selectedIds.size === sessions.length) {
@@ -430,7 +478,7 @@ export default function ConversationsPage() {
       {stats && (
         <div
           className={cn(
-            "rounded-xl border bg-card/80 backdrop-blur-sm p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/10",
+            "rounded-xl border bg-card/80 backdrop-blur-sm p-4",
             !prefersReducedMotion && "animate-fade-up"
           )}
           style={!prefersReducedMotion ? { opacity: 0, animationDelay: "50ms" } : undefined}
@@ -504,28 +552,23 @@ export default function ConversationsPage() {
             <SelectItem value="authenticated">{t("authenticatedOnly")}</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="pl-9 w-[150px]"
-              placeholder="Start date"
-            />
-          </div>
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="pl-9 w-[150px]"
-              placeholder="End date"
-            />
-          </div>
-        </div>
+        <PeriodSelector
+          currentPeriod={period}
+          customStartDate={startDate}
+          customEndDate={endDate}
+          primaryColor={primaryColor}
+          translations={{
+            period7d: tDashboard("period7d"),
+            period30d: tDashboard("period30d"),
+            period90d: tDashboard("period90d"),
+            period1y: tDashboard("period1y"),
+            periodCustom: tDashboard("periodCustom"),
+            selectDateRange: tDashboard("selectDateRange"),
+            from: tDashboard("from"),
+            to: tDashboard("to"),
+            apply: tDashboard("apply"),
+          }}
+        />
       </div>
 
       {/* Table Container */}
@@ -614,15 +657,17 @@ export default function ConversationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedSessions.map((session, index) => (
+                {paginatedSessions.map((session, index) => (
                   <TableRow
                     key={session.id}
                     className={cn(
                       "hover:bg-muted/50 transition-colors",
-                      selectedIds.has(session.id) && "bg-primary/5",
-                      !session.isRead && "bg-blue-50/50 dark:bg-blue-950/20"
+                      selectedIds.has(session.id) && "bg-primary/5"
                     )}
-                    style={{ animationDelay: `${index * 30}ms` }}
+                    style={{
+                      animationDelay: `${index * 30}ms`,
+                      ...((!session.isRead && primaryColor) ? { backgroundColor: `${primaryColor}10` } : {}),
+                    }}
                     data-state={selectedIds.has(session.id) ? "selected" : undefined}
                   >
                     <TableCell className="w-12">
@@ -635,7 +680,10 @@ export default function ConversationsPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {!session.isRead && (
-                          <span className="h-2 w-2 rounded-full bg-blue-500" />
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: primaryColor || "#3B82F6" }}
+                          />
                         )}
                         {session.isImportant && (
                           <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
@@ -737,6 +785,58 @@ export default function ConversationsPage() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {t("showing")} {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, sortedSessions.length)} {t("of")} {sortedSessions.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      // Show first, last, current, and adjacent pages
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .map((page, idx, arr) => (
+                      <span key={page} className="flex items-center">
+                        {idx > 0 && arr[idx - 1] !== page - 1 && (
+                          <span className="px-1 text-muted-foreground">...</span>
+                        )}
+                        <Button
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="h-8 w-8 p-0"
+                          style={currentPage === page && primaryColor ? { backgroundColor: primaryColor } : undefined}
+                        >
+                          {page}
+                        </Button>
+                      </span>
+                    ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
