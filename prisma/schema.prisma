@@ -34,6 +34,11 @@ enum PromotionalBadge {
   HOT
 }
 
+enum MembershipRole {
+  OWNER    // Full control, can delete company
+  ADMIN    // Full admin access
+}
+
 // Company (Tenant)
 model Company {
   id           String   @id @default(cuid())
@@ -72,6 +77,7 @@ model Company {
 
   // Relations
   users         User[]
+  memberships   CompanyMembership[]
   services      Service[]
   workingHours  WorkingHours[]
   appointments  Appointment[]
@@ -101,6 +107,7 @@ model User {
   // Relations
   accounts      Account[]
   sessions      Session[]
+  memberships   CompanyMembership[]
   appointments  Appointment[]
   invoices      Invoice[]
   chatSessions  ChatSession[]
@@ -324,4 +331,22 @@ model ChatMessage {
   createdAt DateTime    @default(now())
 
   @@index([sessionId])
+}
+
+// Company Membership - allows users to own/admin multiple companies
+model CompanyMembership {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role        MembershipRole @default(ADMIN)
+  isPrimary   Boolean        @default(false)  // User's primary company for quick switching
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([userId, companyId])
+  @@index([userId])
+  @@index([companyId])
 }

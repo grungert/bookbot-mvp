@@ -35,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { CompanySwitcher } from "./company-switcher";
 
 // Sidebar context for sharing collapsed state
 interface SidebarContextType {
@@ -271,6 +272,14 @@ function NavContent({
             <h2 className="font-semibold mt-2">Admin Panel</h2>
           </>
         )}
+      </div>
+      {/* Company Switcher */}
+      <div className={cn("p-2 border-b", isCollapsed && "p-1")}>
+        <CompanySwitcher
+          currentCompanySlug={companySlug}
+          currentCompanyName={companyName}
+          isCollapsed={isCollapsed}
+        />
       </div>
       <div className="flex flex-col flex-1">
         <nav className={cn("p-2", isCollapsed && "p-1")}>

@@ -4,8 +4,17 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import { UserRole, MembershipRole } from "@prisma/client";
 import { z } from "zod";
+
+// Membership info for session
+export interface SessionMembership {
+  companyId: string;
+  companySlug: string;
+  companyName: string;
+  role: MembershipRole;
+  isPrimary: boolean;
+}
 
 // Extend the built-in session types
 declare module "next-auth" {
@@ -14,6 +23,7 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       companyId: string | null;
+      memberships: SessionMembership[];
     } & DefaultSession["user"];
   }
 
@@ -28,6 +38,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: UserRole;
     companyId: string | null;
+    memberships: SessionMembership[];
   }
 }
 
@@ -89,12 +100,71 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.companyId = user.companyId;
+
+        // Fetch memberships for COMPANY_ADMIN users
+        if (user.role === "COMPANY_ADMIN") {
+          const memberships = await prisma.companyMembership.findMany({
+            where: { userId: user.id },
+            include: {
+              company: {
+                select: {
+                  id: true,
+                  slug: true,
+                  name: true,
+                },
+              },
+            },
+            orderBy: [
+              { isPrimary: "desc" },
+              { createdAt: "asc" },
+            ],
+          });
+
+          token.memberships = memberships.map((m) => ({
+            companyId: m.company.id,
+            companySlug: m.company.slug,
+            companyName: m.company.name,
+            role: m.role,
+            isPrimary: m.isPrimary,
+          }));
+        } else {
+          token.memberships = [];
+        }
       }
+
+      // Refresh memberships on session update
+      if (trigger === "update" && token.role === "COMPANY_ADMIN") {
+        const memberships = await prisma.companyMembership.findMany({
+          where: { userId: token.id },
+          include: {
+            company: {
+              select: {
+                id: true,
+                slug: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: [
+            { isPrimary: "desc" },
+            { createdAt: "asc" },
+          ],
+        });
+
+        token.memberships = memberships.map((m) => ({
+          companyId: m.company.id,
+          companySlug: m.company.slug,
+          companyName: m.company.name,
+          role: m.role,
+          isPrimary: m.isPrimary,
+        }));
+      }
+
       return token;
     },
     async session({ session, token }) {
@@ -102,6 +172,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.companyId = token.companyId;
+        session.user.memberships = token.memberships || [];
       }
       return session;
     },

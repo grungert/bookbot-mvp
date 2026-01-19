@@ -95,7 +95,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { companySlug } = await params;
-    let user = await getCurrentUser();
+    const sessionUser = await getCurrentUser();
+
+    // We only need id, email, and name for creating appointments
+    let user: { id: string; email: string | null; name: string | null } | null = sessionUser
+      ? { id: sessionUser.id, email: sessionUser.email ?? null, name: sessionUser.name ?? null }
+      : null;
 
     const company = await getCompanyBySlug(companySlug);
     if (!company) {

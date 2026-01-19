@@ -168,6 +168,8 @@ export default function SettingsPage() {
         wrapper.style.setProperty("--primary-foreground", palette.foreground);
         wrapper.style.setProperty("--ring", palette.ring);
       }
+      // Dispatch event for components outside the wrapper (like dropdown portals)
+      window.dispatchEvent(new CustomEvent("company-color-change", { detail: { color: primaryColor } }));
     }
   }, [primaryColor]);
 

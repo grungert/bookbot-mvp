@@ -1,0 +1,61 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+import { Calendar, FileText, MessageSquare } from "lucide-react";
+import { FeatureCard } from "./feature-card";
+import { ScrollReveal } from "./scroll-reveal";
+
+export function FeaturesSection() {
+  const t = useTranslations("landing");
+
+  const features = [
+    {
+      icon: Calendar,
+      titleKey: "feature1Title",
+      descKey: "feature1Desc",
+      pointKeys: ["feature1Point1", "feature1Point2", "feature1Point3"],
+    },
+    {
+      icon: FileText,
+      titleKey: "feature2Title",
+      descKey: "feature2Desc",
+      pointKeys: ["feature2Point1", "feature2Point2", "feature2Point3"],
+    },
+    {
+      icon: MessageSquare,
+      titleKey: "feature3Title",
+      descKey: "feature3Desc",
+      pointKeys: ["feature3Point1", "feature3Point2", "feature3Point3"],
+    },
+  ];
+
+  return (
+    <section id="features" className="py-24 bg-muted/50">
+      <div className="container mx-auto px-4">
+        {/* Section Header */}
+        <ScrollReveal className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            {t("featuresTitle")}
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            {t("featuresSubtitle")}
+          </p>
+        </ScrollReveal>
+
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {features.map((feature, index) => (
+            <FeatureCard
+              key={feature.titleKey}
+              icon={feature.icon}
+              title={t(feature.titleKey)}
+              description={t(feature.descKey)}
+              features={feature.pointKeys.map((key) => t(key))}
+              delay={index * 0.1}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

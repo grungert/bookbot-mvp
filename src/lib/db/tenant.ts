@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { cache } from "react";
+import type { MembershipRole } from "@prisma/client";
+
+// Maximum companies per user (before paid tiers)
+const MAX_COMPANIES_PER_USER = 3;
 
 // Get company by slug (cached per request)
 export const getCompanyBySlug = cache(async (slug: string) => {
@@ -65,6 +69,237 @@ export async function validateCompanyAdminAccess(companySlug: string) {
   }
 
   return result;
+}
+
+// Validate company membership access - checks CompanyMembership table
+// Falls back to legacy companyId if no membership found
+export async function validateCompanyMembershipAccess(companySlug: string) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { error: "Unauthorized", company: null, membership: null };
+  }
+
+  const company = await getCompanyBySlug(companySlug);
+
+  if (!company) {
+    return { error: "Company not found", company: null, membership: null };
+  }
+
+  // Super admin can access any company
+  if (user.role === "SUPER_ADMIN") {
+    return { error: null, company, user, membership: null };
+  }
+
+  // Check membership first
+  const membership = await prisma.companyMembership.findUnique({
+    where: {
+      userId_companyId: {
+        userId: user.id,
+        companyId: company.id,
+      },
+    },
+  });
+
+  if (membership) {
+    return { error: null, company, user, membership };
+  }
+
+  // Fall back to legacy companyId for backwards compatibility
+  if (user.companyId === company.id) {
+    return { error: null, company, user, membership: null };
+  }
+
+  return { error: "Access denied", company: null, membership: null };
+}
+
+// Get all companies a user can access
+export async function getUserCompanies(userId: string) {
+  // Get the user to check role and legacy companyId
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      company: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
+          primaryColor: true,
+        },
+      },
+    },
+  });
+
+  if (!user) return [];
+
+  // SUPER_ADMIN can see all companies
+  if (user.role === "SUPER_ADMIN") {
+    const allCompanies = await prisma.company.findMany({
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        logoUrl: true,
+        primaryColor: true,
+      },
+      orderBy: { name: "asc" },
+    });
+
+    return allCompanies.map((c, index) => ({
+      companyId: c.id,
+      companySlug: c.slug,
+      companyName: c.name,
+      logoUrl: c.logoUrl,
+      primaryColor: c.primaryColor,
+      role: "OWNER" as MembershipRole,
+      isPrimary: index === 0,
+    }));
+  }
+
+  // Get memberships for COMPANY_ADMIN
+  const memberships = await prisma.companyMembership.findMany({
+    where: { userId },
+    include: {
+      company: {
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          logoUrl: true,
+          primaryColor: true,
+        },
+      },
+    },
+    orderBy: [
+      { isPrimary: "desc" },
+      { createdAt: "asc" },
+    ],
+  });
+
+  const result: Array<{
+    companyId: string;
+    companySlug: string;
+    companyName: string;
+    logoUrl: string | null;
+    primaryColor: string | null;
+    role: MembershipRole;
+    isPrimary: boolean;
+  }> = [];
+
+  // Add legacy company first if it exists and is not already in memberships
+  if (user.company) {
+    const legacyCompanyInMemberships = memberships.some(
+      (m) => m.companyId === user.company!.id
+    );
+
+    if (!legacyCompanyInMemberships) {
+      result.push({
+        companyId: user.company.id,
+        companySlug: user.company.slug,
+        companyName: user.company.name,
+        logoUrl: user.company.logoUrl,
+        primaryColor: user.company.primaryColor,
+        role: "OWNER" as MembershipRole,
+        isPrimary: memberships.length === 0, // Primary only if no other memberships
+      });
+    }
+  }
+
+  // Add membership companies
+  memberships.forEach((m) => {
+    result.push({
+      companyId: m.company.id,
+      companySlug: m.company.slug,
+      companyName: m.company.name,
+      logoUrl: m.company.logoUrl,
+      primaryColor: m.company.primaryColor,
+      role: m.role,
+      isPrimary: m.isPrimary,
+    });
+  });
+
+  return result;
+}
+
+// Check if user can create more companies
+export async function checkCanCreateCompany(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+
+  // SUPER_ADMIN has no limit
+  if (user?.role === "SUPER_ADMIN") {
+    return { allowed: true, reason: null, currentCount: 0, maxCount: Infinity };
+  }
+
+  // Count existing memberships with OWNER role
+  const ownerCount = await prisma.companyMembership.count({
+    where: {
+      userId,
+      role: "OWNER",
+    },
+  });
+
+  if (ownerCount >= MAX_COMPANIES_PER_USER) {
+    return {
+      allowed: false,
+      reason: "Company limit reached",
+      currentCount: ownerCount,
+      maxCount: MAX_COMPANIES_PER_USER,
+    };
+  }
+
+  return {
+    allowed: true,
+    reason: null,
+    currentCount: ownerCount,
+    maxCount: MAX_COMPANIES_PER_USER,
+  };
+}
+
+// Set a company as primary for a user
+export async function setUserPrimaryCompany(userId: string, companyId: string) {
+  // Verify user has membership for this company
+  const membership = await prisma.companyMembership.findUnique({
+    where: {
+      userId_companyId: {
+        userId,
+        companyId,
+      },
+    },
+  });
+
+  if (!membership) {
+    throw new Error("Membership not found");
+  }
+
+  // Remove primary flag from all other memberships
+  await prisma.companyMembership.updateMany({
+    where: {
+      userId,
+      isPrimary: true,
+    },
+    data: {
+      isPrimary: false,
+    },
+  });
+
+  // Set the new primary
+  await prisma.companyMembership.update({
+    where: {
+      userId_companyId: {
+        userId,
+        companyId,
+      },
+    },
+    data: {
+      isPrimary: true,
+    },
+  });
+
+  return true;
 }
 
 // Create company (super admin only)

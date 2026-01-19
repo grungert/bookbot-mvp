@@ -68,7 +68,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
         {company.services.length === 0 ? (
           <p className="text-muted-foreground">{tServices("noServices")}</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-4">
+          <div className="flex flex-wrap justify-center gap-4 pt-4">
             {company.services.map((service, index) => {
               const serviceWithDiscount: ServiceWithDiscount = {
                 price: Number(service.price),
@@ -88,7 +88,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                 <div
                   key={service.id}
                   className={cn(
-                    "relative",
+                    "relative w-full md:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.67rem)]",
                     `animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`
                   )}
                   style={{ opacity: 0 }}
