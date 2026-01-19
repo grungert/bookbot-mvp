@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -20,10 +21,50 @@ interface UserMenuProps {
   companySlug?: string;
 }
 
+interface UserProfile {
+  name: string | null;
+  email: string;
+  image: string | null;
+}
+
 export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProps) {
   const { data: session } = useSession();
   const t = useTranslations("auth");
   const tNav = useTranslations("nav");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only rendering after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Fetch user profile to get the latest image
+  useEffect(() => {
+    if (session?.user) {
+      fetch("/api/user/profile")
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => {
+          if (data) {
+            setProfile(data);
+          }
+        })
+        .catch(() => {
+          // Silently fail - will use session data as fallback
+        });
+    }
+  }, [session?.user]);
+
+  // Render placeholder during SSR to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback>...</AvatarFallback>
+        </Avatar>
+      </Button>
+    );
+  }
 
   if (!session?.user) {
     return (
@@ -36,21 +77,25 @@ export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProp
   }
 
   const user = session.user;
-  const initials = user.name
-    ? user.name
+  const displayName = profile?.name || user.name;
+  const displayEmail = profile?.email || user.email;
+  const displayImage = profile?.image || user.image;
+
+  const initials = displayName
+    ? displayName
         .split(" ")
         .map((n) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : user.email?.charAt(0).toUpperCase() || "U";
+    : displayEmail?.charAt(0).toUpperCase() || "U";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.image || undefined} alt={user.name || ""} />
+            <AvatarImage src={displayImage || undefined} alt={displayName || ""} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
         </Button>
@@ -58,9 +103,9 @@ export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProp
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.name}</p>
+            <p className="text-sm font-medium leading-none">{displayName}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              {displayEmail}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -77,7 +122,7 @@ export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProp
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
-          <Link href={companySlug ? `/c/${companySlug}/user/profile` : "/user/profile"} className="cursor-pointer">
+          <Link href={companySlug ? `/c/${companySlug}/admin/profile` : "/user/profile"} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             {tNav("profile")}
           </Link>

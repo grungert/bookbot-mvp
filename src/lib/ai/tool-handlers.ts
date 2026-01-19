@@ -66,6 +66,12 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
       price: true,
       currency: true,
       color: true,
+      discountType: true,
+      discountValue: true,
+      discountStartDate: true,
+      discountEndDate: true,
+      promotionalBadge: true,
+      customBadgeLabel: true,
     },
     orderBy: { name: "asc" },
   });
@@ -95,6 +101,12 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
     price: Number(s.price),
     currency: s.currency,
     color: s.color,
+    discountType: s.discountType as "percentage" | "fixed" | null,
+    discountValue: s.discountValue ? Number(s.discountValue) : null,
+    discountStartDate: s.discountStartDate?.toISOString() ?? null,
+    discountEndDate: s.discountEndDate?.toISOString() ?? null,
+    promotionalBadge: s.promotionalBadge,
+    customBadgeLabel: s.customBadgeLabel,
   }));
 
   return {
