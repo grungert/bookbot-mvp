@@ -5,9 +5,8 @@ import { Clock, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { ChatService } from "../types";
-import { ServicePriceDisplay } from "@/components/service/service-price-display";
 import { PromotionalBadge } from "@/components/service/promotional-badge";
-import { isDiscountActive } from "@/lib/utils/discount";
+import { isDiscountActive, calculateDiscountedPrice } from "@/lib/utils/discount";
 
 interface ChatServiceSelectorProps {
   services: ChatService[];
@@ -54,48 +53,64 @@ export function ChatServiceSelector({
         const isSelected = selectedId === service.id;
         const hasDiscount = isDiscountActive(service);
 
+        // Calculate discount if applicable
+        const priceResult = hasDiscount ? calculateDiscountedPrice(service) : null;
+
         return (
           <button
             key={service.id}
             onClick={() => handleSelect(service)}
             disabled={disabled}
             className={cn(
-              "w-full p-3 border rounded-lg text-left transition-all duration-200 relative",
+              "w-full p-3 border rounded-lg text-left transition-all duration-200",
               "bg-background hover:bg-muted/50 hover:border-primary",
               isSelected && "border-primary bg-primary/5 ring-1 ring-primary/20",
               disabled && !isSelected && "opacity-40 cursor-default hover:bg-background hover:border-border",
               disabled && isSelected && "opacity-100 cursor-default"
             )}
           >
-            {/* Promotional Badge - top right */}
-            {(service.promotionalBadge || service.customBadgeLabel) && (
-              <div className="absolute top-1 right-1">
-                <PromotionalBadge
-                  badge={service.promotionalBadge}
-                  customLabel={service.customBadgeLabel}
-                  size="sm"
-                />
-              </div>
-            )}
             <div className="flex gap-2">
               <div
                 className="w-1 rounded-full shrink-0 self-stretch"
                 style={{ backgroundColor: service.color || "#3B82F6" }}
               />
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    {isSelected && (
-                      <Check className="h-4 w-4 text-primary shrink-0" />
-                    )}
-                    <h4 className="font-medium text-sm truncate">{service.name}</h4>
-                  </div>
-                  {hasDiscount ? (
-                    <ServicePriceDisplay service={service} size="sm" showCountdown={false} />
+                {/* Service name with badge inline */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {isSelected && (
+                    <Check className="h-4 w-4 text-primary shrink-0" />
+                  )}
+                  <h4 className="font-medium text-sm">{service.name}</h4>
+                  {(service.promotionalBadge || service.customBadgeLabel) && (
+                    <PromotionalBadge
+                      badge={service.promotionalBadge}
+                      customLabel={service.customBadgeLabel}
+                      size="sm"
+                    />
+                  )}
+                </div>
+
+                {/* Compact price display - single line */}
+                <div className="flex items-center gap-1.5 mt-1">
+                  {hasDiscount && priceResult ? (
+                    <>
+                      <span className="text-xs text-muted-foreground line-through">
+                        {priceResult.originalPrice.toLocaleString()}
+                      </span>
+                      <span className="text-sm font-medium text-emerald-600">
+                        {service.currency} {Math.round(priceResult.finalPrice).toLocaleString()}
+                      </span>
+                      <span
+                        className="text-[10px] font-bold px-1 py-0.5 rounded text-white"
+                        style={{ backgroundColor: service.color || "#3B82F6" }}
+                      >
+                        -{priceResult.discountPercentage}%
+                      </span>
+                    </>
                   ) : (
                     <Badge
                       variant="secondary"
-                      className="shrink-0 text-xs"
+                      className="text-xs"
                       style={{
                         backgroundColor: service.color ? `${service.color}20` : undefined,
                         color: service.color || undefined,
@@ -106,12 +121,13 @@ export function ChatServiceSelector({
                     </Badge>
                   )}
                 </div>
+
                 {service.description && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
                     {service.description}
                   </p>
                 )}
-                <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
                   <span>{service.duration} min</span>
                 </div>

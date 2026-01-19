@@ -112,6 +112,7 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [companyCurrency, setCompanyCurrency] = useState("RSD");
   const [isLoading, setIsLoading] = useState(true);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
@@ -172,7 +173,22 @@ export default function InvoicesPage() {
     loadInvoices();
     loadUsers();
     loadServices();
+    loadCompanySettings();
   }, [companySlug]);
+
+  async function loadCompanySettings() {
+    try {
+      const response = await fetch(`/api/c/${companySlug}/settings`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.currency) {
+          setCompanyCurrency(data.currency);
+        }
+      }
+    } catch (error) {
+      // Silently fail - will use default currency
+    }
+  }
 
   // Body scroll lock when panel is open
   useEffect(() => {
@@ -491,10 +507,10 @@ export default function InvoicesPage() {
     // Sum only PAID invoices
     const paidInvoices = dateFiltered.filter((inv) => inv.status === "PAID");
     const total = paidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
-    const currency = paidInvoices[0]?.currency || "RSD";
+    const currency = paidInvoices[0]?.currency || companyCurrency;
 
     return { total, currency, count: paidInvoices.length };
-  }, [invoices, datePeriod, customDateFrom, customDateTo]);
+  }, [invoices, datePeriod, customDateFrom, customDateTo, companyCurrency]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedInvoices.length / itemsPerPage);
@@ -1683,7 +1699,7 @@ export default function InvoicesPage() {
                 </div>
               ))}
               <div className="text-right text-sm font-medium pt-2 border-t">
-                {t("subtotal")}: RSD {calculateTotal().toLocaleString()}
+                {t("subtotal")}: {companyCurrency} {calculateTotal().toLocaleString()}
               </div>
             </div>
 

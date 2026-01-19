@@ -39,6 +39,7 @@ interface CompanySettings {
   headerDisplayMode: string;
   primaryColor: string;
   timezone: string;
+  currency: string;
   aiApiKey: string | null;
   hasAiApiKey: boolean;
   aiEndpoint: string | null;
@@ -87,6 +88,7 @@ export default function SettingsPage() {
   const [headerDisplayMode, setHeaderDisplayMode] = useState("both");
   const [primaryColor, setPrimaryColor] = useState("#3B82F6");
   const [timezone, setTimezone] = useState("Europe/Belgrade");
+  const [currency, setCurrency] = useState("RSD");
   const [aiApiKey, setAiApiKey] = useState("");
   const [hasExistingApiKey, setHasExistingApiKey] = useState(false);
   const [aiEndpoint, setAiEndpoint] = useState("");
@@ -194,6 +196,7 @@ export default function SettingsPage() {
       setHeaderDisplayMode(settings.headerDisplayMode || "both");
       setPrimaryColor(settings.primaryColor || "#3B82F6");
       setTimezone(settings.timezone || "Europe/Belgrade");
+      setCurrency(settings.currency || "RSD");
       setAiApiKey(settings.aiApiKey || "");
       setHasExistingApiKey(settings.hasAiApiKey);
       setAiEndpoint(settings.aiEndpoint || "");
@@ -230,6 +233,7 @@ export default function SettingsPage() {
         headerDisplayMode,
         primaryColor,
         timezone,
+        currency,
         aiEndpoint: aiEndpoint || null,
         aiModel: aiModel || null,
         aiSystemPrompt: aiSystemPrompt || null,
@@ -314,6 +318,23 @@ export default function SettingsPage() {
               onChange={(e) => setTimezone(e.target.value)}
               className="h-10"
             />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="currency" className="text-sm font-medium">{t("currency")}</Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="RSD">RSD - Serbian Dinar</SelectItem>
+                <SelectItem value="EUR">EUR - Euro</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("currencyHint")}
+            </p>
           </div>
         </div>
         <div className="space-y-2">

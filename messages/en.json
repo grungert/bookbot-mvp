@@ -401,6 +401,8 @@
     "businessEmail": "Business Email",
     "taxRate": "Tax Rate (%)",
     "taxRateHint": "Default tax rate for invoices",
+    "currency": "Currency",
+    "currencyHint": "Currency used for invoices and pricing",
     "documentsSubtitle": "Add documents to your knowledge base for the AI chatbot",
     "knowledgeBase": "Knowledge Base",
     "noDocuments": "No documents in your knowledge base yet",

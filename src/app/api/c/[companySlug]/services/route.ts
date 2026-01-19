@@ -8,7 +8,7 @@ const createServiceSchema = z.object({
   description: z.string().optional(),
   duration: z.number().int().min(5).max(480),
   price: z.number().min(0),
-  currency: z.string().default("RSD"),
+  currency: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   // Discount fields
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
@@ -111,7 +111,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         description: parsed.data.description,
         duration: parsed.data.duration,
         price: parsed.data.price,
-        currency: parsed.data.currency,
+        currency: parsed.data.currency || company.currency,
         color: parsed.data.color,
         discountType: parsed.data.discountType,
         discountValue: parsed.data.discountValue,

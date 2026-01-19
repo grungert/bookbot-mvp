@@ -70,7 +70,7 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
       period={period}
       customStartDate={isCustomPeriod ? startDate : undefined}
       customEndDate={isCustomPeriod ? endDate : undefined}
-      currency={company.timezone === "Europe/Belgrade" ? "RSD" : "EUR"}
+      currency={company.currency}
       primaryColor={company.primaryColor || undefined}
       translations={{
         title: t("title"),

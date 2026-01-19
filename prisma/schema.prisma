@@ -44,6 +44,7 @@ model Company {
   headerDisplayMode String   @default("both") // "both" | "logo" | "name"
   primaryColor      String   @default("#3B82F6")
   timezone     String   @default("Europe/Belgrade")
+  currency     String   @default("RSD")
 
   // AI Configuration
   aiApiKey       String?

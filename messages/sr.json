@@ -401,6 +401,8 @@
     "businessEmail": "Poslovni email",
     "taxRate": "Stopa poreza (%)",
     "taxRateHint": "Podrazumevana stopa poreza za fakture",
+    "currency": "Valuta",
+    "currencyHint": "Valuta za fakture i cene",
     "documentsSubtitle": "Dodajte dokumente u bazu znanja za AI chatbot",
     "knowledgeBase": "Baza znanja",
     "noDocuments": "Nema dokumenata u vasoj bazi znanja",
