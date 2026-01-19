@@ -50,6 +50,7 @@ export default async function CompanyLayout({
   return (
     <div
       className="min-h-screen"
+      data-theme-wrapper
       style={
         {
           "--company-primary": company.primaryColor,

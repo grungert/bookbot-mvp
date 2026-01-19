@@ -198,8 +198,7 @@ function NavContent({
               <ChevronLeft className="h-4 w-4" />
               {tNav("backToSite")}
             </Link>
-            <h2 className="font-semibold mt-2 truncate">{companyName}</h2>
-            <p className="text-xs text-muted-foreground">Admin Panel</p>
+            <h2 className="font-semibold mt-2">Admin Panel</h2>
           </>
         )}
       </div>
@@ -216,35 +215,16 @@ function NavContent({
                   "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
                   "hover:bg-muted/80",
                   isActive
-                    ? "bg-muted font-medium"
+                    ? "bg-primary/10 text-primary font-medium"
                     : "text-muted-foreground hover:text-foreground",
                   isCollapsed && "justify-center px-2"
                 )}
-                style={
-                  isActive && primaryColor
-                    ? {
-                        backgroundColor: `${primaryColor}15`,
-                        borderLeft: isCollapsed ? "none" : `3px solid ${primaryColor}`,
-                        paddingLeft: isCollapsed ? undefined : "9px",
-                        borderBottom: isCollapsed ? `2px solid ${primaryColor}` : undefined,
-                      }
-                    : isActive
-                    ? {
-                        borderLeft: isCollapsed ? "none" : "3px solid hsl(var(--primary))",
-                        paddingLeft: isCollapsed ? undefined : "9px",
-                        borderBottom: isCollapsed ? "2px solid hsl(var(--primary))" : undefined,
-                      }
-                    : undefined
-                }
               >
-                <span
-                  style={primaryColor ? { color: primaryColor } : undefined}
-                  className={cn(!primaryColor && isActive && "text-primary")}
-                >
+                <span className={cn(isActive && "text-primary")}>
                   <item.icon className="h-4 w-4 shrink-0" />
                 </span>
                 {!isCollapsed && (
-                  <span className={cn(isActive && !primaryColor && "text-foreground")}>
+                  <span className={cn(isActive && "text-primary")}>
                     {item.label}
                   </span>
                 )}

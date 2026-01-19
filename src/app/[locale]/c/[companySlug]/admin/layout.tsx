@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { AdminSidebar, AdminMobileNav, SidebarProvider, AdminMainContent } from "@/components/admin/admin-sidebar";
 import { UserMenu } from "@/components/navigation/user-menu";
+import { LanguageSwitcher } from "@/components/navigation/language-switcher";
 import { prisma } from "@/lib/prisma";
 
 interface AdminLayoutProps {
@@ -75,7 +76,8 @@ export default async function AdminLayout({
               actionableInvoicesCount={actionableInvoicesCount}
             />
             <span className="font-semibold ml-2">{company.name}</span>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <LanguageSwitcher />
               <UserMenu showDashboardLink={false} />
             </div>
           </div>

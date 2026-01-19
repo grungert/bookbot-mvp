@@ -127,6 +127,15 @@
 
 /* Animation Utilities */
 @layer utilities {
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Stagger delay utilities for sequential animations */
   .stagger-1 { animation-delay: 50ms; }
   .stagger-2 { animation-delay: 100ms; }
@@ -336,6 +345,61 @@
   }
 }
 
+/* Discount and promotional badge animations */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes countdown-tick {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes strikethrough-animate {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@layer utilities {
+  .animate-pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
+  }
+
+  .animate-countdown-tick {
+    animation: countdown-tick 1s ease-in-out infinite;
+  }
+
+  .discount-strikethrough {
+    position: relative;
+  }
+
+  .discount-strikethrough::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 100%;
+    height: 1px;
+    background-color: currentColor;
+    animation: strikethrough-animate 0.3s ease-out forwards;
+  }
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -354,10 +418,17 @@
   .animate-success-bounce,
   .animate-icon-pulse,
   .animate-trend-bounce,
+  .animate-pulse-subtle,
+  .animate-countdown-tick,
   .filter-item {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  .discount-strikethrough::after {
+    animation: none !important;
+    width: 100% !important;
   }
 
   .hover-lift:hover {
@@ -368,4 +439,125 @@
   .appointment-card {
     transition: none !important;
   }
+}
+
+/* MDEditor Custom Styles */
+.md-editor-wrapper {
+  --md-editor-radius: var(--radius);
+}
+
+.md-editor-wrapper .w-md-editor {
+  border-radius: var(--md-editor-radius) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  overflow: hidden;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar {
+  border-bottom: 1px solid var(--border) !important;
+  background-color: var(--muted) !important;
+  border-radius: var(--md-editor-radius) var(--md-editor-radius) 0 0 !important;
+  padding: 8px 12px !important;
+  min-height: 44px !important;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar ul {
+  gap: 2px;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar li > button {
+  border-radius: 6px !important;
+  padding: 6px !important;
+  height: 32px !important;
+  width: 32px !important;
+  margin: 0 !important;
+  transition: all 0.15s ease !important;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar li > button:hover {
+  background-color: var(--background) !important;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar li > button:active,
+.md-editor-wrapper .w-md-editor-toolbar li.active > button {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar li > button svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.md-editor-wrapper .w-md-editor-toolbar-divider {
+  background-color: var(--border) !important;
+  height: 20px !important;
+  margin: 0 8px !important;
+}
+
+.md-editor-wrapper .w-md-editor-content {
+  background-color: var(--background) !important;
+}
+
+.md-editor-wrapper .w-md-editor-text-input,
+.md-editor-wrapper .w-md-editor-text-pre {
+  font-family: var(--font-mono), ui-monospace, monospace !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  padding: 16px !important;
+}
+
+.md-editor-wrapper .w-md-editor-text-input::placeholder {
+  color: var(--muted-foreground) !important;
+  opacity: 0.6;
+}
+
+.md-editor-wrapper .w-md-editor-area {
+  border-radius: 0 0 var(--md-editor-radius) var(--md-editor-radius) !important;
+}
+
+/* Preview mode styles */
+.md-editor-wrapper .w-md-editor-preview {
+  padding: 16px !important;
+  background-color: var(--muted) !important;
+  border-left: 1px solid var(--border) !important;
+}
+
+.md-editor-wrapper .wmde-markdown {
+  background-color: transparent !important;
+  font-family: var(--font-sans), system-ui, sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.7 !important;
+}
+
+/* Dark mode adjustments */
+[data-color-mode="dark"] .md-editor-wrapper .w-md-editor {
+  --color-canvas-default: var(--background);
+  --color-canvas-subtle: var(--muted);
+  --color-border-default: var(--border);
+  --color-fg-default: var(--foreground);
+  --color-fg-muted: var(--muted-foreground);
+}
+
+[data-color-mode="dark"] .md-editor-wrapper .w-md-editor-toolbar {
+  background-color: oklch(0.2 0 0) !important;
+}
+
+[data-color-mode="dark"] .md-editor-wrapper .w-md-editor-toolbar li > button:hover {
+  background-color: oklch(0.3 0 0) !important;
+}
+
+[data-color-mode="dark"] .md-editor-wrapper .w-md-editor-content {
+  background-color: var(--background) !important;
+}
+
+[data-color-mode="dark"] .md-editor-wrapper .w-md-editor-preview {
+  background-color: oklch(0.18 0 0) !important;
+}
+
+/* Focus states */
+.md-editor-wrapper .w-md-editor:focus-within {
+  border-color: var(--ring) !important;
+  outline: none !important;
 }

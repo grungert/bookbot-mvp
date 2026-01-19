@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { UserMenu } from "./user-menu";
 import { MobileNav } from "./mobile-nav";
+import { LanguageSwitcher } from "./language-switcher";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Settings, Calendar } from "lucide-react";
@@ -97,6 +98,7 @@ export function Header({
               </Button>
             </Link>
           )}
+          <LanguageSwitcher />
           <UserMenu companySlug={companySlug} />
         </div>
       </div>
