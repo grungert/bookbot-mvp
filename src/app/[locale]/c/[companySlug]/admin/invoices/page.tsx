@@ -81,6 +81,7 @@ interface Invoice {
   status: "DRAFT" | "SENT" | "PAID" | "CANCELLED";
   issueDate: string;
   dueDate: string | null;
+  appointmentDate: string | null;
   subtotal: number;
   tax: number;
   total: number;
@@ -681,7 +682,7 @@ export default function InvoicesPage() {
         <div>
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage and track your invoices
+            {t("subtitle")}
           </p>
         </div>
         <Button
@@ -750,7 +751,7 @@ export default function InvoicesPage() {
                 className="text-xs text-muted-foreground hover:text-foreground ml-1"
                 onClick={() => setStatusFilters(new Set())}
               >
-                Clear
+                {t("clear")}
               </button>
             )}
           </div>
@@ -759,9 +760,9 @@ export default function InvoicesPage() {
         {/* Date Period Filter - Dashboard style */}
         <div className="inline-flex items-center gap-1 rounded-lg border bg-muted p-1">
           {([
-            { value: "7d", label: "7 Days" },
-            { value: "30d", label: "30 Days" },
-            { value: "90d", label: "90 Days" },
+            { value: "7d", label: t("days7") },
+            { value: "30d", label: t("days30") },
+            { value: "90d", label: t("days90") },
           ] as const).map((period) => (
             <button
               key={period.value}
@@ -790,13 +791,13 @@ export default function InvoicesPage() {
                 <span className="hidden sm:inline">
                   {datePeriod === "custom" && customDateFrom && customDateTo
                     ? `${format(new Date(customDateFrom), "MMM d")} - ${format(new Date(customDateTo), "MMM d")}`
-                    : "Custom"}
+                    : t("custom")}
                 </span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <div className="p-3 border-b">
-                <p className="text-sm font-medium">Select date range</p>
+                <p className="text-sm font-medium">{t("selectDateRange")}</p>
               </div>
               <div
                 className="[&_[data-selected-single=true]]:!bg-[var(--calendar-primary)] [&_[data-range-start=true]]:!bg-[var(--calendar-primary)] [&_[data-range-end=true]]:!bg-[var(--calendar-primary)] [&_.rdp-range_start]:!bg-[var(--calendar-primary)]/10 [&_.rdp-range_end]:!bg-[var(--calendar-primary)]/10"
@@ -815,9 +816,9 @@ export default function InvoicesPage() {
                 <div className="text-sm text-muted-foreground">
                   {dateRange?.from && (
                     <span>
-                      From: {format(dateRange.from, "MMM d, yyyy")}
+                      {t("from")}: {format(dateRange.from, "MMM d, yyyy")}
                       {dateRange?.to && (
-                        <> → To: {format(dateRange.to, "MMM d, yyyy")}</>
+                        <> → {t("to")}: {format(dateRange.to, "MMM d, yyyy")}</>
                       )}
                     </span>
                   )}
@@ -835,7 +836,7 @@ export default function InvoicesPage() {
                   disabled={!dateRange?.from || !dateRange?.to}
                   style={primaryColor ? { backgroundColor: primaryColor } : undefined}
                 >
-                  Apply
+                  {t("apply")}
                 </Button>
               </div>
             </PopoverContent>
@@ -851,7 +852,7 @@ export default function InvoicesPage() {
           </div>
           <div>
             <p className="text-xs text-green-700 font-medium">
-              Paid in selected period ({paidTotalForPeriod.count} invoice{paidTotalForPeriod.count !== 1 ? "s" : ""})
+              {t("paidInPeriod")} ({paidTotalForPeriod.count} {paidTotalForPeriod.count !== 1 ? t("invoices") : t("invoice")})
             </p>
             <p className="text-lg font-bold text-green-800">
               {paidTotalForPeriod.currency} {paidTotalForPeriod.total.toLocaleString()}
@@ -865,8 +866,8 @@ export default function InvoicesPage() {
         <div className="p-4 border-b flex items-center justify-between">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {filteredAndSortedInvoices.length === invoices.length
-              ? `All Invoices (${invoices.length})`
-              : `Filtered Invoices (${filteredAndSortedInvoices.length} of ${invoices.length})`}
+              ? `${t("allInvoices")} (${invoices.length})`
+              : `${t("filteredInvoices")} (${filteredAndSortedInvoices.length} ${t("of")} ${invoices.length})`}
           </h3>
           {statusFilters.size > 0 && (
             <Button
@@ -878,7 +879,7 @@ export default function InvoicesPage() {
               }}
             >
               <X className="h-3 w-3 mr-1" />
-              Clear status filter
+              {t("clearStatusFilter")}
             </Button>
           )}
         </div>
@@ -901,7 +902,7 @@ export default function InvoicesPage() {
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
               <FileText className="h-6 w-6 text-muted-foreground" />
             </div>
-            <p className="text-muted-foreground">No invoices match your filters</p>
+            <p className="text-muted-foreground">{t("noMatchingInvoices")}</p>
             <Button
               onClick={() => {
                 setStatusFilters(new Set());
@@ -912,7 +913,7 @@ export default function InvoicesPage() {
               variant="link"
               className="mt-2 text-primary"
             >
-              Reset filters
+              {t("resetFilters")}
             </Button>
           </div>
         ) : (
@@ -921,7 +922,7 @@ export default function InvoicesPage() {
             {selectedIds.size > 0 && (
               <div className="flex items-center justify-between bg-muted/50 px-4 py-3 border-b animate-fade-in">
                 <span className="text-sm font-medium">
-                  {selectedIds.size} invoice{selectedIds.size !== 1 ? "s" : ""} selected
+                  {selectedIds.size} {selectedIds.size !== 1 ? t("invoices") : t("invoice")} {t("selected")}
                 </span>
                 <Button
                   variant="destructive"
@@ -929,7 +930,7 @@ export default function InvoicesPage() {
                   onClick={() => setIsBulkDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Selected
+                  {t("deleteSelected")}
                 </Button>
               </div>
             )}
@@ -960,7 +961,7 @@ export default function InvoicesPage() {
                       className="flex items-center hover:text-foreground transition-colors"
                       onClick={() => handleSort("customer")}
                     >
-                      Customer
+                      {t("customer")}
                       {getSortIcon("customer")}
                     </button>
                   </TableHead>
@@ -973,6 +974,9 @@ export default function InvoicesPage() {
                       {t("issueDate")}
                       {getSortIcon("issueDate")}
                     </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    {t("appointmentDate")}
                   </TableHead>
                   <TableHead className="text-xs font-medium">
                     <button
@@ -994,7 +998,7 @@ export default function InvoicesPage() {
                       {getSortIcon("status")}
                     </button>
                   </TableHead>
-                  <TableHead className="text-xs font-medium text-center">Status Actions</TableHead>
+                  <TableHead className="text-xs font-medium text-center">{t("statusActions")}</TableHead>
                   <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1029,6 +1033,13 @@ export default function InvoicesPage() {
                       <span className="text-sm">{format(parseISO(invoice.issueDate), "MMM d, yyyy")}</span>
                     </TableCell>
                     <TableCell>
+                      {invoice.appointmentDate ? (
+                        <span className="text-sm">{format(parseISO(invoice.appointmentDate), "MMM d, yyyy HH:mm")}</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <span className="font-medium">{invoice.currency} {Number(invoice.total).toLocaleString()}</span>
                     </TableCell>
                     <TableCell>{getStatusBadge(invoice.status)}</TableCell>
@@ -1043,7 +1054,7 @@ export default function InvoicesPage() {
                             onClick={() => updateStatus(invoice.id, "SENT")}
                             style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
                           >
-                            Send
+                            {t("send")}
                           </Button>
                         )}
                         {invoice.status === "SENT" && (
@@ -1053,7 +1064,7 @@ export default function InvoicesPage() {
                             className="h-8 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
                             onClick={() => updateStatus(invoice.id, "PAID")}
                           >
-                            Mark Paid
+                            {t("markPaid")}
                           </Button>
                         )}
                         {(invoice.status === "PAID" || invoice.status === "CANCELLED") && (
@@ -1094,7 +1105,7 @@ export default function InvoicesPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t">
                 <p className="text-sm text-muted-foreground">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredAndSortedInvoices.length)} of {filteredAndSortedInvoices.length}
+                  {t("showing")} {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredAndSortedInvoices.length)} {t("of")} {filteredAndSortedInvoices.length}
                 </p>
                 <div className="flex items-center gap-1">
                   <Button
@@ -1149,15 +1160,15 @@ export default function InvoicesPage() {
       <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} Invoice{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteInvoice")} ({selectedIds.size})</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The following invoices will be permanently deleted:
+              {t("deleteConfirmation")}
               <ul className="mt-2 list-disc list-inside text-sm">
                 {getSelectedInvoiceNumbers().slice(0, 5).map((num) => (
                   <li key={num}>{num}</li>
                 ))}
                 {selectedIds.size > 5 && (
-                  <li>...and {selectedIds.size - 5} more</li>
+                  <li>...{t("andMore", { count: selectedIds.size - 5 })}</li>
                 )}
               </ul>
             </AlertDialogDescription>
@@ -1172,7 +1183,7 @@ export default function InvoicesPage() {
               {isBulkDeleting ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Delete {selectedIds.size} Invoice{selectedIds.size !== 1 ? "s" : ""}
+              {tCommon("delete")} ({selectedIds.size})
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1182,10 +1193,10 @@ export default function InvoicesPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteInvoice")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete invoice <strong>{deletingInvoice?.invoiceNumber}</strong>?
-              This action cannot be undone.
+              {t("areYouSure")} <strong>{deletingInvoice?.invoiceNumber}</strong>?
+              {t("cannotBeUndone")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1198,7 +1209,7 @@ export default function InvoicesPage() {
               {isDeleting ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Delete
+              {tCommon("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1239,22 +1250,28 @@ export default function InvoicesPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Customer
+                    {t("customer")}
                   </h4>
                   <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
                   <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
                 </div>
                 <div className="text-right">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Dates
+                    {t("dates")}
                   </h4>
+                  {viewingInvoice.appointmentDate && (
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">{t("appointmentDate")}:</span>{" "}
+                      {format(parseISO(viewingInvoice.appointmentDate), "MMM d, yyyy HH:mm")}
+                    </p>
+                  )}
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Issued:</span>{" "}
+                    <span className="text-muted-foreground">{t("issued")}:</span>{" "}
                     {format(parseISO(viewingInvoice.issueDate), "MMM d, yyyy")}
                   </p>
                   {viewingInvoice.dueDate && (
                     <p className="text-sm">
-                      <span className="text-muted-foreground">Due:</span>{" "}
+                      <span className="text-muted-foreground">{t("due")}:</span>{" "}
                       {format(parseISO(viewingInvoice.dueDate), "MMM d, yyyy")}
                     </p>
                   )}
@@ -1270,9 +1287,9 @@ export default function InvoicesPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Description</TableHead>
-                        <TableHead className="text-xs text-center w-20">Qty</TableHead>
-                        <TableHead className="text-xs text-right w-28">Unit Price</TableHead>
+                        <TableHead className="text-xs">{t("description")}</TableHead>
+                        <TableHead className="text-xs text-center w-20">{t("qty")}</TableHead>
+                        <TableHead className="text-xs text-right w-28">{t("unitPrice")}</TableHead>
                         <TableHead className="text-xs text-right w-28">{t("total")}</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1318,11 +1335,11 @@ export default function InvoicesPage() {
               <div className="flex justify-end">
                 <div className="w-64 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">{t("subtotal")}</span>
                     <span>{viewingInvoice.currency} {Number(viewingInvoice.subtotal).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Tax</span>
+                    <span className="text-muted-foreground">{t("tax")}</span>
                     <span>{viewingInvoice.currency} {Number(viewingInvoice.tax).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-semibold text-lg pt-2 border-t">
@@ -1336,7 +1353,7 @@ export default function InvoicesPage() {
               {viewingInvoice.notes && (
                 <div>
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Notes
+                    {t("notes")}
                   </h4>
                   <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
                     {viewingInvoice.notes}
@@ -1355,13 +1372,13 @@ export default function InvoicesPage() {
                     style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
                   >
                     <Pencil className="h-4 w-4 mr-2" />
-                    Edit
+                    {t("edit")}
                   </Button>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={closePanel}>
-                  Close
+                  {t("close")}
                 </Button>
                 {viewingInvoice.status === "DRAFT" && (
                   <Button
@@ -1371,7 +1388,7 @@ export default function InvoicesPage() {
                     }}
                     style={primaryColor ? { backgroundColor: primaryColor } : undefined}
                   >
-                    Send Invoice
+                    {t("sendInvoice")}
                   </Button>
                 )}
                 {viewingInvoice.status === "SENT" && (
@@ -1382,7 +1399,7 @@ export default function InvoicesPage() {
                       closePanel();
                     }}
                   >
-                    Mark as Paid
+                    {t("markAsPaid")}
                   </Button>
                 )}
               </div>
@@ -1411,7 +1428,7 @@ export default function InvoicesPage() {
           {/* Panel Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-xl font-semibold">
-              {editingInvoice ? "Edit Invoice" : t("createInvoice")}
+              {editingInvoice ? t("editInvoice") : t("createInvoice")}
             </h2>
             <Button type="button" variant="ghost" size="icon" onClick={closeFormPanel}>
               <X className="h-5 w-5" />
@@ -1422,10 +1439,10 @@ export default function InvoicesPage() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Customer</Label>
+                <Label>{t("customer")}</Label>
                 <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
+                    <SelectValue placeholder={t("selectCustomer")} />
                   </SelectTrigger>
                   <SelectContent>
                     {users.map((user) => (
@@ -1449,7 +1466,7 @@ export default function InvoicesPage() {
                       )}
                     >
                       <Calendar className="mr-2 h-4 w-4" />
-                      {dueDate ? format(new Date(dueDate), "PPP") : "Select date"}
+                      {dueDate ? format(new Date(dueDate), "PPP") : t("selectDateRange")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1545,7 +1562,7 @@ export default function InvoicesPage() {
                         }}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select service or custom" />
+                          <SelectValue placeholder={t("selectServiceOrCustom")} />
                         </SelectTrigger>
                         <SelectContent>
                           {services.map((service) => {
@@ -1584,7 +1601,7 @@ export default function InvoicesPage() {
                             );
                           })}
                           <SelectItem value="custom">
-                            <span className="text-muted-foreground">+ Custom Item</span>
+                            <span className="text-muted-foreground">{t("customItem")}</span>
                           </SelectItem>
                         </SelectContent>
                       </Select>
@@ -1603,7 +1620,7 @@ export default function InvoicesPage() {
                   {/* Show custom description input only for custom items */}
                   {!item.serviceId && (
                     <Input
-                      placeholder="Enter item description"
+                      placeholder={t("enterDescription")}
                       value={item.description}
                       onChange={(e) =>
                         updateLineItem(index, { description: e.target.value })
@@ -1612,7 +1629,7 @@ export default function InvoicesPage() {
                   )}
                   <div className="flex gap-2 items-center">
                     <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Qty</Label>
+                      <Label className="text-xs text-muted-foreground">{t("qty")}</Label>
                       <Input
                         type="number"
                         min="1"
@@ -1623,7 +1640,7 @@ export default function InvoicesPage() {
                       />
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Unit Price</Label>
+                      <Label className="text-xs text-muted-foreground">{t("unitPrice")}</Label>
                       {item.discountPercentage && item.originalUnitPrice ? (
                         <div className="h-9 px-3 py-1 text-sm bg-muted rounded-md flex flex-col justify-center">
                           <span className="text-[10px] text-muted-foreground line-through leading-none">
@@ -1647,7 +1664,7 @@ export default function InvoicesPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <Label className="text-xs text-muted-foreground">Total</Label>
+                      <Label className="text-xs text-muted-foreground">{t("total")}</Label>
                       <div className="h-9 px-3 py-2 text-sm font-medium bg-muted rounded-md">
                         {(item.quantity * item.unitPrice).toLocaleString()}
                       </div>
@@ -1656,22 +1673,22 @@ export default function InvoicesPage() {
                   {item.discountPercentage && item.discountPercentage > 0 && (
                     <div className="flex items-center gap-2 text-xs text-green-600">
                       <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] px-1.5 py-0">
-                        -{item.discountPercentage}% discount applied
+                        -{item.discountPercentage}% {t("discountApplied")}
                       </Badge>
                       <span>
-                        You save {((item.originalUnitPrice || 0) - item.unitPrice).toLocaleString()} per item
+                        {t("youSave", { amount: ((item.originalUnitPrice || 0) - item.unitPrice).toLocaleString() })}
                       </span>
                     </div>
                   )}
                 </div>
               ))}
               <div className="text-right text-sm font-medium pt-2 border-t">
-                Subtotal: RSD {calculateTotal().toLocaleString()}
+                {t("subtotal")}: RSD {calculateTotal().toLocaleString()}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">{t("notes")}</Label>
               <Textarea
                 id="notes"
                 value={notes}
@@ -1694,7 +1711,7 @@ export default function InvoicesPage() {
               {isSubmitting && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              {editingInvoice ? "Save Changes" : tCommon("create")}
+              {editingInvoice ? t("saveChanges") : tCommon("create")}
             </Button>
           </div>
         </form>

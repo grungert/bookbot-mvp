@@ -229,6 +229,7 @@ model Invoice {
 
   appointmentId  String?       @unique
   appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+  appointmentDate DateTime?    // Date and time of the appointment
 
   invoiceNumber  String
   status         InvoiceStatus @default(DRAFT)

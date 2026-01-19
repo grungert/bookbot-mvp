@@ -6,6 +6,7 @@ interface GenerateInvoiceParams {
   companyId: string;
   userId: string;
   appointmentId: string;
+  appointmentDate: Date;
   serviceName: string;
   serviceDuration: number;
   servicePrice: Prisma.Decimal | number;
@@ -45,6 +46,7 @@ export async function createInvoiceForAppointment(
     companyId,
     userId,
     appointmentId,
+    appointmentDate,
     serviceName,
     serviceDuration,
     servicePrice,
@@ -133,6 +135,7 @@ export async function createInvoiceForAppointment(
       companyId,
       userId,
       appointmentId,
+      appointmentDate,
       invoiceNumber,
       status: "SENT", // Automatically sent to customer
       dueDate,

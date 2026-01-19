@@ -182,6 +182,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           companyId: company.id,
           userId: updated.userId,
           appointmentId: updated.id,
+          appointmentDate: updated.startTime,
           serviceName: updated.service.name,
           serviceDuration: updated.service.duration,
           servicePrice: updated.service.price,
