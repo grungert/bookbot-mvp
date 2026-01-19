@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Document {
   id: string;
@@ -58,6 +59,13 @@ export default function DocumentsPage() {
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+
+  // Selection and sorting state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<"title" | "updatedAt" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -153,6 +161,101 @@ export default function DocumentsPage() {
     }
   }
 
+  // Sorting helper
+  const sortedDocuments = useMemo(() => {
+    if (!sortColumn) return documents;
+
+    return [...documents].sort((a, b) => {
+      let comparison = 0;
+
+      if (sortColumn === "title") {
+        comparison = a.title.localeCompare(b.title);
+      } else if (sortColumn === "updatedAt") {
+        comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [documents, sortColumn, sortDirection]);
+
+  // Selection helpers
+  function toggleSelectAll() {
+    if (selectedIds.size === documents.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(documents.map((doc) => doc.id)));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  }
+
+  // Sorting handler
+  function handleSort(column: "title" | "updatedAt") {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }
+
+  // Get sort icon for column
+  function getSortIcon(column: "title" | "updatedAt") {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1" />
+    );
+  }
+
+  // Bulk delete handler
+  async function handleBulkDelete() {
+    setIsBulkDeleting(true);
+
+    try {
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/c/${companySlug}/documents/${id}`, { method: "DELETE" })
+      );
+
+      const results = await Promise.allSettled(deletePromises);
+      const successCount = results.filter((r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<Response>).value.ok).length;
+      const failCount = selectedIds.size - successCount;
+
+      if (successCount > 0) {
+        toast.success(`${successCount} document(s) deleted successfully`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} document(s)`);
+      }
+
+      setSelectedIds(new Set());
+      setIsBulkDeleteOpen(false);
+      loadDocuments();
+    } catch {
+      toast.error("Failed to delete documents. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  // Get selected document titles for confirmation
+  function getSelectedDocumentTitles(): string[] {
+    return documents
+      .filter((doc) => selectedIds.has(doc.id))
+      .map((doc) => doc.title);
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -164,7 +267,7 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold">{t("documents")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -248,75 +351,166 @@ export default function DocumentsPage() {
             </Button>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-medium">Title</TableHead>
-                <TableHead className="text-xs font-medium">Preview</TableHead>
-                <TableHead className="text-xs font-medium">Last Updated</TableHead>
-                <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {documents.map((doc) => (
-                <TableRow key={doc.id} className="hover:bg-muted/50 transition-colors">
-                  <TableCell className="font-medium">{doc.title}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
-                    {doc.content.substring(0, 100)}...
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{format(parseISO(doc.updatedAt), "MMM d, yyyy")}</span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                        onClick={() => openEditDialog(doc)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Document?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete &quot;{doc.title}&quot;? This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDelete(doc.id)}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              disabled={deletingDocumentId === doc.id}
-                            >
-                              {deletingDocumentId === doc.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              ) : null}
-                              {tCommon("delete")}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
+          <>
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-muted/50 px-4 py-3 border-b animate-fade-in">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} document{selectedIds.size !== 1 ? "s" : ""} selected
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
+            )}
+
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={documents.length > 0 && selectedIds.size === documents.length}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("title")}
+                    >
+                      Title
+                      {getSortIcon("title")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">Preview</TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("updatedAt")}
+                    >
+                      Last Updated
+                      {getSortIcon("updatedAt")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sortedDocuments.map((doc, index) => (
+                  <TableRow
+                    key={doc.id}
+                    className={`hover:bg-muted/50 transition-colors ${
+                      selectedIds.has(doc.id) ? "bg-primary/5" : ""
+                    }`}
+                    style={{ animationDelay: `${index * 30}ms` }}
+                    data-state={selectedIds.has(doc.id) ? "selected" : undefined}
+                  >
+                    <TableCell className="w-12">
+                      <Checkbox
+                        checked={selectedIds.has(doc.id)}
+                        onCheckedChange={() => toggleSelectOne(doc.id)}
+                        aria-label={`Select ${doc.title}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{doc.title}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
+                      {doc.content.substring(0, 100)}...
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{format(parseISO(doc.updatedAt), "MMM d, yyyy")}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                          onClick={() => openEditDialog(doc)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Document?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete &quot;{doc.title}&quot;? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDelete(doc.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                disabled={deletingDocumentId === doc.id}
+                              >
+                                {deletingDocumentId === doc.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : null}
+                                {tCommon("delete")}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
         )}
       </div>
+
+      {/* Bulk Delete AlertDialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Document{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The following documents will be permanently deleted:
+              <ul className="mt-2 list-disc list-inside text-sm">
+                {getSelectedDocumentTitles().slice(0, 5).map((title) => (
+                  <li key={title}>{title}</li>
+                ))}
+                {selectedIds.size > 5 && (
+                  <li>...and {selectedIds.size - 5} more</li>
+                )}
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete {selectedIds.size} Document{selectedIds.size !== 1 ? "s" : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

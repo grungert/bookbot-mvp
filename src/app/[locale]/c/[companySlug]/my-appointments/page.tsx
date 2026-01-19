@@ -57,6 +57,7 @@ export default function MyAppointmentsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const storageKey = `appointments-service-filter-${companySlug}`;
+  const viewModeStorageKey = `appointments-view-mode-${companySlug}`;
 
   // Get unique services with counts for filter badges
   const servicesWithCounts = useMemo(() => {
@@ -111,6 +112,28 @@ export default function MyAppointmentsPage() {
       localStorage.setItem(storageKey, JSON.stringify(selectedServiceIds));
     }
   }, [selectedServiceIds, storageKey]);
+
+  // Initialize view mode from localStorage
+  useEffect(() => {
+    try {
+      const savedViewMode = localStorage.getItem(viewModeStorageKey);
+      if (savedViewMode === "calendar" || savedViewMode === "list") {
+        setViewMode(savedViewMode);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [viewModeStorageKey]);
+
+  // Save view mode to localStorage when it changes
+  const handleViewModeChange = useCallback((mode: "calendar" | "list") => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem(viewModeStorageKey, mode);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [viewModeStorageKey]);
 
   // Filter appointments based on selected services and date range
   const filteredAppointments = useMemo(() => {
@@ -232,7 +255,7 @@ export default function MyAppointmentsPage() {
       <AppointmentsHeader
         appointments={appointments}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         companySlug={companySlug}
         t={t}
       />

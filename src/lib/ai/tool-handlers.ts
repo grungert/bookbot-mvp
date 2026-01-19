@@ -6,10 +6,12 @@ import { addMinutes, format, parseISO } from "date-fns";
 import type {
   ToolParams,
   GetServicesParams,
+  GetDatePickerParams,
   GetAvailableSlotsParams,
   CreateBookingParams,
   SearchAppointmentsParams,
 } from "./tools";
+import type { ChatUIComponent } from "@/components/chat/types";
 
 // Context passed to tool handlers
 export interface ToolContext {
@@ -25,6 +27,7 @@ export interface ToolResult {
   success: boolean;
   data?: unknown;
   userMessage: string;
+  ui?: ChatUIComponent;
 }
 
 // Main handler that routes to specific tool handlers
@@ -35,6 +38,8 @@ export async function executeToolAction(
   switch (params.tool) {
     case "getServices":
       return handleGetServices(context);
+    case "getDatePicker":
+      return handleGetDatePicker(context, params);
     case "getAvailableSlots":
       return handleGetAvailableSlots(context, params);
     case "createBooking":
@@ -60,6 +65,7 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
       duration: true,
       price: true,
       currency: true,
+      color: true,
     },
     orderBy: { name: "asc" },
   });
@@ -80,10 +86,74 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
     price: `${s.currency} ${s.price}`,
   }));
 
+  // UI data for service selector
+  const uiServices = services.map((s) => ({
+    id: s.id,
+    name: s.name,
+    description: s.description,
+    duration: s.duration,
+    price: Number(s.price),
+    currency: s.currency,
+    color: s.color,
+  }));
+
   return {
     success: true,
     data: formattedServices,
     userMessage: `Found ${services.length} available service(s).`,
+    ui: {
+      component: "service-selector",
+      props: { services: uiServices },
+    },
+  };
+}
+
+// Show date picker for a service
+async function handleGetDatePicker(
+  context: ToolContext,
+  params: GetDatePickerParams
+): Promise<ToolResult> {
+  // Validate service exists
+  const service = await prisma.service.findFirst({
+    where: {
+      id: params.serviceId,
+      companyId: context.companyId,
+      isActive: true,
+    },
+  });
+
+  if (!service) {
+    return {
+      success: false,
+      userMessage:
+        "Service not found. Please use getServices to see available services.",
+    };
+  }
+
+  // Get closed days
+  const allWorkingHours = await prisma.workingHours.findMany({
+    where: { companyId: context.companyId },
+    select: { dayOfWeek: true, isOpen: true },
+  });
+  const closedDays = allWorkingHours
+    .filter((wh) => !wh.isOpen)
+    .map((wh) => wh.dayOfWeek);
+
+  return {
+    success: true,
+    data: {
+      service: service.name,
+      serviceId: service.id,
+    },
+    userMessage: `Ready to select a date for ${service.name}.`,
+    ui: {
+      component: "date-picker",
+      props: {
+        serviceId: service.id,
+        serviceName: service.name,
+        closedDays,
+      },
+    },
   };
 }
 
@@ -149,10 +219,27 @@ async function handleGetAvailableSlots(
   const slots = await getAvailableSlots(context.companyId, date, service.duration);
 
   if (slots.length === 0) {
+    // Get closed days for the date picker UI
+    const allWorkingHours = await prisma.workingHours.findMany({
+      where: { companyId: context.companyId },
+      select: { dayOfWeek: true, isOpen: true },
+    });
+    const closedDays = allWorkingHours
+      .filter((wh) => !wh.isOpen)
+      .map((wh) => wh.dayOfWeek);
+
     return {
       success: true,
       data: { fullyBooked: true },
       userMessage: `All time slots for ${service.name} on ${format(date, "EEEE, MMMM d, yyyy")} are fully booked. Please try another date.`,
+      ui: {
+        component: "date-picker",
+        props: {
+          serviceId: service.id,
+          serviceName: service.name,
+          closedDays,
+        },
+      },
     };
   }
 
@@ -169,6 +256,16 @@ async function handleGetAvailableSlots(
       slots: formattedSlots,
     },
     userMessage: `Found ${slots.length} available time slot(s) for ${service.name} on ${format(date, "EEEE, MMMM d, yyyy")}.`,
+    ui: {
+      component: "time-slots",
+      props: {
+        serviceId: service.id,
+        serviceName: service.name,
+        date: format(date, "EEEE, MMMM d, yyyy"),
+        dateISO: params.date,
+        slots: formattedSlots,
+      },
+    },
   };
 }
 
@@ -301,17 +398,24 @@ async function handleCreateBooking(
     }
   }
 
+  const bookingData = {
+    appointmentId: appointment.id,
+    service: service.name,
+    date: format(startTime, "EEEE, MMMM d, yyyy"),
+    time: format(startTime, "HH:mm"),
+    duration: `${service.duration} minutes`,
+    price: `${service.currency} ${Number(service.price).toLocaleString()}`,
+    status: "PENDING",
+  };
+
   return {
     success: true,
-    data: {
-      appointmentId: appointment.id,
-      service: service.name,
-      date: format(startTime, "EEEE, MMMM d, yyyy"),
-      time: format(startTime, "HH:mm"),
-      duration: `${service.duration} minutes`,
-      status: "PENDING",
-    },
+    data: bookingData,
     userMessage: `Booking confirmed! ${service.name} on ${format(startTime, "EEEE, MMMM d")} at ${format(startTime, "HH:mm")}. A confirmation email has been sent.`,
+    ui: {
+      component: "booking-card",
+      props: bookingData,
+    },
   };
 }
 

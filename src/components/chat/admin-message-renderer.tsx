@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { parseMessage } from "./message-parser";
+import { extractSelectionFromNextMessage } from "./selection-extractor";
 import { ChatServiceSelector } from "./ui/chat-service-selector";
 import { ChatDatePicker } from "./ui/chat-date-picker";
 import { ChatTimeSlots } from "./ui/chat-time-slots";
@@ -10,6 +11,7 @@ import type { ChatMessage } from "./types";
 
 interface AdminMessageRendererProps {
   message: ChatMessage;
+  nextMessage?: ChatMessage; // Next message in conversation for extracting selections
   timestamp?: string;
 }
 
@@ -19,10 +21,16 @@ interface AdminMessageRendererProps {
  */
 export function AdminMessageRenderer({
   message,
+  nextMessage,
   timestamp,
 }: AdminMessageRendererProps) {
   const parsed = parseMessage(message);
   const isUser = parsed.role === "user";
+
+  // Extract selection context from the next message (user's response)
+  const selectionContext = nextMessage?.role === "user"
+    ? extractSelectionFromNextMessage(nextMessage.content)
+    : {};
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -54,6 +62,7 @@ export function AdminMessageRenderer({
               <ChatServiceSelector
                 services={parsed.ui.props.services}
                 disabled={true}
+                preSelectedServiceName={selectionContext.preSelectedServiceName}
               />
             )}
 
@@ -63,6 +72,7 @@ export function AdminMessageRenderer({
                 serviceName={parsed.ui.props.serviceName}
                 closedDays={parsed.ui.props.closedDays}
                 disabled={true}
+                preSelectedDate={selectionContext.preSelectedDate}
               />
             )}
 
@@ -74,6 +84,7 @@ export function AdminMessageRenderer({
                 dateISO={parsed.ui.props.dateISO}
                 slots={parsed.ui.props.slots}
                 disabled={true}
+                preSelectedTime={selectionContext.preSelectedTime}
               />
             )}
 

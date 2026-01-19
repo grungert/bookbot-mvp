@@ -345,7 +345,7 @@ function AppointmentListCard({
       className={cn(
         "cursor-pointer group overflow-hidden appointment-card",
         "rounded-xl border bg-gradient-to-br to-transparent",
-        "shadow-sm hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/20",
+        "shadow-sm hover:shadow-lg transition-all duration-300 hover:border-primary/20",
         isAppointmentPast && "opacity-60"
       )}
       style={{

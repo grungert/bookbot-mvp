@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { parseMessage } from "./message-parser";
+import { extractSelectionFromNextMessage } from "./selection-extractor";
 import { ChatServiceSelector } from "./ui/chat-service-selector";
 import { ChatDatePicker } from "./ui/chat-date-picker";
 import { ChatTimeSlots } from "./ui/chat-time-slots";
@@ -10,18 +11,25 @@ import type { ChatMessage, ChatUICallbacks, ChatService, ChatTimeSlot } from "./
 
 interface ChatMessageRendererProps {
   message: ChatMessage;
+  nextMessage?: ChatMessage; // Next message in conversation for extracting selections
   isLatest: boolean;
   callbacks?: ChatUICallbacks;
 }
 
 export function ChatMessageRenderer({
   message,
+  nextMessage,
   isLatest,
   callbacks,
 }: ChatMessageRendererProps) {
   const parsed = parseMessage(message);
   const isUser = parsed.role === "user";
   const isInteractive = isLatest && !isUser && callbacks;
+
+  // Extract selection context from the next message (user's response)
+  const selectionContext = nextMessage?.role === "user"
+    ? extractSelectionFromNextMessage(nextMessage.content)
+    : {};
 
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
@@ -46,6 +54,7 @@ export function ChatMessageRenderer({
                     : undefined
                 }
                 disabled={!isInteractive}
+                preSelectedServiceName={selectionContext.preSelectedServiceName}
               />
             )}
 
@@ -61,6 +70,7 @@ export function ChatMessageRenderer({
                     : undefined
                 }
                 disabled={!isInteractive}
+                preSelectedDate={selectionContext.preSelectedDate}
               />
             )}
 
@@ -78,6 +88,7 @@ export function ChatMessageRenderer({
                     : undefined
                 }
                 disabled={!isInteractive}
+                preSelectedTime={selectionContext.preSelectedTime}
               />
             )}
 

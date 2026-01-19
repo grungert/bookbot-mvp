@@ -15,8 +15,10 @@ import {
   FileArchive,
   ChevronLeft,
   Menu,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Sheet,
   SheetContent,
@@ -28,15 +30,19 @@ import {
 interface AdminSidebarProps {
   companySlug: string;
   companyName: string;
+  primaryColor?: string | null;
+  pendingAppointmentsCount?: number;
+  actionableInvoicesCount?: number;
 }
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
 }
 
-function useNavItems(companySlug: string) {
+function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number) {
   const t = useTranslations("nav");
   const tAdmin = useTranslations("admin");
 
@@ -57,6 +63,7 @@ function useNavItems(companySlug: string) {
       href: `${basePath}/appointments`,
       label: t("bookings"),
       icon: Calendar,
+      badge: pendingAppointmentsCount,
     },
     {
       href: `${basePath}/working-hours`,
@@ -67,11 +74,17 @@ function useNavItems(companySlug: string) {
       href: `${basePath}/invoices`,
       label: t("invoices"),
       icon: FileText,
+      badge: actionableInvoicesCount,
     },
     {
       href: `${basePath}/documents`,
       label: tAdmin("documents"),
       icon: FileArchive,
+    },
+    {
+      href: `${basePath}/conversations`,
+      label: tAdmin("conversations"),
+      icon: MessageSquare,
     },
     {
       href: `${basePath}/settings`,
@@ -87,6 +100,7 @@ function NavContent({
   basePath,
   companySlug,
   companyName,
+  primaryColor,
   onItemClick,
 }: {
   navItems: NavItem[];
@@ -94,6 +108,7 @@ function NavContent({
   basePath: string;
   companySlug: string;
   companyName: string;
+  primaryColor?: string | null;
   onItemClick?: () => void;
 }) {
   const tNav = useTranslations("nav");
@@ -114,21 +129,48 @@ function NavContent({
       </div>
       <nav className="p-2">
         {navItems.map((item) => {
+          // pathname includes locale prefix (e.g., /sr/c/...), href doesn't
+          // Check if pathname ends with href or starts with href after locale
           const isActive =
-            pathname === item.href ||
-            (item.href !== basePath && pathname.startsWith(item.href));
+            pathname.endsWith(item.href) ||
+            (item.href !== basePath && pathname.includes(item.href));
           return (
             <Link key={item.href} href={item.href} onClick={onItemClick}>
-              <Button
-                variant={isActive ? "secondary" : "ghost"}
+              <div
                 className={cn(
-                  "w-full justify-start gap-2 mb-1",
-                  isActive && "bg-secondary"
+                  "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
+                  "hover:bg-muted/80",
+                  isActive
+                    ? "bg-muted font-medium"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
+                style={
+                  isActive && primaryColor
+                    ? {
+                        backgroundColor: `${primaryColor}15`,
+                        borderLeft: `3px solid ${primaryColor}`,
+                        paddingLeft: "9px",
+                      }
+                    : isActive
+                    ? { borderLeft: "3px solid hsl(var(--primary))", paddingLeft: "9px" }
+                    : undefined
+                }
               >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </Button>
+                <span
+                  style={primaryColor ? { color: primaryColor } : undefined}
+                  className={cn(!primaryColor && isActive && "text-primary")}
+                >
+                  <item.icon className="h-4 w-4" />
+                </span>
+                <span className={cn(isActive && !primaryColor && "text-foreground")}>
+                  {item.label}
+                </span>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <Badge className="ml-auto h-5 min-w-5 px-1.5">
+                    {item.badge}
+                  </Badge>
+                )}
+              </div>
             </Link>
           );
         })}
@@ -137,9 +179,9 @@ function NavContent({
   );
 }
 
-export function AdminSidebar({ companySlug, companyName }: AdminSidebarProps) {
+export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAppointmentsCount, actionableInvoicesCount }: AdminSidebarProps) {
   const pathname = usePathname();
-  const navItems = useNavItems(companySlug);
+  const navItems = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
   const basePath = `/c/${companySlug}/admin`;
 
   return (
@@ -152,6 +194,7 @@ export function AdminSidebar({ companySlug, companyName }: AdminSidebarProps) {
           basePath={basePath}
           companySlug={companySlug}
           companyName={companyName}
+          primaryColor={primaryColor}
         />
       </aside>
     </>
@@ -161,10 +204,13 @@ export function AdminSidebar({ companySlug, companyName }: AdminSidebarProps) {
 export function AdminMobileNav({
   companySlug,
   companyName,
+  primaryColor,
+  pendingAppointmentsCount,
+  actionableInvoicesCount,
 }: AdminSidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const navItems = useNavItems(companySlug);
+  const navItems = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
   const basePath = `/c/${companySlug}/admin`;
 
   return (
@@ -185,6 +231,7 @@ export function AdminMobileNav({
           basePath={basePath}
           companySlug={companySlug}
           companyName={companyName}
+          primaryColor={primaryColor}
           onItemClick={() => setOpen(false)}
         />
       </SheetContent>

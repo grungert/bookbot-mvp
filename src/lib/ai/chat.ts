@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { getPersonalityPrompt } from "./personalities";
 import { TOOL_INSTRUCTIONS, type ToolParams } from "./tools";
-import { executeToolAction, type ToolContext } from "./tool-handlers";
+import { executeToolAction, type ToolContext, type ToolResult } from "./tool-handlers";
+import { createRichMessageContent } from "@/components/chat/message-parser";
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -244,13 +245,45 @@ ${customPrompt}`;
   return prompt;
 }
 
+// Clean malformed JSON (trailing commas, etc.)
+function cleanJSON(jsonStr: string): string {
+  return jsonStr
+    .replace(/,\s*}/g, "}") // Remove trailing commas before }
+    .replace(/,\s*]/g, "]"); // Remove trailing commas before ]
+}
+
 // Parse action block from response
+// Supports multiple formats: <action>...</action>, ```action {...} ```, and special model tokens
 function parseAction(response: string): ToolParams | null {
-  const match = response.match(/<action>([\s\S]*?)<\/action>/);
+  // Try XML-style tags first
+  let match = response.match(/<action>([\s\S]*?)<\/action>/);
+
+  // Try markdown code block format: ```action {...} ```
+  if (!match) {
+    match = response.match(/```action\s*([\s\S]*?)```/);
+  }
+
+  // Try plain JSON block that looks like a tool call
+  if (!match) {
+    match = response.match(/```(?:json)?\s*(\{[\s\S]*?"tool"[\s\S]*?\})```/);
+  }
+
+  // Try special model token format: <|channel|>...{"tool":...}
+  if (!match) {
+    match = response.match(/<\|channel\|>[\s\S]*?<\|message\|>\s*(\{[\s\S]*?"tool"[\s\S]*?\})/);
+  }
+
+  // Try to find any JSON object with "tool" key as last resort
+  if (!match) {
+    match = response.match(/(\{"tool"\s*:\s*"[^"]+?"[^}]*\})/);
+  }
+
   if (!match) return null;
 
   try {
-    const parsed = JSON.parse(match[1].trim());
+    // Clean malformed JSON before parsing
+    const cleanedJSON = cleanJSON(match[1].trim());
+    const parsed = JSON.parse(cleanedJSON);
     if (typeof parsed === "object" && parsed.tool) {
       return parsed as ToolParams;
     }
@@ -262,7 +295,42 @@ function parseAction(response: string): ToolParams | null {
 
 // Remove action block from response for display
 function removeActionBlock(response: string): string {
-  return response.replace(/<action>[\s\S]*?<\/action>/g, "").trim();
+  return response
+    .replace(/<action>[\s\S]*?<\/action>/g, "")
+    .replace(/```action\s*[\s\S]*?```/g, "")
+    .replace(/```(?:json)?\s*\{[\s\S]*?"tool"[\s\S]*?\}```/g, "")
+    // Remove special model token format
+    .replace(/<\|channel\|>[\s\S]*?<\|message\|>\s*\{[\s\S]*?"tool"[\s\S]*?\}/g, "")
+    // Remove any standalone JSON tool objects
+    .replace(/\{"tool"\s*:\s*"[^"]+?"[^}]*\}/g, "")
+    .trim();
+}
+
+// Extract plain text from potentially nested JSON response
+// The LLM sometimes outputs JSON format when it shouldn't - this cleans it up
+function extractPlainText(response: string): string {
+  const trimmed = response.trim();
+
+  // If it doesn't look like JSON, return as-is
+  if (!trimmed.startsWith("{")) {
+    return response;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+
+    // Check if it's a rich message structure
+    if (parsed && typeof parsed === "object" && parsed.type === "rich" && typeof parsed.text === "string") {
+      // Recursively extract text in case it's also JSON
+      return extractPlainText(parsed.text);
+    }
+
+    // If it's JSON but not a rich message, return as-is
+    return response;
+  } catch {
+    // Not valid JSON, return as-is
+    return response;
+  }
 }
 
 // Main chat function with tool execution loop
@@ -293,6 +361,7 @@ export async function chat(
   };
 
   let iterations = 0;
+  let lastToolResult: ToolResult | null = null;
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
@@ -311,18 +380,65 @@ export async function chat(
       const action = parseAction(response);
 
       if (!action) {
-        // No action - return the response
-        return response;
+        // Check if the LLM mentioned showing UI but forgot the action block
+        const mentionsUI = /calendar|date picker|available dates|time slots|available times|service list|services/i.test(response);
+        const mentionsShowing = /let me show|here('s| are)|showing|pull up|display/i.test(response);
+
+        if (mentionsUI && mentionsShowing && iterations < MAX_TOOL_ITERATIONS) {
+          // LLM forgot the action block - remind it
+          allMessages.push({ role: "assistant", content: response });
+          allMessages.push({
+            role: "user",
+            content: `ERROR: You mentioned showing UI (calendar/dates/times/services) but did NOT include an <action> block. The UI will NOT appear without an action block. You MUST include the <action> block in your response. Please try again with the correct action block.`,
+          });
+          continue;
+        }
+
+        // No action - return the response (with UI if available from last tool)
+        // Always clean the response - remove any JSON wrapper and action blocks the LLM may have added
+        const cleanResponse = removeActionBlock(extractPlainText(response));
+
+        if (lastToolResult?.ui) {
+          return createRichMessageContent(cleanResponse, lastToolResult.ui);
+        }
+        return cleanResponse;
       }
 
       // Execute the tool
       const result = await executeToolAction(toolContext, action);
+      lastToolResult = result;
 
       // Add assistant message and tool result to context
       allMessages.push({ role: "assistant", content: response });
+
+      // Format tool result with clear next-step instructions
+      let resultMessage = `<tool_result>
+Tool: ${action.tool}
+Success: ${result.success}
+Result: ${result.userMessage}
+</tool_result>`;
+
+      // Add next step hints based on the tool that was called
+      if (result.success && result.ui) {
+        switch (action.tool) {
+          case "getServices":
+            resultMessage += `\n\nThe service selector UI is now displayed. Wait for the user to select a service. When they do, they will say something like "I'd like to book [Service Name]". Then you MUST call getDatePicker with that service's ID.`;
+            break;
+          case "getDatePicker":
+            resultMessage += `\n\nThe calendar UI is now displayed. Wait for the user to select a date. When they do, they will say something like "I'd like to book on [Date]". Then you MUST call getAvailableSlots with the serviceId and date.`;
+            break;
+          case "getAvailableSlots":
+            resultMessage += `\n\nThe time slots UI is now displayed. Wait for the user to select a time. When they do, they will say something like "I'd like the [Time] slot". Then you MUST call createBooking.`;
+            break;
+          case "createBooking":
+            resultMessage += `\n\nThe booking has been created and confirmation card is displayed. Thank the user and ask if they need anything else.`;
+            break;
+        }
+      }
+
       allMessages.push({
         role: "user",
-        content: `<result>${JSON.stringify(result)}</result>`,
+        content: resultMessage,
       });
 
       // Continue loop to get next response
@@ -352,12 +468,31 @@ export async function saveChatMessage(
 }
 
 // Get or create chat session
+// For logged-in users: reuse recent session (within 24 hours)
+// For guests: always create new session (they use localStorage to track sessionId)
 export async function getOrCreateChatSession(
   companyId: string,
   userId?: string
 ) {
-  // For simplicity, create a new session each time
-  // In production, you might want to reuse sessions
+  // For logged-in users, try to find a recent active session
+  if (userId) {
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const recentSession = await prisma.chatSession.findFirst({
+      where: {
+        companyId,
+        userId,
+        createdAt: { gte: twentyFourHoursAgo },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (recentSession) {
+      return recentSession;
+    }
+  }
+
+  // Create a new session for guests or if no recent session found
   return prisma.chatSession.create({
     data: {
       companyId,

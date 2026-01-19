@@ -6,7 +6,6 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Loader2, Save } from "lucide-react";
@@ -17,16 +16,6 @@ interface WorkingHour {
   endTime: string;
   isOpen: boolean;
 }
-
-const dayNames = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
 
 const defaultWorkingHours: WorkingHour[] = [
   { dayOfWeek: 0, startTime: "09:00", endTime: "17:00", isOpen: false },
@@ -49,6 +38,17 @@ export default function WorkingHoursPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Day names from translations
+  const dayNames: Record<number, string> = {
+    0: t("sunday"),
+    1: t("monday"),
+    2: t("tuesday"),
+    3: t("wednesday"),
+    4: t("thursday"),
+    5: t("friday"),
+    6: t("saturday"),
+  };
+
   useEffect(() => {
     loadWorkingHours();
   }, [companySlug]);
@@ -58,9 +58,14 @@ export default function WorkingHoursPage() {
       const response = await fetch(`/api/c/${companySlug}/working-hours`);
       if (response.ok) {
         const data = await response.json();
-        if (data.length > 0) {
-          setWorkingHours(data);
-        }
+        // Merge API data with defaults to ensure all 7 days are present
+        const mergedHours = defaultWorkingHours.map((defaultDay) => {
+          const apiDay = data.find(
+            (d: WorkingHour) => d.dayOfWeek === defaultDay.dayOfWeek
+          );
+          return apiDay || defaultDay;
+        });
+        setWorkingHours(mergedHours);
       }
     } catch (error) {
       console.error("Error loading working hours:", error);
@@ -114,7 +119,7 @@ export default function WorkingHoursPage() {
         <div>
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Set your business availability
+            {t("subtitle") || "Set your business availability"}
           </p>
         </div>
         <Button onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
@@ -130,18 +135,29 @@ export default function WorkingHoursPage() {
       {/* Working Hours Card */}
       <div className="rounded-xl border bg-card p-4">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-          Weekly Schedule
+          {t("weeklySchedule") || "Weekly Schedule"}
         </h3>
         <div className="space-y-2">
           {workingHours
-            .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+            .sort((a, b) => {
+              // Start from Monday (1) and end with Sunday (0)
+              const orderA = a.dayOfWeek === 0 ? 7 : a.dayOfWeek;
+              const orderB = b.dayOfWeek === 0 ? 7 : b.dayOfWeek;
+              return orderA - orderB;
+            })
             .map((wh) => (
               <div
                 key={wh.dayOfWeek}
-                className="flex items-center gap-4 p-3 rounded-lg border bg-background hover:border-primary/20 transition-colors"
+                className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
+                  wh.isOpen
+                    ? "bg-background hover:border-primary/20"
+                    : "bg-muted/30 border-dashed"
+                }`}
               >
                 <div className="w-28">
-                  <span className="font-medium text-sm">{dayNames[wh.dayOfWeek]}</span>
+                  <span className={`font-medium text-sm ${!wh.isOpen ? "text-muted-foreground" : ""}`}>
+                    {dayNames[wh.dayOfWeek]}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -159,7 +175,7 @@ export default function WorkingHoursPage() {
                 {wh.isOpen ? (
                   <div className="flex items-center gap-2 ml-auto">
                     <Label htmlFor={`start-${wh.dayOfWeek}`} className="sr-only">
-                      Start time
+                      {t("startTime")}
                     </Label>
                     <Input
                       id={`start-${wh.dayOfWeek}`}
@@ -170,9 +186,9 @@ export default function WorkingHoursPage() {
                       }
                       className="w-28 h-9"
                     />
-                    <span className="text-muted-foreground text-sm">to</span>
+                    <span className="text-muted-foreground text-sm">—</span>
                     <Label htmlFor={`end-${wh.dayOfWeek}`} className="sr-only">
-                      End time
+                      {t("endTime")}
                     </Label>
                     <Input
                       id={`end-${wh.dayOfWeek}`}
@@ -185,8 +201,8 @@ export default function WorkingHoursPage() {
                     />
                   </div>
                 ) : (
-                  <div className="ml-auto text-sm text-muted-foreground">
-                    Closed all day
+                  <div className="ml-auto text-sm text-muted-foreground italic">
+                    {t("closedAllDay") || "Closed all day"}
                   </div>
                 )}
               </div>

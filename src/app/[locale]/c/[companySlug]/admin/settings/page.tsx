@@ -45,6 +45,15 @@ interface CompanySettings {
   aiBotName: string | null;
   aiGreeting: string | null;
   aiPersonality: string | null;
+  // Business Details
+  businessAddress: string | null;
+  taxId: string | null;
+  vatNumber: string | null;
+  bankAccount: string | null;
+  bankName: string | null;
+  businessPhone: string | null;
+  businessEmail: string | null;
+  taxRate: number;
 }
 
 export default function SettingsPage() {
@@ -71,6 +80,16 @@ export default function SettingsPage() {
   const [aiBotName, setAiBotName] = useState("");
   const [aiGreeting, setAiGreeting] = useState("");
   const [aiPersonality, setAiPersonality] = useState<string>("friendly");
+
+  // Business Details state
+  const [businessAddress, setBusinessAddress] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [vatNumber, setVatNumber] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [businessPhone, setBusinessPhone] = useState("");
+  const [businessEmail, setBusinessEmail] = useState("");
+  const [taxRate, setTaxRate] = useState<number>(20);
 
   useEffect(() => {
     loadSettings();
@@ -99,6 +118,15 @@ export default function SettingsPage() {
       setAiBotName(settings.aiBotName || "");
       setAiGreeting(settings.aiGreeting || "");
       setAiPersonality(settings.aiPersonality || "friendly");
+      // Business Details
+      setBusinessAddress(settings.businessAddress || "");
+      setTaxId(settings.taxId || "");
+      setVatNumber(settings.vatNumber || "");
+      setBankAccount(settings.bankAccount || "");
+      setBankName(settings.bankName || "");
+      setBusinessPhone(settings.businessPhone || "");
+      setBusinessEmail(settings.businessEmail || "");
+      setTaxRate(settings.taxRate ?? 20);
     } catch (error) {
       console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
@@ -123,6 +151,15 @@ export default function SettingsPage() {
         aiBotName: aiBotName || null,
         aiGreeting: aiGreeting || null,
         aiPersonality: aiPersonality || null,
+        // Business Details
+        businessAddress: businessAddress || null,
+        taxId: taxId || null,
+        vatNumber: vatNumber || null,
+        bankAccount: bankAccount || null,
+        bankName: bankName || null,
+        businessPhone: businessPhone || null,
+        businessEmail: businessEmail || null,
+        taxRate,
       };
 
       // Only include API key if it's been changed (not masked)
@@ -406,6 +443,114 @@ export default function SettingsPage() {
               placeholder="Custom instructions for the AI assistant..."
               rows={4}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Business Details */}
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          Business Details
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          Business information used for invoices
+        </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessAddress" className="text-sm font-medium">Business Address</Label>
+              <Textarea
+                id="businessAddress"
+                value={businessAddress}
+                onChange={(e) => setBusinessAddress(e.target.value)}
+                placeholder="123 Business St, City, Country"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="taxId" className="text-sm font-medium">Tax ID / PIB</Label>
+                <Input
+                  id="taxId"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  placeholder="123456789"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vatNumber" className="text-sm font-medium">VAT Number / PDV</Label>
+                <Input
+                  id="vatNumber"
+                  value={vatNumber}
+                  onChange={(e) => setVatNumber(e.target.value)}
+                  placeholder="RS123456789"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bankName" className="text-sm font-medium">Bank Name</Label>
+              <Input
+                id="bankName"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="Bank Name"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="bankAccount" className="text-sm font-medium">Bank Account Number</Label>
+              <Input
+                id="bankAccount"
+                value={bankAccount}
+                onChange={(e) => setBankAccount(e.target.value)}
+                placeholder="123-4567890123456-78"
+                className="h-10"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessPhone" className="text-sm font-medium">Business Phone</Label>
+              <Input
+                id="businessPhone"
+                value={businessPhone}
+                onChange={(e) => setBusinessPhone(e.target.value)}
+                placeholder="+381 11 123 4567"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessEmail" className="text-sm font-medium">Business Email</Label>
+              <Input
+                id="businessEmail"
+                type="email"
+                value={businessEmail}
+                onChange={(e) => setBusinessEmail(e.target.value)}
+                placeholder="billing@company.com"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="taxRate" className="text-sm font-medium">Tax Rate (%)</Label>
+              <Input
+                id="taxRate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={taxRate}
+                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                placeholder="20"
+                className="h-10"
+              />
+              <p className="text-xs text-muted-foreground">
+                Default tax rate for invoices
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -49,7 +49,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
           </>
         )}
         <Link href={`/c/${companySlug}/book`}>
-          <Button size="lg" className="cursor-pointer press-feedback shadow-md hover:shadow-lg transition-shadow">
+          <Button size="lg" className="cursor-pointer press-feedback shadow-md hover:shadow-lg">
             {t("title")}
           </Button>
         </Link>
@@ -124,7 +124,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                     </div>
                     <Link href={`/c/${companySlug}/book?service=${service.id}`}>
                       <Button
-                        className="w-full cursor-pointer press-feedback transition-colors duration-300"
+                        className="w-full cursor-pointer press-feedback"
                         variant="outline"
                         style={{
                           "--hover-bg": `${service.color || "#3B82F6"}10`,

@@ -239,6 +239,16 @@ export async function getCompanyDashboardStats(
 
     // Unique customers in period
     uniqueCustomers,
+
+    // Chat stats
+    currentChatSessions,
+    previousChatSessions,
+    currentChatMessages,
+    previousChatMessages,
+    guestChatSessions,
+    authenticatedChatSessions,
+    chatActivityTrend,
+    uniqueChatters,
   ] = await Promise.all([
     // Appointments grouped by status for current period (includes future)
     prisma.appointment.groupBy({
@@ -341,6 +351,84 @@ export async function getCompanyDashboardStats(
         startTime: { gte: periodStart, lte: periodEnd },
       },
     }),
+
+    // Chat session count for current period
+    prisma.chatSession.count({
+      where: {
+        companyId,
+        createdAt: { gte: periodStart },
+      },
+    }),
+
+    // Chat session count for previous period
+    prisma.chatSession.count({
+      where: {
+        companyId,
+        createdAt: { gte: previousStart, lt: periodStart },
+      },
+    }),
+
+    // Chat message count for current period
+    prisma.chatMessage.count({
+      where: {
+        session: {
+          companyId,
+        },
+        createdAt: { gte: periodStart },
+      },
+    }),
+
+    // Chat message count for previous period
+    prisma.chatMessage.count({
+      where: {
+        session: {
+          companyId,
+        },
+        createdAt: { gte: previousStart, lt: periodStart },
+      },
+    }),
+
+    // Guest chat sessions (userId is null)
+    prisma.chatSession.count({
+      where: {
+        companyId,
+        userId: null,
+        createdAt: { gte: periodStart },
+      },
+    }),
+
+    // Authenticated chat sessions (userId is not null)
+    prisma.chatSession.count({
+      where: {
+        companyId,
+        userId: { not: null },
+        createdAt: { gte: periodStart },
+      },
+    }),
+
+    // Daily chat activity trend
+    prisma.$queryRaw<Array<{ date: Date; sessions: bigint; messages: bigint }>>`
+      SELECT
+        DATE_TRUNC('day', cs."createdAt") as date,
+        COUNT(DISTINCT cs.id) as sessions,
+        COUNT(cm.id) as messages
+      FROM "ChatSession" cs
+      LEFT JOIN "ChatMessage" cm ON cm."sessionId" = cs.id AND cm."createdAt" >= ${periodStart}
+      WHERE cs."companyId" = ${companyId}
+        AND cs."createdAt" >= ${periodStart}
+      GROUP BY DATE_TRUNC('day', cs."createdAt")
+      ORDER BY date ASC
+    `,
+
+    // Unique chatters (authenticated users only)
+    prisma.chatSession.groupBy({
+      by: ["userId"],
+      where: {
+        companyId,
+        userId: { not: null },
+        createdAt: { gte: periodStart },
+      },
+    }),
   ]);
 
   // Calculate trends (percentage change)
@@ -352,6 +440,15 @@ export async function getCompanyDashboardStats(
 
   const appointmentTrendPercent = previousAppointmentCount > 0
     ? Math.round(((currentAppointmentCount - previousAppointmentCount) / previousAppointmentCount) * 100)
+    : 0;
+
+  // Chat trends
+  const chatSessionTrendPercent = previousChatSessions > 0
+    ? Math.round(((currentChatSessions - previousChatSessions) / previousChatSessions) * 100)
+    : 0;
+
+  const chatMessageTrendPercent = previousChatMessages > 0
+    ? Math.round(((currentChatMessages - previousChatMessages) / previousChatMessages) * 100)
     : 0;
 
   // Format status counts
@@ -388,6 +485,17 @@ export async function getCompanyDashboardStats(
     now
   );
 
+  // Format chat activity trend data
+  const formattedChatActivityTrend = formatChatActivityTrendData(
+    chatActivityTrend.map((d) => ({
+      date: d.date,
+      sessions: Number(d.sessions),
+      messages: Number(d.messages),
+    })),
+    periodStart,
+    now
+  );
+
   return {
     // Summary stats
     totalAppointments: currentAppointmentCount,
@@ -400,11 +508,21 @@ export async function getCompanyDashboardStats(
     revenueTrend: revenueTrendPercent,
     totalCustomers: uniqueCustomers.length,
 
+    // Chat stats
+    totalChatSessions: currentChatSessions,
+    chatSessionTrend: chatSessionTrendPercent,
+    totalChatMessages: currentChatMessages,
+    chatMessageTrend: chatMessageTrendPercent,
+    guestChatSessions,
+    authenticatedChatSessions,
+    uniqueChatters: uniqueChatters.length,
+
     // Chart data
     appointmentsByStatus: statusCounts,
     appointmentsTrendData: formattedAppointmentsTrend,
     revenueTrendData: formattedRevenueTrend,
     serviceStats: formattedServiceStats,
+    chatActivityTrendData: formattedChatActivityTrend,
   };
 }
 
@@ -431,6 +549,38 @@ function formatTrendData(
     result.push({
       date: dateStr,
       value: dateMap.get(dateStr) || 0,
+    });
+    current.setDate(current.getDate() + 1);
+  }
+
+  return result;
+}
+
+// Helper to format chat activity trend data with all dates filled in
+function formatChatActivityTrendData(
+  data: Array<{ date: Date; sessions: number; messages: number }>,
+  startDate: Date,
+  endDate: Date
+): Array<{ date: string; sessions: number; messages: number }> {
+  const dateMap = new Map<string, { sessions: number; messages: number }>();
+
+  // Add existing data to map
+  data.forEach((item) => {
+    const dateStr = item.date.toISOString().split("T")[0];
+    dateMap.set(dateStr, { sessions: item.sessions, messages: item.messages });
+  });
+
+  // Fill in all dates
+  const result: Array<{ date: string; sessions: number; messages: number }> = [];
+  const current = new Date(startDate);
+
+  while (current <= endDate) {
+    const dateStr = current.toISOString().split("T")[0];
+    const values = dateMap.get(dateStr) || { sessions: 0, messages: 0 };
+    result.push({
+      date: dateStr,
+      sessions: values.sessions,
+      messages: values.messages,
     });
     current.setDate(current.getDate() + 1);
   }

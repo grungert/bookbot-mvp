@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -34,7 +44,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, Eye, FileText } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
 
 interface LineItem {
   id?: string;
@@ -80,6 +90,14 @@ export default function InvoicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Selection and sorting state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<"invoiceNumber" | "customer" | "issueDate" | "total" | "status" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
 
   // Form state
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -239,6 +257,110 @@ export default function InvoicesPage() {
     );
   }
 
+  // Sorting helper
+  const sortedInvoices = useMemo(() => {
+    if (!sortColumn) return invoices;
+
+    return [...invoices].sort((a, b) => {
+      let comparison = 0;
+
+      if (sortColumn === "invoiceNumber") {
+        comparison = a.invoiceNumber.localeCompare(b.invoiceNumber);
+      } else if (sortColumn === "customer") {
+        const nameA = a.user.name || a.user.email;
+        const nameB = b.user.name || b.user.email;
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortColumn === "issueDate") {
+        comparison = new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime();
+      } else if (sortColumn === "total") {
+        comparison = Number(a.total) - Number(b.total);
+      } else if (sortColumn === "status") {
+        const statusOrder = { DRAFT: 0, SENT: 1, PAID: 2, CANCELLED: 3 };
+        comparison = statusOrder[a.status] - statusOrder[b.status];
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [invoices, sortColumn, sortDirection]);
+
+  // Selection helpers
+  function toggleSelectAll() {
+    if (selectedIds.size === invoices.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(invoices.map((inv) => inv.id)));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  }
+
+  // Sorting handler
+  function handleSort(column: "invoiceNumber" | "customer" | "issueDate" | "total" | "status") {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }
+
+  // Get sort icon for column
+  function getSortIcon(column: "invoiceNumber" | "customer" | "issueDate" | "total" | "status") {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1" />
+    );
+  }
+
+  // Bulk delete handler
+  async function handleBulkDelete() {
+    setIsBulkDeleting(true);
+
+    try {
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/c/${companySlug}/invoices/${id}`, { method: "DELETE" })
+      );
+
+      const results = await Promise.allSettled(deletePromises);
+      const successCount = results.filter((r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<Response>).value.ok).length;
+      const failCount = selectedIds.size - successCount;
+
+      if (successCount > 0) {
+        toast.success(`${successCount} invoice(s) deleted successfully`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} invoice(s)`);
+      }
+
+      setSelectedIds(new Set());
+      setIsBulkDeleteOpen(false);
+      loadInvoices();
+    } catch {
+      toast.error("Failed to delete invoices. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  // Get selected invoice numbers for confirmation
+  function getSelectedInvoiceNumbers(): string[] {
+    return invoices
+      .filter((inv) => selectedIds.has(inv.id))
+      .map((inv) => inv.invoiceNumber);
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -250,7 +372,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -407,63 +529,316 @@ export default function InvoicesPage() {
             </Button>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-medium">{t("invoiceNumber")}</TableHead>
-                <TableHead className="text-xs font-medium">Customer</TableHead>
-                <TableHead className="text-xs font-medium">{t("issueDate")}</TableHead>
-                <TableHead className="text-xs font-medium">{t("total")}</TableHead>
-                <TableHead className="text-xs font-medium">{tCommon("status")}</TableHead>
-                <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invoices.map((invoice) => (
-                <TableRow key={invoice.id} className="hover:bg-muted/50 transition-colors">
-                  <TableCell className="font-medium">
-                    {invoice.invoiceNumber}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{invoice.user.name || invoice.user.email}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{format(parseISO(invoice.issueDate), "MMM d, yyyy")}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-medium">{invoice.currency} {Number(invoice.total).toLocaleString()}</span>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {invoice.status === "DRAFT" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
-                          onClick={() => updateStatus(invoice.id, "SENT")}
-                        >
-                          Send
-                        </Button>
-                      )}
-                      {invoice.status === "SENT" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
-                          onClick={() => updateStatus(invoice.id, "PAID")}
-                        >
-                          Mark Paid
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <>
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-muted/50 px-4 py-3 border-b animate-fade-in">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} invoice{selectedIds.size !== 1 ? "s" : ""} selected
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
+            )}
+
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={invoices.length > 0 && selectedIds.size === invoices.length}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("invoiceNumber")}
+                    >
+                      {t("invoiceNumber")}
+                      {getSortIcon("invoiceNumber")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("customer")}
+                    >
+                      Customer
+                      {getSortIcon("customer")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("issueDate")}
+                    >
+                      {t("issueDate")}
+                      {getSortIcon("issueDate")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("total")}
+                    >
+                      {t("total")}
+                      {getSortIcon("total")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium">
+                    <button
+                      type="button"
+                      className="flex items-center hover:text-foreground transition-colors"
+                      onClick={() => handleSort("status")}
+                    >
+                      {tCommon("status")}
+                      {getSortIcon("status")}
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {sortedInvoices.map((invoice, index) => (
+                  <TableRow
+                    key={invoice.id}
+                    className={`hover:bg-muted/50 transition-colors cursor-pointer ${
+                      selectedIds.has(invoice.id) ? "bg-primary/5" : ""
+                    }`}
+                    style={{ animationDelay: `${index * 30}ms` }}
+                    data-state={selectedIds.has(invoice.id) ? "selected" : undefined}
+                    onClick={() => setViewingInvoice(invoice)}
+                  >
+                    <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(invoice.id)}
+                        onCheckedChange={() => toggleSelectOne(invoice.id)}
+                        aria-label={`Select ${invoice.invoiceNumber}`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {invoice.invoiceNumber}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{invoice.user.name || invoice.user.email}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{format(parseISO(invoice.issueDate), "MMM d, yyyy")}</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">{invoice.currency} {Number(invoice.total).toLocaleString()}</span>
+                    </TableCell>
+                    <TableCell>{getStatusBadge(invoice.status)}</TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        {invoice.status === "DRAFT" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                            onClick={() => updateStatus(invoice.id, "SENT")}
+                          >
+                            Send
+                          </Button>
+                        )}
+                        {invoice.status === "SENT" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 hover:bg-green-50 hover:text-green-700 hover:border-green-200"
+                            onClick={() => updateStatus(invoice.id, "PAID")}
+                          >
+                            Mark Paid
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
         )}
       </div>
+
+      {/* Bulk Delete AlertDialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Invoice{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The following invoices will be permanently deleted:
+              <ul className="mt-2 list-disc list-inside text-sm">
+                {getSelectedInvoiceNumbers().slice(0, 5).map((num) => (
+                  <li key={num}>{num}</li>
+                ))}
+                {selectedIds.size > 5 && (
+                  <li>...and {selectedIds.size - 5} more</li>
+                )}
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete {selectedIds.size} Invoice{selectedIds.size !== 1 ? "s" : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* View Invoice Dialog */}
+      <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
+        <DialogContent className="max-w-2xl">
+          {viewingInvoice && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-xl">
+                    {viewingInvoice.invoiceNumber}
+                  </DialogTitle>
+                  {getStatusBadge(viewingInvoice.status)}
+                </div>
+              </DialogHeader>
+              <div className="space-y-6 py-4">
+                {/* Invoice Header Info */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Customer
+                    </h4>
+                    <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
+                    <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Dates
+                    </h4>
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Issued:</span>{" "}
+                      {format(parseISO(viewingInvoice.issueDate), "MMM d, yyyy")}
+                    </p>
+                    {viewingInvoice.dueDate && (
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Due:</span>{" "}
+                        {format(parseISO(viewingInvoice.dueDate), "MMM d, yyyy")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Line Items */}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    {t("lineItems")}
+                  </h4>
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Description</TableHead>
+                          <TableHead className="text-xs text-center w-20">Qty</TableHead>
+                          <TableHead className="text-xs text-right w-28">Unit Price</TableHead>
+                          <TableHead className="text-xs text-right w-28">{t("total")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {viewingInvoice.lineItems.map((item, index) => (
+                          <TableRow key={item.id || index}>
+                            <TableCell className="font-medium">{item.description}</TableCell>
+                            <TableCell className="text-center">{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                              {viewingInvoice.currency} {Number(item.unitPrice).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {viewingInvoice.currency} {Number(item.total || item.quantity * item.unitPrice).toLocaleString()}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="flex justify-end">
+                  <div className="w-64 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>{viewingInvoice.currency} {Number(viewingInvoice.subtotal).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Tax</span>
+                      <span>{viewingInvoice.currency} {Number(viewingInvoice.tax).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold text-lg pt-2 border-t">
+                      <span>{t("total")}</span>
+                      <span>{viewingInvoice.currency} {Number(viewingInvoice.total).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {viewingInvoice.notes && (
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                      Notes
+                    </h4>
+                    <p className="text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
+                      {viewingInvoice.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewingInvoice(null)}>
+                  Close
+                </Button>
+                {viewingInvoice.status === "DRAFT" && (
+                  <Button
+                    onClick={() => {
+                      updateStatus(viewingInvoice.id, "SENT");
+                      setViewingInvoice(null);
+                    }}
+                  >
+                    Send Invoice
+                  </Button>
+                )}
+                {viewingInvoice.status === "SENT" && (
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      updateStatus(viewingInvoice.id, "PAID");
+                      setViewingInvoice(null);
+                    }}
+                  >
+                    Mark as Paid
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

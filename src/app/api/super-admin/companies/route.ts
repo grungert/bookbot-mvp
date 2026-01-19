@@ -75,14 +75,38 @@ export async function POST(request: Request) {
       );
     }
 
-    const company = await prisma.company.create({
-      data: {
-        name: parsed.data.name,
-        slug: parsed.data.slug.toLowerCase(),
-        description: parsed.data.description,
-        timezone: parsed.data.timezone || "Europe/Belgrade",
-        primaryColor: parsed.data.primaryColor || "#3B82F6",
-      },
+    // Default working hours for all 7 days
+    const defaultWorkingHours = [
+      { dayOfWeek: 0, startTime: "09:00", endTime: "17:00", isOpen: false }, // Sunday
+      { dayOfWeek: 1, startTime: "09:00", endTime: "17:00", isOpen: true }, // Monday
+      { dayOfWeek: 2, startTime: "09:00", endTime: "17:00", isOpen: true }, // Tuesday
+      { dayOfWeek: 3, startTime: "09:00", endTime: "17:00", isOpen: true }, // Wednesday
+      { dayOfWeek: 4, startTime: "09:00", endTime: "17:00", isOpen: true }, // Thursday
+      { dayOfWeek: 5, startTime: "09:00", endTime: "17:00", isOpen: true }, // Friday
+      { dayOfWeek: 6, startTime: "09:00", endTime: "13:00", isOpen: false }, // Saturday
+    ];
+
+    // Create company and working hours in a transaction
+    const company = await prisma.$transaction(async (tx) => {
+      const newCompany = await tx.company.create({
+        data: {
+          name: parsed.data.name,
+          slug: parsed.data.slug.toLowerCase(),
+          description: parsed.data.description,
+          timezone: parsed.data.timezone || "Europe/Belgrade",
+          primaryColor: parsed.data.primaryColor || "#3B82F6",
+        },
+      });
+
+      // Seed all 7 working hours for the new company
+      await tx.workingHours.createMany({
+        data: defaultWorkingHours.map((wh) => ({
+          companyId: newCompany.id,
+          ...wh,
+        })),
+      });
+
+      return newCompany;
     });
 
     return NextResponse.json(company, { status: 201 });

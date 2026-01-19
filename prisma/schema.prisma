@@ -48,6 +48,16 @@ model Company {
   aiGreeting     String?   // Custom greeting message
   aiPersonality  String?   // Personality preset key (e.g., "professional", "friendly")
 
+  // Business Details for Invoices
+  businessAddress String?   // Full business address
+  taxId           String?   // Tax ID / PIB
+  vatNumber       String?   // VAT number / PDV
+  bankAccount     String?   // Bank account number
+  bankName        String?   // Bank name
+  businessPhone   String?   // Business contact phone
+  businessEmail   String?   // Business contact email
+  taxRate         Decimal?  @db.Decimal(5, 2) @default(20.00)  // Configurable tax %
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -264,6 +274,9 @@ model ChatSession {
 
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
+
+  isRead      Boolean @default(false)  // Mark as reviewed by admin
+  isImportant Boolean @default(false)  // Flag important conversations
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

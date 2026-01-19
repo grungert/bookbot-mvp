@@ -24,21 +24,11 @@ interface Appointment {
   };
 }
 
-interface ServiceWithCount {
-  id: string;
-  name: string;
-  color: string | null;
-  count: number;
-}
-
 interface AppointmentsHeaderProps {
   appointments: Appointment[];
   viewMode: "calendar" | "list";
   onViewModeChange: (mode: "calendar" | "list") => void;
   companySlug: string;
-  servicesWithCounts: ServiceWithCount[];
-  selectedServiceIds: string[] | null;
-  onServiceToggle: (serviceId: string) => void;
   t: ReturnType<typeof useTranslations<"appointments">>;
 }
 
@@ -47,9 +37,6 @@ export function AppointmentsHeader({
   viewMode,
   onViewModeChange,
   companySlug,
-  servicesWithCounts,
-  selectedServiceIds,
-  onServiceToggle,
   t,
 }: AppointmentsHeaderProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -157,15 +144,15 @@ export function AppointmentsHeader({
           </div>
         </div>
 
-        {/* Stats bar with service filters */}
+        {/* Stats bar */}
         <div
           className={cn(
-            "mt-3 flex items-center justify-between gap-3 text-sm flex-wrap",
+            "mt-3 flex items-center gap-3 text-sm flex-wrap",
             !prefersReducedMotion && "animate-fade-up stagger-2"
           )}
           style={!prefersReducedMotion ? { opacity: 0 } : undefined}
         >
-          {/* Left side: upcoming count and next appointment */}
+          {/* Upcoming count and next appointment */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1 rounded-full">
               <Calendar className="h-3.5 w-3.5" />
@@ -193,41 +180,6 @@ export function AppointmentsHeader({
             )}
           </div>
 
-          {/* Right side: service filter badges */}
-          {servicesWithCounts.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              {servicesWithCounts.map(service => {
-                const isSelected = selectedServiceIds === null ||
-                  selectedServiceIds.length === servicesWithCounts.length ||
-                  selectedServiceIds.includes(service.id);
-                return (
-                  <button
-                    key={service.id}
-                    onClick={() => onServiceToggle(service.id)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all press-feedback",
-                      isSelected
-                        ? "text-white"
-                        : "bg-muted/50 text-foreground hover:bg-muted"
-                    )}
-                    style={isSelected ? { backgroundColor: service.color || "#3B82F6" } : {}}
-                  >
-                    <div
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: isSelected ? "white" : (service.color || "#3B82F6") }}
-                    />
-                    <span className="font-medium">{service.name}</span>
-                    <span className={cn(
-                      "ml-0.5 px-1.5 py-0.5 text-xs rounded-full",
-                      isSelected ? "bg-white/20" : "bg-primary/10 text-primary"
-                    )}>
-                      {service.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
     </header>

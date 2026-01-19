@@ -14,6 +14,24 @@ interface ChatTimeSlotsProps {
   slots: ChatTimeSlot[];
   onSelect?: (slot: ChatTimeSlot, serviceId: string, dateISO: string, serviceName: string) => void;
   disabled?: boolean;
+  preSelectedTime?: string; // Pre-selected time for historical messages (e.g., "09:00" or "9:00 AM")
+}
+
+// Helper to find matching slot by display time
+function findMatchingSlotTime(
+  slots: ChatTimeSlot[],
+  preSelectedTime: string
+): string | null {
+  // Normalize the pre-selected time for comparison
+  const normalizedPreSelected = preSelectedTime.toLowerCase().replace(/\s+/g, "");
+
+  for (const slot of slots) {
+    const normalizedDisplay = slot.displayTime.toLowerCase().replace(/\s+/g, "");
+    if (normalizedDisplay === normalizedPreSelected) {
+      return slot.startTime;
+    }
+  }
+  return null;
 }
 
 export function ChatTimeSlots({
@@ -23,8 +41,14 @@ export function ChatTimeSlots({
   slots,
   onSelect,
   disabled = false,
+  preSelectedTime,
 }: ChatTimeSlotsProps) {
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string | null>(() => {
+    if (disabled && preSelectedTime) {
+      return findMatchingSlotTime(slots, preSelectedTime);
+    }
+    return null;
+  });
 
   const handleSelect = (slot: ChatTimeSlot) => {
     setSelectedTime(slot.startTime);

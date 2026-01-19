@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { AdminSidebar, AdminMobileNav } from "@/components/admin/admin-sidebar";
 import { UserMenu } from "@/components/navigation/user-menu";
+import { prisma } from "@/lib/prisma";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -39,12 +40,39 @@ export default async function AdminLayout({
     redirect(`/${locale}`);
   }
 
+  const [pendingAppointmentsCount, actionableInvoicesCount] = await Promise.all([
+    prisma.appointment.count({
+      where: {
+        companyId: company.id,
+        status: "PENDING",
+      },
+    }),
+    prisma.invoice.count({
+      where: {
+        companyId: company.id,
+        OR: [
+          { status: "DRAFT" },
+          {
+            status: "SENT",
+            dueDate: { lt: new Date() },
+          },
+        ],
+      },
+    }),
+  ]);
+
   return (
     <div className="min-h-screen bg-muted/30">
       {/* Mobile header */}
       <header className="lg:hidden sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex h-14 items-center px-4">
-          <AdminMobileNav companySlug={companySlug} companyName={company.name} />
+          <AdminMobileNav
+            companySlug={companySlug}
+            companyName={company.name}
+            primaryColor={company.primaryColor}
+            pendingAppointmentsCount={pendingAppointmentsCount}
+            actionableInvoicesCount={actionableInvoicesCount}
+          />
           <span className="font-semibold ml-2">{company.name}</span>
           <div className="ml-auto">
             <UserMenu showDashboardLink={false} />
@@ -52,7 +80,13 @@ export default async function AdminLayout({
         </div>
       </header>
       <div className="flex">
-        <AdminSidebar companySlug={companySlug} companyName={company.name} />
+        <AdminSidebar
+          companySlug={companySlug}
+          companyName={company.name}
+          primaryColor={company.primaryColor}
+          pendingAppointmentsCount={pendingAppointmentsCount}
+          actionableInvoicesCount={actionableInvoicesCount}
+        />
         <main className="flex-1 p-4 lg:p-6">{children}</main>
       </div>
     </div>

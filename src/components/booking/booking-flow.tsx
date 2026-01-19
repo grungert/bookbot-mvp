@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/routing";
 import { format, parseISO, isSameDay } from "date-fns";
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Clock, CheckCircle, Loader2, CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 interface Service {
   id: string;
@@ -48,6 +49,11 @@ interface UserAppointment {
   };
 }
 
+interface WorkingHours {
+  dayOfWeek: number;
+  isOpen: boolean;
+}
+
 interface BookingFlowProps {
   companySlug: string;
   services: Service[];
@@ -66,12 +72,14 @@ export function BookingFlow({
   const t = useTranslations("booking");
   const tCommon = useTranslations("common");
   const router = useRouter();
+  const prefersReducedMotion = useReducedMotion();
 
   const isGuest = !user;
 
   const [step, setStep] = useState<BookingStep>(
     initialServiceId ? "date" : "service"
   );
+  const [stepDirection, setStepDirection] = useState<"forward" | "back">("forward");
   const [selectedService, setSelectedService] = useState<Service | null>(
     initialServiceId
       ? services.find((s) => s.id === initialServiceId) || null
@@ -91,6 +99,9 @@ export function BookingFlow({
 
   // User's existing appointments
   const [userAppointments, setUserAppointments] = useState<UserAppointment[]>([]);
+
+  // Closed days (days where isOpen = false)
+  const [closedDays, setClosedDays] = useState<number[]>([]);
 
   // Load user's appointments on mount (only for logged-in users)
   const loadUserAppointments = useCallback(async () => {
@@ -112,9 +123,30 @@ export function BookingFlow({
     }
   }, [companySlug, isGuest]);
 
+  // Load working hours to determine closed days
+  const loadWorkingHours = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/c/${companySlug}/working-hours`);
+      if (response.ok) {
+        const workingHours: WorkingHours[] = await response.json();
+        // Get days that are open
+        const openDays = workingHours
+          .filter((wh) => wh.isOpen)
+          .map((wh) => wh.dayOfWeek);
+        // All days not in openDays are closed (0=Sun, 1=Mon, ..., 6=Sat)
+        const allDays = [0, 1, 2, 3, 4, 5, 6];
+        const closed = allDays.filter((day) => !openDays.includes(day));
+        setClosedDays(closed);
+      }
+    } catch {
+      // Silently fail - not critical
+    }
+  }, [companySlug]);
+
   useEffect(() => {
     loadUserAppointments();
-  }, [loadUserAppointments]);
+    loadWorkingHours();
+  }, [loadUserAppointments, loadWorkingHours]);
 
   // Get dates that have appointments
   const appointmentDates = userAppointments.map(apt => parseISO(apt.startTime));
@@ -159,6 +191,7 @@ export function BookingFlow({
 
   function handleServiceSelect(service: Service) {
     setSelectedService(service);
+    setStepDirection("forward");
     setStep("date");
   }
 
@@ -166,12 +199,14 @@ export function BookingFlow({
     setSelectedDate(date);
     if (date && selectedService) {
       loadSlots(date, selectedService.id);
+      setStepDirection("forward");
       setStep("time");
     }
   }
 
   function handleSlotSelect(slot: TimeSlot) {
     setSelectedSlot(slot);
+    setStepDirection("forward");
     // If guest, show details form; otherwise go to confirm
     if (isGuest) {
       setStep("details");
@@ -186,6 +221,7 @@ export function BookingFlow({
       toast.error(t("detailsRequired"));
       return;
     }
+    setStepDirection("forward");
     setStep("confirm");
   }
 
@@ -238,6 +274,7 @@ export function BookingFlow({
   }
 
   function goBack() {
+    setStepDirection("back");
     switch (step) {
       case "date":
         setStep("service");
@@ -253,6 +290,14 @@ export function BookingFlow({
         break;
     }
   }
+
+  // Helper to get animation class based on direction
+  const getStepAnimationClass = () => {
+    if (prefersReducedMotion) return "";
+    return stepDirection === "forward"
+      ? "animate-slide-in-right"
+      : "animate-slide-in-left";
+  };
 
   // Step indicator - different for guests
   const steps = isGuest
@@ -281,21 +326,23 @@ export function BookingFlow({
             <div key={s.key} className="flex items-center">
               <div
                 className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium",
+                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300",
                   i <= currentStepIndex
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    ? "bg-primary text-primary-foreground scale-100"
+                    : "bg-muted text-muted-foreground scale-95"
                 )}
               >
                 {i + 1}
               </div>
               {i < steps.length - 1 && (
-                <div
-                  className={cn(
-                    "w-12 h-1 mx-2",
-                    i < currentStepIndex ? "bg-primary" : "bg-muted"
-                  )}
-                />
+                <div className="w-12 h-1 mx-2 bg-muted overflow-hidden rounded-full">
+                  <div
+                    className={cn(
+                      "h-full bg-primary transition-transform duration-300 ease-out origin-left",
+                      i < currentStepIndex ? "scale-x-100" : "scale-x-0"
+                    )}
+                  />
+                </div>
               )}
             </div>
           ))}
@@ -304,16 +351,21 @@ export function BookingFlow({
 
       {/* Service Selection */}
       {step === "service" && (
-        <Card>
+        <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("selectService")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {services.map((service) => (
+            {services.map((service, index) => (
               <button
                 key={service.id}
                 onClick={() => handleServiceSelect(service)}
-                className="w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition text-left"
+                className={cn(
+                  "w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition-all duration-200 text-left hover-lift press-feedback",
+                  !prefersReducedMotion && "animate-fade-up",
+                  !prefersReducedMotion && index > 0 && `stagger-${Math.min(index, 5)}`
+                )}
+                style={!prefersReducedMotion ? { opacity: 0 } : undefined}
               >
                 <div className="flex justify-between items-start">
                   <div className="flex gap-3">
@@ -351,7 +403,7 @@ export function BookingFlow({
 
       {/* Date Selection */}
       {step === "date" && selectedService && (
-        <Card>
+        <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("selectDate")}</CardTitle>
             <CardDescription className="flex items-center gap-2">
@@ -367,7 +419,13 @@ export function BookingFlow({
               mode="single"
               selected={selectedDate}
               onSelect={handleDateSelect}
-              disabled={(date) => date < new Date()}
+              disabled={(date) => {
+                // Disable past dates
+                if (date < new Date()) return true;
+                // Disable closed days (non-working days)
+                if (closedDays.includes(date.getDay())) return true;
+                return false;
+              }}
               className="rounded-md border"
               getDayIndicators={getColorsForDate}
             />
@@ -404,7 +462,7 @@ export function BookingFlow({
 
       {/* Time Selection */}
       {step === "time" && selectedService && selectedDate && (
-        <Card>
+        <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("selectTime")}</CardTitle>
             <CardDescription className="flex items-center gap-2">
@@ -455,12 +513,17 @@ export function BookingFlow({
               </p>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {slots.map((slot) => (
+                {slots.map((slot, index) => (
                   <Button
                     key={slot.start}
                     variant={selectedSlot?.start === slot.start ? "default" : "outline"}
                     onClick={() => handleSlotSelect(slot)}
-                    className="w-full"
+                    className={cn(
+                      "w-full press-feedback",
+                      !prefersReducedMotion && "animate-fade-up",
+                      !prefersReducedMotion && `stagger-${Math.min((index % 5) + 1, 5)}`
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0 } : undefined}
                   >
                     {format(parseISO(slot.start), "HH:mm")}
                   </Button>
@@ -478,7 +541,7 @@ export function BookingFlow({
 
       {/* Guest Details Form */}
       {step === "details" && selectedService && selectedDate && selectedSlot && (
-        <Card>
+        <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("yourDetails")}</CardTitle>
             <CardDescription className="flex items-center gap-2">
@@ -537,7 +600,7 @@ export function BookingFlow({
 
       {/* Confirmation */}
       {step === "confirm" && selectedService && selectedDate && selectedSlot && (
-        <Card>
+        <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("confirmBooking")}</CardTitle>
           </CardHeader>
@@ -606,14 +669,36 @@ export function BookingFlow({
 
       {/* Success */}
       {step === "success" && (
-        <Card>
+        <Card className={!prefersReducedMotion ? "animate-fade-in-scale" : ""}>
           <CardContent className="py-12 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">{t("bookingSuccess")}</h2>
-            <p className="text-muted-foreground mb-6">
+            <div className={!prefersReducedMotion ? "animate-success-bounce" : ""}>
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            </div>
+            <h2
+              className={cn(
+                "text-2xl font-bold mb-2",
+                !prefersReducedMotion && "animate-fade-up stagger-2"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+            >
+              {t("bookingSuccess")}
+            </h2>
+            <p
+              className={cn(
+                "text-muted-foreground mb-6",
+                !prefersReducedMotion && "animate-fade-up stagger-3"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+            >
               {t("appointmentPending")}
             </p>
-            <Button onClick={() => router.push(`/c/${companySlug}`)}>
+            <Button
+              onClick={() => router.push(`/c/${companySlug}`)}
+              className={cn(
+                !prefersReducedMotion && "animate-fade-up stagger-4"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+            >
               {tCommon("back")}
             </Button>
           </CardContent>

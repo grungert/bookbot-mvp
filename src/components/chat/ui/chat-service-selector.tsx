@@ -10,14 +10,35 @@ interface ChatServiceSelectorProps {
   services: ChatService[];
   onSelect?: (service: ChatService) => void;
   disabled?: boolean;
+  preSelectedServiceName?: string; // Pre-selected service name for historical messages
+}
+
+// Helper to find service ID by name
+function findServiceIdByName(
+  services: ChatService[],
+  serviceName: string
+): string | null {
+  const normalizedName = serviceName.toLowerCase().trim();
+  for (const service of services) {
+    if (service.name.toLowerCase().trim() === normalizedName) {
+      return service.id;
+    }
+  }
+  return null;
 }
 
 export function ChatServiceSelector({
   services,
   onSelect,
   disabled = false,
+  preSelectedServiceName,
 }: ChatServiceSelectorProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (disabled && preSelectedServiceName) {
+      return findServiceIdByName(services, preSelectedServiceName);
+    }
+    return null;
+  });
 
   const handleSelect = (service: ChatService) => {
     setSelectedId(service.id);

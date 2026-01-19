@@ -10,6 +10,7 @@ interface ChatDatePickerProps {
   closedDays?: number[]; // 0 = Sunday, 1 = Monday, etc.
   onSelect?: (date: Date, serviceId: string, serviceName: string) => void;
   disabled?: boolean;
+  preSelectedDate?: Date; // Pre-selected date for historical messages
 }
 
 export function ChatDatePicker({
@@ -18,8 +19,11 @@ export function ChatDatePicker({
   closedDays = [],
   onSelect,
   disabled = false,
+  preSelectedDate,
 }: ChatDatePickerProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
+    disabled ? preSelectedDate : undefined
+  );
 
   const handleSelect = (date: Date | undefined) => {
     if (date && !disabled) {

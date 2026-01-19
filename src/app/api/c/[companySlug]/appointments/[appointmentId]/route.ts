@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { sendCancellationEmail } from "@/lib/email/send";
+import { createInvoiceForAppointment } from "@/lib/invoices";
 import { z } from "zod";
 
 const updateAppointmentSchema = z.object({
@@ -140,7 +141,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       where: { id: appointmentId },
       data: parsed.data,
       include: {
-        service: true,
+        service: {
+          select: {
+            id: true,
+            name: true,
+            duration: true,
+            price: true,
+            currency: true,
+          },
+        },
         user: {
           select: {
             id: true,
@@ -160,6 +169,25 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         startTime: updated.startTime,
         companyName: company.name,
       });
+    }
+
+    // Auto-generate invoice when appointment is confirmed
+    if (parsed.data.status === "CONFIRMED") {
+      try {
+        await createInvoiceForAppointment({
+          companyId: company.id,
+          userId: updated.userId,
+          appointmentId: updated.id,
+          serviceName: updated.service.name,
+          serviceDuration: updated.service.duration,
+          servicePrice: updated.service.price,
+          serviceCurrency: updated.service.currency,
+          taxRate: company.taxRate,
+        });
+      } catch (invoiceError) {
+        console.error("Error auto-generating invoice:", invoiceError);
+        // Don't fail the appointment update if invoice generation fails
+      }
     }
 
     return NextResponse.json(updated);

@@ -16,6 +16,15 @@ const updateSettingsSchema = z.object({
   aiBotName: z.string().nullable().optional(),
   aiGreeting: z.string().nullable().optional(),
   aiPersonality: z.string().nullable().optional(),
+  // Business Details
+  businessAddress: z.string().nullable().optional(),
+  taxId: z.string().nullable().optional(),
+  vatNumber: z.string().nullable().optional(),
+  bankAccount: z.string().nullable().optional(),
+  bankName: z.string().nullable().optional(),
+  businessPhone: z.string().nullable().optional(),
+  businessEmail: z.string().email().nullable().optional(),
+  taxRate: z.number().min(0).max(100).nullable().optional(),
 });
 
 interface RouteParams {
@@ -55,6 +64,15 @@ export async function GET(request: Request, { params }: RouteParams) {
       aiBotName: company.aiBotName,
       aiGreeting: company.aiGreeting,
       aiPersonality: company.aiPersonality,
+      // Business Details
+      businessAddress: company.businessAddress,
+      taxId: company.taxId,
+      vatNumber: company.vatNumber,
+      bankAccount: company.bankAccount,
+      bankName: company.bankName,
+      businessPhone: company.businessPhone,
+      businessEmail: company.businessEmail,
+      taxRate: company.taxRate ? Number(company.taxRate) : 20,
     };
 
     return NextResponse.json(settings);
@@ -107,6 +125,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.aiGreeting !== undefined) updateData.aiGreeting = data.aiGreeting;
     if (data.aiPersonality !== undefined) updateData.aiPersonality = data.aiPersonality;
 
+    // Business Details
+    if (data.businessAddress !== undefined) updateData.businessAddress = data.businessAddress;
+    if (data.taxId !== undefined) updateData.taxId = data.taxId;
+    if (data.vatNumber !== undefined) updateData.vatNumber = data.vatNumber;
+    if (data.bankAccount !== undefined) updateData.bankAccount = data.bankAccount;
+    if (data.bankName !== undefined) updateData.bankName = data.bankName;
+    if (data.businessPhone !== undefined) updateData.businessPhone = data.businessPhone;
+    if (data.businessEmail !== undefined) updateData.businessEmail = data.businessEmail;
+    if (data.taxRate !== undefined) updateData.taxRate = data.taxRate;
+
     // Only update API key if a new one is provided (not masked value)
     if (data.aiApiKey !== undefined && !data.aiApiKey?.startsWith("***")) {
       updateData.aiApiKey = data.aiApiKey;
@@ -136,6 +164,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       aiBotName: updatedCompany.aiBotName,
       aiGreeting: updatedCompany.aiGreeting,
       aiPersonality: updatedCompany.aiPersonality,
+      // Business Details
+      businessAddress: updatedCompany.businessAddress,
+      taxId: updatedCompany.taxId,
+      vatNumber: updatedCompany.vatNumber,
+      bankAccount: updatedCompany.bankAccount,
+      bankName: updatedCompany.bankName,
+      businessPhone: updatedCompany.businessPhone,
+      businessEmail: updatedCompany.businessEmail,
+      taxRate: updatedCompany.taxRate ? Number(updatedCompany.taxRate) : 20,
     };
 
     return NextResponse.json(settings);

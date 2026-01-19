@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +37,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, PackageOpen } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, PackageOpen, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface Service {
   id: string;
@@ -73,6 +74,13 @@ export default function ServicesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
 
+  // Selection and sorting state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortColumn, setSortColumn] = useState<"name" | "duration" | "price" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -97,6 +105,103 @@ export default function ServicesPage() {
   useEffect(() => {
     loadServices();
   }, [loadServices]);
+
+  // Sorting helper
+  const sortedServices = useMemo(() => {
+    if (!sortColumn) return services;
+
+    return [...services].sort((a, b) => {
+      let comparison = 0;
+
+      if (sortColumn === "name") {
+        comparison = a.name.localeCompare(b.name);
+      } else if (sortColumn === "duration") {
+        comparison = a.duration - b.duration;
+      } else if (sortColumn === "price") {
+        comparison = Number(a.price) - Number(b.price);
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [services, sortColumn, sortDirection]);
+
+  // Selection helpers
+  function toggleSelectAll() {
+    if (selectedIds.size === services.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(services.map((s) => s.id)));
+    }
+  }
+
+  function toggleSelectOne(id: string) {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  }
+
+  // Sorting handler
+  function handleSort(column: "name" | "duration" | "price") {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }
+
+  // Get sort icon for column
+  function getSortIcon(column: "name" | "duration" | "price") {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-4 w-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="h-4 w-4 ml-1" />
+    ) : (
+      <ArrowDown className="h-4 w-4 ml-1" />
+    );
+  }
+
+  // Bulk delete handler
+  async function handleBulkDelete() {
+    setIsBulkDeleting(true);
+
+    try {
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/c/${companySlug}/services/${id}`, { method: "DELETE" })
+      );
+
+      const results = await Promise.allSettled(deletePromises);
+      const successCount = results.filter((r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<Response>).value.ok).length;
+      const failCount = selectedIds.size - successCount;
+
+      if (successCount > 0) {
+        toast.success(`${successCount} service(s) deleted successfully`);
+      }
+      if (failCount > 0) {
+        toast.error(`Failed to delete ${failCount} service(s)`);
+      }
+
+      setSelectedIds(new Set());
+      setIsBulkDeleteOpen(false);
+      loadServices();
+    } catch {
+      toast.error("Failed to delete services. Please try again.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  }
+
+  // Get selected service names for confirmation
+  function getSelectedServiceNames(): string[] {
+    return services
+      .filter((s) => selectedIds.has(s.id))
+      .map((s) => s.name);
+  }
 
   function openCreateDialog() {
     setEditingService(null);
@@ -196,7 +301,7 @@ export default function ServicesPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-up">
         <div>
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -342,18 +447,84 @@ export default function ServicesPage() {
             </Button>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
+          <>
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <div className="flex items-center justify-between bg-muted/50 px-4 py-3 border-b animate-fade-in">
+                <span className="text-sm font-medium">
+                  {selectedIds.size} service{selectedIds.size !== 1 ? "s" : ""} selected
+                </span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
+            )}
+
+            <Table>
+            <TableHeader className="sticky top-0 bg-card z-10">
               <TableRow className="hover:bg-transparent">
-                <TableHead className="text-xs font-medium">{tCommon("name")}</TableHead>
-                <TableHead className="text-xs font-medium">{tCommon("duration")}</TableHead>
-                <TableHead className="text-xs font-medium">{tCommon("price")}</TableHead>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={services.length > 0 && selectedIds.size === services.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+                <TableHead className="text-xs font-medium">
+                  <button
+                    type="button"
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    {tCommon("name")}
+                    {getSortIcon("name")}
+                  </button>
+                </TableHead>
+                <TableHead className="text-xs font-medium">
+                  <button
+                    type="button"
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort("duration")}
+                  >
+                    {tCommon("duration")}
+                    {getSortIcon("duration")}
+                  </button>
+                </TableHead>
+                <TableHead className="text-xs font-medium">
+                  <button
+                    type="button"
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort("price")}
+                  >
+                    {tCommon("price")}
+                    {getSortIcon("price")}
+                  </button>
+                </TableHead>
                 <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {services.map((service) => (
-                <TableRow key={service.id} className="hover:bg-muted/50 transition-colors">
+              {sortedServices.map((service, index) => (
+                <TableRow
+                  key={service.id}
+                  className={`hover:bg-muted/50 transition-colors ${
+                    selectedIds.has(service.id) ? "bg-primary/5" : ""
+                  }`}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                  data-state={selectedIds.has(service.id) ? "selected" : undefined}
+                >
+                  <TableCell className="w-12">
+                    <Checkbox
+                      checked={selectedIds.has(service.id)}
+                      onCheckedChange={() => toggleSelectOne(service.id)}
+                      aria-label={`Select ${service.name}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div
@@ -426,8 +597,42 @@ export default function ServicesPage() {
               ))}
             </TableBody>
           </Table>
+          </>
         )}
       </div>
+
+      {/* Bulk Delete AlertDialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Service{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The following services will be permanently deleted:
+              <ul className="mt-2 list-disc list-inside text-sm">
+                {getSelectedServiceNames().slice(0, 5).map((name) => (
+                  <li key={name}>{name}</li>
+                ))}
+                {selectedIds.size > 5 && (
+                  <li>...and {selectedIds.size - 5} more</li>
+                )}
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isBulkDeleting}
+            >
+              {isBulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete {selectedIds.size} Service{selectedIds.size !== 1 ? "s" : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
