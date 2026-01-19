@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -21,7 +22,22 @@ export function ServicePriceDisplay({
   showCountdown = true,
   className,
 }: ServicePriceDisplayProps) {
+  const t = useTranslations("services");
   const result = calculateDiscountedPrice(service);
+
+  // Generate translated countdown text
+  const getCountdownText = () => {
+    if (!result.timeRemaining) return null;
+    const { days, hours, minutes } = result.timeRemaining;
+
+    if (days > 0) {
+      return days === 1 ? t("endsInDay") : t("endsInDays", { count: days });
+    } else if (hours > 0) {
+      return hours === 1 ? t("endsInHour") : t("endsInHours", { count: hours });
+    } else {
+      return minutes <= 1 ? t("endsSoon") : t("endsInMinutes", { count: minutes });
+    }
+  };
 
   const sizeClasses = {
     sm: {
@@ -92,7 +108,7 @@ export function ServicePriceDisplay({
             result.isExpiringSoon && "text-orange-500 animate-countdown-tick font-medium"
           )}
         >
-          {result.timeRemaining.displayText}
+          {getCountdownText()}
         </span>
       )}
     </div>

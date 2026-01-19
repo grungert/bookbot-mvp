@@ -81,7 +81,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           email: user.email,
           name: user.name,
-          image: user.image,
+          image: null, // Don't include base64 images in auth - fetch via API instead
           role: user.role,
           companyId: user.companyId,
         };

@@ -17,6 +17,8 @@ interface NavItem {
 interface HeaderProps {
   companyName?: string;
   companySlug?: string;
+  companyLogo?: string | null;
+  headerDisplayMode?: string;
   showAdminLink?: boolean;
   showMyAppointments?: boolean;
   appointmentCount?: number;
@@ -26,6 +28,8 @@ interface HeaderProps {
 export function Header({
   companyName = "BookBot",
   companySlug,
+  companyLogo,
+  headerDisplayMode = "both",
   showAdminLink = false,
   showMyAppointments = false,
   appointmentCount = 0,
@@ -43,6 +47,8 @@ export function Header({
         <MobileNav
           companyName={companyName}
           companySlug={companySlug}
+          companyLogo={companyLogo}
+          headerDisplayMode={headerDisplayMode}
           navItems={navItems}
           showAdminLink={showAdminLink}
           showMyAppointments={showMyAppointments}
@@ -53,9 +59,18 @@ export function Header({
         <div className="mr-4 flex items-center">
           <Link
             href={companySlug ? `/c/${companySlug}` : "/"}
-            className="flex items-center"
+            className="flex items-center gap-2"
           >
-            <span className="font-bold">{companyName}</span>
+            {companyLogo && headerDisplayMode !== "name" && (
+              <img
+                src={companyLogo}
+                alt={companyName}
+                className="h-8 w-8 object-contain"
+              />
+            )}
+            {headerDisplayMode !== "logo" && (
+              <span className="font-bold">{companyName}</span>
+            )}
           </Link>
         </div>
 

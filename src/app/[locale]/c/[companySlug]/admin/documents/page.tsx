@@ -290,7 +290,7 @@ export default function DocumentsPage() {
         <div>
           <h1 className="text-2xl font-bold">{t("documents")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Add documents to your knowledge base for the AI chatbot
+            {t("documentsSubtitle")}
           </p>
         </div>
         <Button onClick={openCreatePanel} className="bg-primary hover:bg-primary/90">
@@ -303,7 +303,7 @@ export default function DocumentsPage() {
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="p-4 border-b">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Knowledge Base
+            {t("knowledgeBase")}
           </h3>
         </div>
         {documents.length === 0 ? (
@@ -312,10 +312,10 @@ export default function DocumentsPage() {
               <FileText className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground mb-2">
-              No documents in your knowledge base yet
+              {t("noDocuments")}
             </p>
             <Button onClick={openCreatePanel} variant="link" className="text-primary">
-              Add your first document
+              {t("addFirstDocument")}
             </Button>
           </div>
         ) : (
@@ -324,7 +324,7 @@ export default function DocumentsPage() {
             {selectedIds.size > 0 && (
               <div className="flex items-center justify-between bg-muted/50 px-4 py-3 border-b animate-fade-in">
                 <span className="text-sm font-medium">
-                  {selectedIds.size} document{selectedIds.size !== 1 ? "s" : ""} selected
+                  {selectedIds.size} {selectedIds.size !== 1 ? t("documentsPlural") : t("document")} {t("selected")}
                 </span>
                 <Button
                   variant="destructive"
@@ -332,7 +332,7 @@ export default function DocumentsPage() {
                   onClick={() => setIsBulkDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Selected
+                  {t("deleteSelected")}
                 </Button>
               </div>
             )}
@@ -353,18 +353,18 @@ export default function DocumentsPage() {
                       className="flex items-center hover:text-foreground transition-colors"
                       onClick={() => handleSort("title")}
                     >
-                      Title
+                      {t("documentTitle")}
                       {getSortIcon("title")}
                     </button>
                   </TableHead>
-                  <TableHead className="text-xs font-medium">Preview</TableHead>
+                  <TableHead className="text-xs font-medium">{t("preview")}</TableHead>
                   <TableHead className="text-xs font-medium">
                     <button
                       type="button"
                       className="flex items-center hover:text-foreground transition-colors"
                       onClick={() => handleSort("updatedAt")}
                     >
-                      Last Updated
+                      {t("lastUpdated")}
                       {getSortIcon("updatedAt")}
                     </button>
                   </TableHead>
@@ -419,9 +419,9 @@ export default function DocumentsPage() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Document?</AlertDialogTitle>
+                              <AlertDialogTitle>{t("deleteDocument")}?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                Are you sure you want to delete &quot;{doc.title}&quot;? This action cannot be undone.
+                                {t("deleteDocumentConfirm", { title: doc.title })}
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -453,15 +453,15 @@ export default function DocumentsPage() {
       <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {selectedIds.size} Document{selectedIds.size !== 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteDocuments")} ({selectedIds.size})</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The following documents will be permanently deleted:
+              {t("deleteDocumentsConfirm")}
               <ul className="mt-2 list-disc list-inside text-sm">
                 {getSelectedDocumentTitles().slice(0, 5).map((docTitle) => (
                   <li key={docTitle}>{docTitle}</li>
                 ))}
                 {selectedIds.size > 5 && (
-                  <li>...and {selectedIds.size - 5} more</li>
+                  <li>...{t("andMore", { count: selectedIds.size - 5 })}</li>
                 )}
               </ul>
             </AlertDialogDescription>
@@ -476,7 +476,7 @@ export default function DocumentsPage() {
               {isBulkDeleting ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Delete {selectedIds.size} Document{selectedIds.size !== 1 ? "s" : ""}
+              {tCommon("delete")} ({selectedIds.size})
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -502,7 +502,7 @@ export default function DocumentsPage() {
           {/* Panel Header */}
           <div className="flex items-center justify-between p-4 border-b shrink-0">
             <h2 className="text-xl font-semibold">
-              {editingDocument ? "Edit Document" : "Add Document"}
+              {editingDocument ? t("editDocument") : t("addDocument")}
             </h2>
             <Button type="button" variant="ghost" size="icon" onClick={closePanel}>
               <X className="h-5 w-5" />
@@ -512,18 +512,18 @@ export default function DocumentsPage() {
           {/* Panel Content - Scrollable */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">{t("documentTitle")}</Label>
               <Input
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="FAQ, Pricing, About Us, etc."
+                placeholder={t("documentTitlePlaceholder")}
                 required
               />
             </div>
 
             <div className="space-y-2" data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
-              <Label htmlFor="content">Content</Label>
+              <Label htmlFor="content">{t("documentContent")}</Label>
               <div className="md-editor-wrapper">
                 <MDEditor
                   value={content}
@@ -531,12 +531,12 @@ export default function DocumentsPage() {
                   height={500}
                   preview="edit"
                   textareaProps={{
-                    placeholder: "Enter the document content that will be used by the AI...",
+                    placeholder: t("documentContentPlaceholder"),
                   }}
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Supports Markdown formatting (headings, bold, lists, etc.)
+                {t("markdownSupport")}
               </p>
             </div>
           </div>

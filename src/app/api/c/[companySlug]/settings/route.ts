@@ -7,6 +7,7 @@ const updateSettingsSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   logoUrl: z.string().nullable().optional(),
+  headerDisplayMode: z.enum(["both", "logo", "name"]).optional(),
   primaryColor: z.string().optional(),
   timezone: z.string().optional(),
   aiApiKey: z.string().nullable().optional(),
@@ -51,6 +52,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       slug: company.slug,
       description: company.description,
       logoUrl: company.logoUrl,
+      headerDisplayMode: company.headerDisplayMode,
       primaryColor: company.primaryColor,
       timezone: company.timezone,
       // Mask API key - only show last 4 chars if exists
@@ -116,6 +118,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
+    if (data.headerDisplayMode !== undefined) updateData.headerDisplayMode = data.headerDisplayMode;
     if (data.primaryColor !== undefined) updateData.primaryColor = data.primaryColor;
     if (data.timezone !== undefined) updateData.timezone = data.timezone;
     if (data.aiEndpoint !== undefined) updateData.aiEndpoint = data.aiEndpoint;
@@ -152,6 +155,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       slug: updatedCompany.slug,
       description: updatedCompany.description,
       logoUrl: updatedCompany.logoUrl,
+      headerDisplayMode: updatedCompany.headerDisplayMode,
       primaryColor: updatedCompany.primaryColor,
       timezone: updatedCompany.timezone,
       aiApiKey: updatedCompany.aiApiKey

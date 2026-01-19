@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,6 +36,7 @@ interface CompanySettings {
   slug: string;
   description: string | null;
   logoUrl: string | null;
+  headerDisplayMode: string;
   primaryColor: string;
   timezone: string;
   aiApiKey: string | null;
@@ -59,16 +60,17 @@ interface CompanySettings {
 
 type SettingsTab = "general" | "branding" | "ai" | "bot" | "business";
 
-const tabs: { id: SettingsTab; label: string; icon: typeof Building2 }[] = [
-  { id: "general", label: "General", icon: Building2 },
-  { id: "branding", label: "Branding", icon: Palette },
-  { id: "ai", label: "AI Chatbot", icon: Bot },
-  { id: "bot", label: "Bot Personality", icon: MessageSquare },
-  { id: "business", label: "Business Details", icon: FileText },
+const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
+  { id: "general", labelKey: "tabGeneral", icon: Building2 },
+  { id: "branding", labelKey: "tabBranding", icon: Palette },
+  { id: "ai", labelKey: "tabAiChatbot", icon: Bot },
+  { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
+  { id: "business", labelKey: "tabBusinessDetails", icon: FileText },
 ];
 
 export default function SettingsPage() {
   const params = useParams();
+  const router = useRouter();
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
@@ -82,6 +84,7 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [headerDisplayMode, setHeaderDisplayMode] = useState("both");
   const [primaryColor, setPrimaryColor] = useState("#3B82F6");
   const [timezone, setTimezone] = useState("Europe/Belgrade");
   const [aiApiKey, setAiApiKey] = useState("");
@@ -103,10 +106,50 @@ export default function SettingsPage() {
   const [businessEmail, setBusinessEmail] = useState("");
   const [taxRate, setTaxRate] = useState<number>(20);
 
+  // Logo upload
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  const handleLogoClick = () => {
+    logoInputRef.current?.click();
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error(t("invalidImageType"));
+      return;
+    }
+
+    // Max 500KB for logos to avoid storage issues
+    if (file.size > 500 * 1024) {
+      toast.error(t("logoTooLarge"));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setLogoPreview(base64);
+      setLogoUrl(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    setLogoUrl("");
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+  };
+
   // Read hash on mount
   useEffect(() => {
     const hash = window.location.hash.slice(1);
-    if (hash && tabs.some(t => t.id === hash)) {
+    if (hash && tabConfig.some(tab => tab.id === hash)) {
       setActiveTab(hash as SettingsTab);
     }
   }, []);
@@ -148,6 +191,7 @@ export default function SettingsPage() {
       setName(settings.name);
       setDescription(settings.description || "");
       setLogoUrl(settings.logoUrl || "");
+      setHeaderDisplayMode(settings.headerDisplayMode || "both");
       setPrimaryColor(settings.primaryColor || "#3B82F6");
       setTimezone(settings.timezone || "Europe/Belgrade");
       setAiApiKey(settings.aiApiKey || "");
@@ -183,6 +227,7 @@ export default function SettingsPage() {
         name,
         description: description || null,
         logoUrl: logoUrl || null,
+        headerDisplayMode,
         primaryColor,
         timezone,
         aiEndpoint: aiEndpoint || null,
@@ -224,6 +269,9 @@ export default function SettingsPage() {
       setAiApiKey(updatedSettings.aiApiKey || "");
       setHasExistingApiKey(updatedSettings.hasAiApiKey);
 
+      // Refresh the page to update header/layout with new settings
+      router.refresh();
+
       toast.success("Settings saved successfully");
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -245,7 +293,7 @@ export default function SettingsPage() {
   const GeneralSection = () => (
     <div className="rounded-xl border bg-card p-4">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-        General Information
+        {t("generalInfo")}
       </h3>
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -269,7 +317,7 @@ export default function SettingsPage() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+          <Label htmlFor="description" className="text-sm font-medium">{t("description")}</Label>
           <Textarea
             id="description"
             value={description}
@@ -281,22 +329,85 @@ export default function SettingsPage() {
     </div>
   );
 
-  const BrandingSection = () => (
+  const BrandingSection = () => {
+    const displayLogo = logoPreview || logoUrl;
+
+    return (
     <div className="rounded-xl border bg-card p-4">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-        Branding
+        {t("branding")}
       </h3>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="logoUrl" className="text-sm font-medium">{t("companyLogo")}</Label>
-          <Input
-            id="logoUrl"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            placeholder="https://..."
-            className="h-10"
-          />
+          <Label className="text-sm font-medium">{t("companyLogo")}</Label>
+          <div className="flex items-center gap-6">
+            <div className="relative group">
+              <div
+                onClick={handleLogoClick}
+                className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden bg-muted/50"
+              >
+                {displayLogo ? (
+                  <img
+                    src={displayLogo}
+                    alt="Company logo"
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                )}
+              </div>
+              {displayLogo && (
+                <button
+                  onClick={handleLogoClick}
+                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Camera className="h-6 w-6 text-white" />
+                </button>
+              )}
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoChange}
+                className="hidden"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleLogoClick}>
+                  {t("uploadLogo")}
+                </Button>
+                {displayLogo && (
+                  <Button variant="outline" size="sm" onClick={handleRemoveLogo}>
+                    <X className="h-4 w-4 mr-1" />
+                    {t("removeLogo")}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {t("logoHint")}
+              </p>
+            </div>
+          </div>
         </div>
+        {displayLogo && (
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t("headerDisplay")}</Label>
+            <Select value={headerDisplayMode} onValueChange={setHeaderDisplayMode}>
+              <SelectTrigger className="w-full md:w-64 h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both">{t("headerDisplayBoth")}</SelectItem>
+                <SelectItem value="logo">{t("headerDisplayLogo")}</SelectItem>
+                <SelectItem value="name">{t("headerDisplayName")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {t("headerDisplayHint")}
+            </p>
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="color" className="text-sm font-medium">{t("primaryColor")}</Label>
           <div className="flex gap-3 items-center flex-wrap">
@@ -330,20 +441,21 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            This color will be used throughout your booking pages and admin interface
+            {t("brandColorHint")}
           </p>
         </div>
       </div>
     </div>
   );
+  };
 
   const AiChatbotSection = () => (
     <div className="rounded-xl border bg-card p-4">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-        AI Chatbot
+        {t("aiChatbot")}
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Configure AI settings for your customer chatbot
+        {t("aiChatbotDescription")}
       </p>
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -355,7 +467,7 @@ export default function SettingsPage() {
                 type={showApiKey ? "text" : "password"}
                 value={aiApiKey}
                 onChange={(e) => setAiApiKey(e.target.value)}
-                placeholder={hasExistingApiKey ? "Enter new key to replace" : "sk-..."}
+                placeholder={hasExistingApiKey ? t("enterNewKeyToReplace") : "sk-..."}
                 className="h-10"
               />
               <Button
@@ -374,7 +486,7 @@ export default function SettingsPage() {
             </div>
             {hasExistingApiKey && aiApiKey?.startsWith("***") && (
               <p className="text-xs text-muted-foreground">
-                API key is configured. Enter a new key to replace it.
+                {t("apiKeyConfigured")}
               </p>
             )}
           </div>
@@ -475,15 +587,15 @@ export default function SettingsPage() {
   const BusinessDetailsSection = () => (
     <div className="rounded-xl border bg-card p-4">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-        Business Details
+        {t("businessDetails")}
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Business information used for invoices
+        {t("businessDetailsDescription")}
       </p>
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="businessAddress" className="text-sm font-medium">Business Address</Label>
+            <Label htmlFor="businessAddress" className="text-sm font-medium">{t("businessAddress")}</Label>
             <Textarea
               id="businessAddress"
               value={businessAddress}
@@ -494,7 +606,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="taxId" className="text-sm font-medium">Tax ID / PIB</Label>
+              <Label htmlFor="taxId" className="text-sm font-medium">{t("taxId")}</Label>
               <Input
                 id="taxId"
                 value={taxId}
@@ -504,7 +616,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vatNumber" className="text-sm font-medium">VAT Number / PDV</Label>
+              <Label htmlFor="vatNumber" className="text-sm font-medium">{t("vatNumber")}</Label>
               <Input
                 id="vatNumber"
                 value={vatNumber}
@@ -517,7 +629,7 @@ export default function SettingsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="bankName" className="text-sm font-medium">Bank Name</Label>
+            <Label htmlFor="bankName" className="text-sm font-medium">{t("bankName")}</Label>
             <Input
               id="bankName"
               value={bankName}
@@ -527,7 +639,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="bankAccount" className="text-sm font-medium">Bank Account Number</Label>
+            <Label htmlFor="bankAccount" className="text-sm font-medium">{t("bankAccount")}</Label>
             <Input
               id="bankAccount"
               value={bankAccount}
@@ -539,7 +651,7 @@ export default function SettingsPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="businessPhone" className="text-sm font-medium">Business Phone</Label>
+            <Label htmlFor="businessPhone" className="text-sm font-medium">{t("businessPhone")}</Label>
             <Input
               id="businessPhone"
               value={businessPhone}
@@ -549,7 +661,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="businessEmail" className="text-sm font-medium">Business Email</Label>
+            <Label htmlFor="businessEmail" className="text-sm font-medium">{t("businessEmail")}</Label>
             <Input
               id="businessEmail"
               type="email"
@@ -560,7 +672,7 @@ export default function SettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="taxRate" className="text-sm font-medium">Tax Rate (%)</Label>
+            <Label htmlFor="taxRate" className="text-sm font-medium">{t("taxRate")}</Label>
             <Input
               id="taxRate"
               type="number"
@@ -573,7 +685,7 @@ export default function SettingsPage() {
               className="h-10"
             />
             <p className="text-xs text-muted-foreground">
-              Default tax rate for invoices
+              {t("taxRateHint")}
             </p>
           </div>
         </div>
@@ -586,9 +698,9 @@ export default function SettingsPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-2xl font-bold">{t("settings")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your company settings and preferences
+            {t("settingsSubtitle")}
           </p>
         </div>
         <Button onClick={handleSave} disabled={isSaving} className="bg-primary hover:bg-primary/90">
@@ -603,7 +715,7 @@ export default function SettingsPage() {
 
       {/* Mobile: Horizontal scrollable tabs */}
       <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-        {tabs.map((tab) => (
+        {tabConfig.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -615,7 +727,7 @@ export default function SettingsPage() {
             )}
           >
             <tab.icon className="h-3.5 w-3.5" />
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -624,7 +736,7 @@ export default function SettingsPage() {
       <div className="flex gap-6">
         {/* Desktop Sidebar Navigation */}
         <nav className="hidden md:block w-48 shrink-0 space-y-1 sticky top-4 self-start">
-          {tabs.map((tab) => (
+          {tabConfig.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -636,7 +748,7 @@ export default function SettingsPage() {
               )}
             >
               <tab.icon className="h-4 w-4" />
-              {tab.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </nav>

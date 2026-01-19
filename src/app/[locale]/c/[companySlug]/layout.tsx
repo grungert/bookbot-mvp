@@ -63,6 +63,8 @@ export default async function CompanyLayout({
       <Header
         companyName={company.name}
         companySlug={companySlug}
+        companyLogo={company.logoUrl}
+        headerDisplayMode={company.headerDisplayMode}
         showAdminLink={canAccessAdmin}
         showMyAppointments={isLoggedIn}
         appointmentCount={appointmentCount}

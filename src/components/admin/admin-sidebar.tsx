@@ -18,6 +18,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeft,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +103,7 @@ interface NavItem {
 function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number) {
   const t = useTranslations("nav");
   const tAdmin = useTranslations("admin");
+  const tWorkingHours = useTranslations("workingHours");
 
   const basePath = `/c/${companySlug}/admin`;
 
@@ -135,7 +137,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
     },
     {
       href: `${basePath}/working-hours`,
-      label: "Working Hours",
+      label: tWorkingHours("title"),
       icon: Clock,
     },
     {
@@ -146,6 +148,11 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
   ];
 
   const bottomItems: NavItem[] = [
+    {
+      href: `${basePath}/profile`,
+      label: t("profile"),
+      icon: User,
+    },
     {
       href: `${basePath}/settings`,
       label: t("settings"),
