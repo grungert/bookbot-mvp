@@ -371,27 +371,58 @@ export function BookingFlow({
             <CardTitle>{t("selectService")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {services.map((service, index) => (
+            {services.map((service, index) => {
+              const hasPromotion = isDiscountActive(service) || service.promotionalBadge || service.customBadgeLabel;
+              const priceResult = isDiscountActive(service) ? calculateDiscountedPrice(service) : null;
+
+              return (
               <button
                 key={service.id}
                 onClick={() => handleServiceSelect(service)}
                 className={cn(
-                  "w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition-all duration-200 text-left hover-lift press-feedback relative",
+                  "w-full border rounded-lg hover:border-primary hover:bg-muted/50 transition-all duration-200 text-left hover-lift press-feedback relative overflow-hidden",
                   !prefersReducedMotion && "animate-fade-up",
                   !prefersReducedMotion && index > 0 && `stagger-${Math.min(index, 5)}`
                 )}
                 style={!prefersReducedMotion ? { opacity: 0 } : undefined}
               >
-                {/* Promotional Badge - top right corner */}
-                {(service.promotionalBadge || service.customBadgeLabel) && (
-                  <div className="absolute top-2 right-2">
-                    <PromotionalBadge
-                      badge={service.promotionalBadge}
-                      customLabel={service.customBadgeLabel}
-                      size="sm"
-                    />
+                {/* Promotional strip at top */}
+                {hasPromotion && (
+                  <div
+                    className="h-1.5 w-full"
+                    style={{ backgroundColor: service.color || "#3B82F6" }}
+                  />
+                )}
+
+                <div className={cn("p-4", hasPromotion && "pt-3")}>
+                {/* Promotional Badge & Discount info */}
+                {hasPromotion && (
+                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-dashed">
+                    <div className="flex items-center gap-2">
+                      {(service.promotionalBadge || service.customBadgeLabel) && (
+                        <PromotionalBadge
+                          badge={service.promotionalBadge}
+                          customLabel={service.customBadgeLabel}
+                          size="sm"
+                        />
+                      )}
+                    </div>
+                    {priceResult && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground line-through">
+                          {service.currency} {priceResult.originalPrice.toLocaleString()}
+                        </span>
+                        <span className="bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded text-xs font-medium">
+                          -{priceResult.discountPercentage}%
+                        </span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {service.currency} {Math.round(priceResult.finalPrice).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
+
                 <div className="flex justify-between items-start">
                   <div className="flex gap-3">
                     <div
@@ -411,9 +442,8 @@ export function BookingFlow({
                       </div>
                     </div>
                   </div>
-                  {isDiscountActive(service) ? (
-                    <ServicePriceDisplay service={service} size="sm" showCountdown={true} />
-                  ) : (
+                  {/* Show price badge only when NO discount (discount shown in header) */}
+                  {!priceResult && (
                     <Badge
                       style={{
                         backgroundColor: service.color || undefined,
@@ -424,8 +454,10 @@ export function BookingFlow({
                     </Badge>
                   )}
                 </div>
+                </div>
               </button>
-            ))}
+              );
+            })}
           </CardContent>
         </Card>
       )}

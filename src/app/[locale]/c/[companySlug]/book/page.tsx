@@ -51,6 +51,13 @@ export default async function BookingPage({
     price: Number(s.price),
     currency: s.currency,
     color: s.color,
+    // Discount fields
+    discountType: s.discountType as "percentage" | "fixed" | null,
+    discountValue: s.discountValue ? Number(s.discountValue) : null,
+    discountStartDate: s.discountStartDate?.toISOString() || null,
+    discountEndDate: s.discountEndDate?.toISOString() || null,
+    promotionalBadge: s.promotionalBadge as "SALE" | "NEW" | "POPULAR" | "HOT" | null,
+    customBadgeLabel: s.customBadgeLabel,
   }));
 
   return (

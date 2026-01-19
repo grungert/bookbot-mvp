@@ -10,6 +10,10 @@ import { Clock } from "lucide-react";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { AboutSection } from "@/components/customer/about-section";
 import { cn } from "@/lib/utils";
+import { ServicePriceDisplay } from "@/components/service/service-price-display";
+import { PromotionalBadge } from "@/components/service/promotional-badge";
+import { isDiscountActive, calculateDiscountedPrice } from "@/lib/utils/discount";
+import type { ServiceWithDiscount, PromotionalBadge as PromotionalBadgeType } from "@/lib/utils/discount";
 
 interface CompanyPageProps {
   params: Promise<{ locale: string; companySlug: string }>;
@@ -64,24 +68,89 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
         {company.services.length === 0 ? (
           <p className="text-muted-foreground">{tServices("noServices")}</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {company.services.map((service, index) => (
-              <Card
-                key={service.id}
-                className={cn(
-                  "overflow-hidden group",
-                  "rounded-xl border",
-                  "shadow-sm hover:shadow-lg",
-                  "transition-all duration-300",
-                  "hover:-translate-y-0.5 hover:border-primary/20",
-                  `animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`
-                )}
-                style={{
-                  opacity: 0,
-                  backgroundImage: `linear-gradient(to bottom right, ${service.color || "#3B82F6"}08, transparent)`
-                }}
-              >
-                <div className="flex p-4 gap-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 pt-4">
+            {company.services.map((service, index) => {
+              const serviceWithDiscount: ServiceWithDiscount = {
+                price: Number(service.price),
+                currency: service.currency,
+                discountType: service.discountType as ServiceWithDiscount["discountType"],
+                discountValue: service.discountValue ? Number(service.discountValue) : null,
+                discountStartDate: service.discountStartDate,
+                discountEndDate: service.discountEndDate,
+                promotionalBadge: service.promotionalBadge as PromotionalBadgeType,
+                customBadgeLabel: service.customBadgeLabel,
+              };
+              const hasDiscount = isDiscountActive(serviceWithDiscount);
+              const hasBadge = service.promotionalBadge || service.customBadgeLabel;
+              const hasPromotion = hasDiscount || hasBadge;
+
+              return (
+                <div
+                  key={service.id}
+                  className={cn(
+                    "relative",
+                    `animate-fade-in-scale stagger-${Math.min(index + 2, 5)}`
+                  )}
+                  style={{ opacity: 0 }}
+                >
+                  {/* Promotional peek card - behind and narrower */}
+                  {hasPromotion && (
+                    <div
+                      className="absolute -top-4 left-3 right-3 rounded-t-xl px-4 py-2.5 shadow-md"
+                      style={{
+                        backgroundColor: service.color || "#3B82F6",
+                        boxShadow: `0 4px 12px ${service.color || "#3B82F6"}40`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        {/* Left: Badge */}
+                        <div className="flex items-center gap-2">
+                          {hasBadge && (
+                            <PromotionalBadge
+                              badge={service.promotionalBadge as PromotionalBadgeType}
+                              customLabel={service.customBadgeLabel}
+                              size="md"
+                              className="!bg-white/25 !text-white !shadow-none"
+                            />
+                          )}
+                        </div>
+
+                        {/* Right: Price info */}
+                        {hasDiscount && (() => {
+                          const priceResult = calculateDiscountedPrice(serviceWithDiscount);
+                          return (
+                            <div className="flex items-center gap-3">
+                              <span className="text-white/70 line-through text-sm">
+                                {service.currency} {priceResult.originalPrice.toLocaleString()}
+                              </span>
+                              <span className="bg-white/25 text-white text-xs font-bold px-2 py-1 rounded-md">
+                                -{priceResult.discountPercentage}%
+                              </span>
+                              <span className="text-white font-bold text-lg">
+                                {service.currency} {Math.round(priceResult.finalPrice).toLocaleString()}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Main service card */}
+                  <Card
+                    className={cn(
+                      "overflow-hidden group relative",
+                      "rounded-xl border bg-background",
+                      "shadow-sm hover:shadow-lg",
+                      "transition-all duration-300",
+                      "hover:-translate-y-0.5 hover:border-primary/20",
+                      hasPromotion && "mt-7"
+                    )}
+                    style={{
+                      backgroundImage: `linear-gradient(to bottom right, ${service.color || "#3B82F6"}08, transparent)`
+                    }}
+                  >
+                    <div className="flex p-4 gap-4">
                   <div
                     className="w-1.5 shrink-0 rounded-full self-stretch transition-all duration-300 group-hover:shadow-[0_0_8px_0px]"
                     style={{
@@ -93,16 +162,19 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold truncate">{service.name}</span>
-                        <Badge
-                          className="shrink-0 shadow-sm"
-                          style={{
-                            backgroundColor: service.color || undefined,
-                            borderColor: service.color || undefined,
-                            color: service.color ? "white" : undefined,
-                          }}
-                        >
-                          {service.currency} {Number(service.price).toLocaleString()}
-                        </Badge>
+                        {/* Show price badge only if NO active discount (price shown in peek card otherwise) */}
+                        {!hasDiscount && (
+                          <Badge
+                            className="shrink-0 shadow-sm"
+                            style={{
+                              backgroundColor: service.color || undefined,
+                              borderColor: service.color || undefined,
+                              color: service.color ? "white" : undefined,
+                            }}
+                          >
+                            {service.currency} {Number(service.price).toLocaleString()}
+                          </Badge>
+                        )}
                       </div>
                       {service.description && (
                         <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{service.description}</p>
@@ -122,7 +194,7 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                         <span>{t("minutes", { count: service.duration })}</span>
                       </div>
                     </div>
-                    <Link href={`/c/${companySlug}/book?service=${service.id}`}>
+                    <Link href={`/c/${companySlug}/book?service=${service.id}`} className="mt-1 block">
                       <Button
                         className="w-full cursor-pointer press-feedback"
                         variant="outline"
@@ -137,7 +209,9 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
                   </div>
                 </div>
               </Card>
-            ))}
+            </div>
+          );
+        })}
           </div>
         )}
       </section>
