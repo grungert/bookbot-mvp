@@ -15,6 +15,7 @@ const querySchema = z.object({
   search: z.string().optional(),
   isRead: z.enum(["true", "false"]).optional(),
   isImportant: z.enum(["true", "false"]).optional(),
+  groupBy: z.enum(["session", "user"]).optional().default("session"),
 });
 
 // GET /api/c/[companySlug]/conversations - List chat sessions with filters
@@ -38,6 +39,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       search: searchParams.get("search") || undefined,
       isRead: searchParams.get("isRead") || undefined,
       isImportant: searchParams.get("isImportant") || undefined,
+      groupBy: searchParams.get("groupBy") || "session",
     });
 
     if (!parsed.success) {
@@ -47,7 +49,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { userType, startDate, endDate, search, isRead, isImportant } = parsed.data;
+    const { userType, startDate, endDate, search, isRead, isImportant, groupBy } = parsed.data;
 
     // Build where clause
     const where: Prisma.ChatSessionWhereInput = {
@@ -141,7 +143,79 @@ export async function GET(request: Request, { params }: RouteParams) {
       where: { companyId: company.id, isRead: false },
     });
 
-    // Format response
+    // Format response based on groupBy mode
+    if (groupBy === "user") {
+      // Group sessions by user
+      const userGroups = new Map<string | null, {
+        userId: string | null;
+        user: { id: string; email: string; name: string | null } | null;
+        sessionCount: number;
+        totalMessages: number;
+        lastActivity: string;
+        unreadCount: number;
+        sessions: Array<{
+          id: string;
+          messageCount: number;
+          isRead: boolean;
+          isImportant: boolean;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      }>();
+
+      for (const session of sessions) {
+        const key = session.userId;
+        const existing = userGroups.get(key);
+
+        const sessionData = {
+          id: session.id,
+          messageCount: session._count.messages,
+          isRead: session.isRead,
+          isImportant: session.isImportant,
+          createdAt: session.createdAt.toISOString(),
+          updatedAt: session.updatedAt.toISOString(),
+        };
+
+        if (existing) {
+          existing.sessionCount += 1;
+          existing.totalMessages += session._count.messages;
+          existing.unreadCount += session.isRead ? 0 : 1;
+          if (new Date(session.updatedAt) > new Date(existing.lastActivity)) {
+            existing.lastActivity = session.updatedAt.toISOString();
+          }
+          existing.sessions.push(sessionData);
+        } else {
+          userGroups.set(key, {
+            userId: session.userId,
+            user: session.user,
+            sessionCount: 1,
+            totalMessages: session._count.messages,
+            lastActivity: session.updatedAt.toISOString(),
+            unreadCount: session.isRead ? 0 : 1,
+            sessions: [sessionData],
+          });
+        }
+      }
+
+      // Convert to array and sort by last activity
+      const groupedUsers = Array.from(userGroups.values()).sort(
+        (a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime()
+      );
+
+      return NextResponse.json({
+        groupBy: "user",
+        users: groupedUsers,
+        stats: {
+          totalSessions,
+          totalMessages,
+          guestSessions,
+          authenticatedSessions,
+          unreadSessions,
+        },
+      });
+    }
+
+    // Default: return sessions (groupBy === "session")
     const formattedSessions = sessions.map((session) => ({
       id: session.id,
       userId: session.userId,
@@ -154,6 +228,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }));
 
     return NextResponse.json({
+      groupBy: "session",
       sessions: formattedSessions,
       stats: {
         totalSessions,

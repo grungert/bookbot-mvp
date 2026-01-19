@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { PeriodSelector } from "@/components/admin/dashboard/period-selector";
 import type { DashboardPeriod } from "@/lib/db/tenant";
@@ -17,12 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +56,10 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  LayoutList,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminMessageRenderer } from "@/components/chat/admin-message-renderer";
@@ -100,6 +98,28 @@ interface SessionDetails {
   isImportant: boolean;
   createdAt: string;
   messages: ChatMessage[];
+  pagination?: {
+    hasMore: boolean;
+    nextCursor: string | null;
+    totalCount: number;
+  };
+}
+
+interface UserGroup {
+  userId: string | null;
+  user: ChatUser | null;
+  sessionCount: number;
+  totalMessages: number;
+  lastActivity: string;
+  unreadCount: number;
+  sessions: Array<{
+    id: string;
+    messageCount: number;
+    isRead: boolean;
+    isImportant: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>;
 }
 
 interface Stats {
@@ -137,12 +157,15 @@ export default function ConversationsPage() {
 
   // Data state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter state
   const [userType, setUserType] = useState<"all" | "guest" | "authenticated">("all");
   const [searchEmail, setSearchEmail] = useState("");
+  const [viewMode, setViewMode] = useState<"session" | "user">("session");
+  const [expandedUserIds, setExpandedUserIds] = useState<Set<string | null>>(new Set());
 
   // Selection and sorting state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -154,6 +177,14 @@ export default function ConversationsPage() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
+  // Lazy loading state for messages
+  const [dialogMessages, setDialogMessages] = useState<ChatMessage[]>([]);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [totalMessageCount, setTotalMessageCount] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   // Delete state
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -164,12 +195,25 @@ export default function ConversationsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Lock body scroll when panel is open
+  useEffect(() => {
+    if (isViewDialogOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isViewDialogOpen]);
+
   const loadConversations = useCallback(async () => {
     try {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
       if (userType !== "all") queryParams.set("userType", userType);
       if (searchEmail) queryParams.set("search", searchEmail);
+      queryParams.set("groupBy", viewMode);
 
       // Compute dates from period when not custom
       let computedStartDate = startDate;
@@ -192,7 +236,13 @@ export default function ConversationsPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setSessions(data.sessions);
+        if (data.groupBy === "user") {
+          setUserGroups(data.users);
+          setSessions([]);
+        } else {
+          setSessions(data.sessions);
+          setUserGroups([]);
+        }
         setStats(data.stats);
       } else {
         toast.error(tCommon("error"));
@@ -202,7 +252,7 @@ export default function ConversationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [companySlug, userType, period, startDate, endDate, searchEmail, tCommon]);
+  }, [companySlug, userType, period, startDate, endDate, searchEmail, viewMode, tCommon]);
 
   useEffect(() => {
     loadConversations();
@@ -212,12 +262,22 @@ export default function ConversationsPage() {
   async function handleViewConversation(sessionId: string) {
     setIsLoadingDetails(true);
     setIsViewDialogOpen(true);
+    setDialogMessages([]);
+    setHasMoreMessages(false);
+    setNextCursor(null);
+    setTotalMessageCount(0);
 
     try {
-      const response = await fetch(`/api/c/${companySlug}/conversations/${sessionId}`);
+      const response = await fetch(`/api/c/${companySlug}/conversations/${sessionId}?limit=30`);
       if (response.ok) {
         const data = await response.json();
         setViewingSession(data);
+        setDialogMessages(data.messages);
+        if (data.pagination) {
+          setHasMoreMessages(data.pagination.hasMore);
+          setNextCursor(data.pagination.nextCursor);
+          setTotalMessageCount(data.pagination.totalCount);
+        }
 
         // Mark as read if not already
         if (!data.isRead) {
@@ -231,6 +291,13 @@ export default function ConversationsPage() {
             prev.map((s) => (s.id === sessionId ? { ...s, isRead: true } : s))
           );
         }
+
+        // Scroll to bottom after loading
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+          }
+        }, 100);
       } else {
         toast.error(tCommon("error"));
         setIsViewDialogOpen(false);
@@ -241,6 +308,55 @@ export default function ConversationsPage() {
     } finally {
       setIsLoadingDetails(false);
     }
+  }
+
+  // Load more (earlier) messages
+  async function loadMoreMessages() {
+    if (!viewingSession || !nextCursor || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    const scrollContainer = scrollContainerRef.current;
+    const previousScrollHeight = scrollContainer?.scrollHeight || 0;
+
+    try {
+      const response = await fetch(
+        `/api/c/${companySlug}/conversations/${viewingSession.id}?limit=30&cursor=${nextCursor}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        // Prepend older messages
+        setDialogMessages((prev) => [...data.messages, ...prev]);
+        if (data.pagination) {
+          setHasMoreMessages(data.pagination.hasMore);
+          setNextCursor(data.pagination.nextCursor);
+        }
+
+        // Preserve scroll position
+        setTimeout(() => {
+          if (scrollContainer) {
+            const newScrollHeight = scrollContainer.scrollHeight;
+            scrollContainer.scrollTop = newScrollHeight - previousScrollHeight;
+          }
+        }, 0);
+      }
+    } catch {
+      toast.error(tCommon("error"));
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  // Toggle user expansion
+  function toggleUserExpanded(userId: string | null) {
+    setExpandedUserIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
   }
 
   // Toggle important
@@ -397,7 +513,8 @@ export default function ConversationsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [userType, searchEmail, period, startDate, endDate]);
+    setExpandedUserIds(new Set());
+  }, [userType, searchEmail, period, startDate, endDate, viewMode]);
 
   // Selection helpers
   function toggleSelectAll() {
@@ -457,7 +574,12 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex gap-6">
+      {/* Main Content */}
+      <div className={cn(
+        "flex-1 min-w-0 space-y-6 transition-all duration-300",
+        isViewDialogOpen && "lg:pr-0"
+      )}>
       {/* Page Header */}
       <div
         className={cn(
@@ -527,12 +649,12 @@ export default function ConversationsPage() {
       {/* Filters */}
       <div
         className={cn(
-          "flex flex-col sm:flex-row gap-4",
+          "flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4",
           !prefersReducedMotion && "animate-fade-up"
         )}
         style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
       >
-        <div className="flex-1 relative">
+        <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("searchByEmail")}
@@ -542,7 +664,7 @@ export default function ConversationsPage() {
           />
         </div>
         <Select value={userType} onValueChange={(v) => setUserType(v as typeof userType)}>
-          <SelectTrigger className="w-full sm:w-[180px]">
+          <SelectTrigger className="w-full sm:w-[120px]">
             <Users className="h-4 w-4 mr-2" />
             <SelectValue placeholder={t("filterByUserType")} />
           </SelectTrigger>
@@ -550,6 +672,16 @@ export default function ConversationsPage() {
             <SelectItem value="all">{t("allUsers")}</SelectItem>
             <SelectItem value="guest">{t("guestOnly")}</SelectItem>
             <SelectItem value="authenticated">{t("authenticatedOnly")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <LayoutList className="h-4 w-4 mr-2" />
+            <SelectValue placeholder={t("viewMode")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="session">{t("bySession")}</SelectItem>
+            <SelectItem value="user">{t("byUser")}</SelectItem>
           </SelectContent>
         </Select>
         <PeriodSelector
@@ -579,13 +711,134 @@ export default function ConversationsPage() {
         )}
         style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
       >
-        {sessions.length === 0 ? (
+        {(viewMode === "session" ? sessions.length === 0 : userGroups.length === 0) ? (
           <div className="py-16 text-center">
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
               <MessageSquare className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-muted-foreground">{t("noConversations")}</p>
           </div>
+        ) : viewMode === "user" ? (
+          /* User View Mode */
+          <Table>
+            <TableHeader className="sticky top-0 bg-card z-10">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-12"></TableHead>
+                <TableHead className="text-xs font-medium">User</TableHead>
+                <TableHead className="text-xs font-medium">{t("sessionsCount")}</TableHead>
+                <TableHead className="text-xs font-medium">{t("messagesLabel")}</TableHead>
+                <TableHead className="text-xs font-medium">{t("unread")}</TableHead>
+                <TableHead className="text-xs font-medium">{t("started")}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {userGroups.map((group) => (
+                <Fragment key={group.userId ?? "guests"}>
+                  {/* User Row */}
+                  <TableRow
+                    className="hover:bg-muted/50 cursor-pointer"
+                    onClick={() => toggleUserExpanded(group.userId)}
+                  >
+                    <TableCell className="w-12">
+                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                        {expandedUserIds.has(group.userId) ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {group.unreadCount > 0 && (
+                          <span
+                            className="h-2 w-2 rounded-full"
+                            style={{ backgroundColor: primaryColor || "#3B82F6" }}
+                          />
+                        )}
+                        <div>
+                          <p className={cn("font-medium", group.unreadCount > 0 && "font-semibold")}>
+                            {group.user ? group.user.name || group.user.email : t("guestSessions")}
+                          </p>
+                          {group.user && (
+                            <p className="text-xs text-muted-foreground">{group.user.email}</p>
+                          )}
+                        </div>
+                        {!group.user && (
+                          <Badge variant="secondary" className="ml-2">{t("guest")}</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{group.sessionCount}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{group.totalMessages}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {group.unreadCount > 0 && (
+                        <Badge variant="secondary">{group.unreadCount}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">
+                        {format(parseISO(group.lastActivity), "MMM d, yyyy HH:mm")}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                  {/* Expanded Sessions */}
+                  {expandedUserIds.has(group.userId) && group.sessions.map((session) => (
+                    <TableRow
+                      key={session.id}
+                      className={cn(
+                        "bg-muted/30 hover:bg-muted/50",
+                        !session.isRead && primaryColor ? `bg-[${primaryColor}10]` : ""
+                      )}
+                      style={!session.isRead && primaryColor ? { backgroundColor: `${primaryColor}10` } : undefined}
+                    >
+                      <TableCell className="w-12"></TableCell>
+                      <TableCell className="pl-10">
+                        <div className="flex items-center gap-2">
+                          {!session.isRead && (
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: primaryColor || "#3B82F6" }}
+                            />
+                          )}
+                          {session.isImportant && (
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          )}
+                          <span className="text-sm text-muted-foreground">
+                            {format(parseISO(session.createdAt), "MMM d, HH:mm")}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{session.messageCount}</Badge>
+                      </TableCell>
+                      <TableCell></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewConversation(session.id);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
+              ))}
+            </TableBody>
+          </Table>
         ) : (
           <>
             {/* Bulk Actions Bar */}
@@ -661,7 +914,7 @@ export default function ConversationsPage() {
                   <TableRow
                     key={session.id}
                     className={cn(
-                      "hover:bg-muted/50 transition-colors",
+                      "hover:bg-muted/50 transition-colors cursor-pointer",
                       selectedIds.has(session.id) && "bg-primary/5"
                     )}
                     style={{
@@ -669,8 +922,9 @@ export default function ConversationsPage() {
                       ...((!session.isRead && primaryColor) ? { backgroundColor: `${primaryColor}10` } : {}),
                     }}
                     data-state={selectedIds.has(session.id) ? "selected" : undefined}
+                    onClick={() => handleViewConversation(session.id)}
                   >
-                    <TableCell className="w-12">
+                    <TableCell className="w-12" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(session.id)}
                         onCheckedChange={() => toggleSelectOne(session.id)}
@@ -713,7 +967,7 @@ export default function ConversationsPage() {
                         {format(parseISO(session.createdAt), "MMM d, yyyy HH:mm")}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -841,56 +1095,6 @@ export default function ConversationsPage() {
         )}
       </div>
 
-      {/* View Conversation Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              {viewingSession && (
-                <>
-                  {t("conversationWith")}{" "}
-                  {viewingSession.user
-                    ? viewingSession.user.name || viewingSession.user.email
-                    : t("guest")}
-                </>
-              )}
-            </DialogTitle>
-            {viewingSession && (
-              <p className="text-sm text-muted-foreground">
-                {format(parseISO(viewingSession.createdAt), "MMMM d, yyyy 'at' HH:mm")}
-              </p>
-            )}
-          </DialogHeader>
-
-          {isLoadingDetails ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : viewingSession ? (
-            <div className="flex-1 overflow-y-auto space-y-4 py-4">
-              {viewingSession.messages.map((message, index) => (
-                <AdminMessageRenderer
-                  key={message.id}
-                  message={{
-                    role: message.role as "user" | "assistant",
-                    content: message.content,
-                  }}
-                  nextMessage={
-                    viewingSession.messages[index + 1]
-                      ? {
-                          role: viewingSession.messages[index + 1].role as "user" | "assistant",
-                          content: viewingSession.messages[index + 1].content,
-                        }
-                      : undefined
-                  }
-                  timestamp={format(parseISO(message.createdAt), "HH:mm")}
-                />
-              ))}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
       {/* Bulk Delete AlertDialog */}
       <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
         <AlertDialogContent>
@@ -917,6 +1121,109 @@ export default function ConversationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
+
+      {/* Conversation Side Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] lg:w-[520px] bg-background border-l shadow-xl",
+          "transform transition-transform duration-300 ease-in-out",
+          isViewDialogOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        {/* Panel Header */}
+        <div className="sticky top-0 z-10 bg-background border-b px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              {viewingSession && (
+                <>
+                  <h2 className="text-lg font-semibold truncate">
+                    {t("conversationWith")}{" "}
+                    {viewingSession.user
+                      ? viewingSession.user.name || viewingSession.user.email
+                      : t("guest")}
+                  </h2>
+                  <div className="flex items-center gap-4 mt-1">
+                    <p className="text-sm text-muted-foreground">
+                      {format(parseISO(viewingSession.createdAt), "MMM d, yyyy 'at' HH:mm")}
+                    </p>
+                    {totalMessageCount > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {t("showingMessages", { shown: dialogMessages.length, total: totalMessageCount })}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              onClick={() => setIsViewDialogOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Panel Content */}
+        {isLoadingDetails ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : viewingSession ? (
+          <div
+            ref={scrollContainerRef}
+            className="h-[calc(100vh-80px)] overflow-y-auto px-6 py-4 space-y-4"
+          >
+            {/* Load Earlier Messages Button */}
+            {hasMoreMessages && (
+              <div className="flex justify-center pb-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMoreMessages}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                  )}
+                  {t("loadEarlierMessages")}
+                </Button>
+              </div>
+            )}
+            {dialogMessages.map((message, index) => (
+              <AdminMessageRenderer
+                key={message.id}
+                message={{
+                  role: message.role as "user" | "assistant",
+                  content: message.content,
+                }}
+                nextMessage={
+                  dialogMessages[index + 1]
+                    ? {
+                        role: dialogMessages[index + 1].role as "user" | "assistant",
+                        content: dialogMessages[index + 1].content,
+                      }
+                    : undefined
+                }
+                timestamp={format(parseISO(message.createdAt), "HH:mm")}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Backdrop overlay for mobile */}
+      {isViewDialogOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setIsViewDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }

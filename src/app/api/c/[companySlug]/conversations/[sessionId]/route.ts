@@ -12,7 +12,12 @@ const updateSchema = z.object({
   isImportant: z.boolean().optional(),
 });
 
-// GET /api/c/[companySlug]/conversations/[sessionId] - Get full conversation
+const querySchema = z.object({
+  limit: z.coerce.number().min(1).max(100).optional().default(30),
+  cursor: z.string().optional(),
+});
+
+// GET /api/c/[companySlug]/conversations/[sessionId] - Get conversation with pagination
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { companySlug, sessionId } = await params;
@@ -25,6 +30,22 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
+    const { searchParams } = new URL(request.url);
+    const parsed = querySchema.safeParse({
+      limit: searchParams.get("limit") || 30,
+      cursor: searchParams.get("cursor") || undefined,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid query parameters" },
+        { status: 400 }
+      );
+    }
+
+    const { limit, cursor } = parsed.data;
+
+    // First, get the session details and total message count
     const session = await prisma.chatSession.findFirst({
       where: {
         id: sessionId,
@@ -38,8 +59,8 @@ export async function GET(request: Request, { params }: RouteParams) {
             name: true,
           },
         },
-        messages: {
-          orderBy: { createdAt: "asc" },
+        _count: {
+          select: { messages: true },
         },
       },
     });
@@ -51,6 +72,30 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
+    const totalCount = session._count.messages;
+
+    // Get messages with cursor-based pagination (newest first, then reverse for display)
+    // We fetch from newest to oldest, so cursor points to older messages
+    const messages = await prisma.chatMessage.findMany({
+      where: {
+        sessionId: sessionId,
+        ...(cursor ? { id: { lt: cursor } } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit + 1, // Fetch one extra to check if there are more
+    });
+
+    const hasMore = messages.length > limit;
+    const paginatedMessages = hasMore ? messages.slice(0, limit) : messages;
+
+    // Reverse to get chronological order for display
+    const chronologicalMessages = paginatedMessages.reverse();
+
+    // Next cursor is the oldest message in current batch (for loading earlier messages)
+    const nextCursor = hasMore && chronologicalMessages.length > 0
+      ? chronologicalMessages[0].id
+      : null;
+
     return NextResponse.json({
       id: session.id,
       userId: session.userId,
@@ -59,12 +104,17 @@ export async function GET(request: Request, { params }: RouteParams) {
       isImportant: session.isImportant,
       createdAt: session.createdAt.toISOString(),
       updatedAt: session.updatedAt.toISOString(),
-      messages: session.messages.map((msg) => ({
+      messages: chronologicalMessages.map((msg) => ({
         id: msg.id,
         role: msg.role,
         content: msg.content,
         createdAt: msg.createdAt.toISOString(),
       })),
+      pagination: {
+        hasMore,
+        nextCursor,
+        totalCount,
+      },
     });
   } catch (error) {
     console.error("Error fetching conversation:", error);

@@ -280,7 +280,14 @@
     "conversationDeleted": "Conversation deleted",
     "started": "Started",
     "showing": "Showing",
-    "of": "of"
+    "of": "of",
+    "viewMode": "View",
+    "bySession": "By Session",
+    "byUser": "By User",
+    "sessionsCount": "Sessions",
+    "guestSessions": "Guest Sessions",
+    "loadEarlierMessages": "Load earlier messages",
+    "showingMessages": "Showing {shown} of {total} messages"
   },
   "landing": {
     "heroTitle": "Smart Booking for Your Business",

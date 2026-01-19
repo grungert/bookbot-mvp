@@ -280,7 +280,14 @@
     "conversationDeleted": "Razgovor obrisan",
     "started": "Zapoceto",
     "showing": "Prikazano",
-    "of": "od"
+    "of": "od",
+    "viewMode": "Prikaz",
+    "bySession": "Po sesiji",
+    "byUser": "Po korisniku",
+    "sessionsCount": "Sesije",
+    "guestSessions": "Gost sesije",
+    "loadEarlierMessages": "Ucitaj ranije poruke",
+    "showingMessages": "Prikazano {shown} od {total} poruka"
   },
   "landing": {
     "heroTitle": "Pametno zakazivanje za vas biznis",
