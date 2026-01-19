@@ -6,8 +6,15 @@ import { z } from "zod";
 
 const updateInvoiceSchema = z.object({
   status: z.enum(["DRAFT", "SENT", "PAID", "CANCELLED"]).optional(),
+  userId: z.string().optional(),
   dueDate: z.string().datetime().optional(),
   notes: z.string().optional(),
+  lineItems: z.array(z.object({
+    id: z.string().optional(),
+    description: z.string().min(1),
+    quantity: z.number().int().min(1),
+    unitPrice: z.number().min(0),
+  })).optional(),
 });
 
 interface RouteParams {
@@ -118,14 +125,50 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    const { lineItems, userId, dueDate, ...restData } = parsed.data;
+
+    // Build update data
+    const updateData: Record<string, unknown> = {
+      ...restData,
+      ...(dueDate && { dueDate: new Date(dueDate) }),
+      ...(userId && { userId }),
+    };
+
+    // If lineItems are provided, delete existing and recreate
+    if (lineItems && lineItems.length > 0) {
+      // Delete existing line items
+      await prisma.invoiceLineItem.deleteMany({
+        where: { invoiceId },
+      });
+
+      // Calculate new totals
+      const subtotal = lineItems.reduce(
+        (sum, item) => sum + item.quantity * item.unitPrice,
+        0
+      );
+      const tax = 0; // Tax can be calculated if needed
+      const total = subtotal + tax;
+
+      // Create new line items
+      await prisma.invoiceLineItem.createMany({
+        data: lineItems.map((item) => ({
+          invoiceId,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.quantity * item.unitPrice,
+        })),
+      });
+
+      // Add totals to update data
+      updateData.subtotal = subtotal;
+      updateData.tax = tax;
+      updateData.total = total;
+    }
+
     const updated = await prisma.invoice.update({
       where: { id: invoiceId },
-      data: {
-        ...parsed.data,
-        dueDate: parsed.data.dueDate
-          ? new Date(parsed.data.dueDate)
-          : undefined,
-      },
+      data: updateData,
       include: {
         lineItems: true,
         user: {

@@ -12,14 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -46,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -54,8 +46,19 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  duration: number;
+  price: number;
+  currency: string;
+  color: string | null;
+}
+
 interface LineItem {
   id?: string;
+  serviceId?: string; // null/undefined means custom item
   description: string;
   quantity: number;
   unitPrice: number;
@@ -97,8 +100,10 @@ export default function InvoicesPage() {
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Selection and sorting state
@@ -107,8 +112,12 @@ export default function InvoicesPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [deletingInvoice, setDeletingInvoice] = useState<Invoice | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [isViewPanelOpen, setIsViewPanelOpen] = useState(false);
+  const [isDueDateOpen, setIsDueDateOpen] = useState(false);
 
   // Filter state
   const [datePeriod, setDatePeriod] = useState<DatePeriod>("7d");
@@ -151,11 +160,12 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
     loadUsers();
+    loadServices();
   }, [companySlug]);
 
   // Body scroll lock when panel is open
   useEffect(() => {
-    if (isViewPanelOpen) {
+    if (isViewPanelOpen || isFormPanelOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -163,7 +173,7 @@ export default function InvoicesPage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isViewPanelOpen]);
+  }, [isViewPanelOpen, isFormPanelOpen]);
 
   async function loadInvoices() {
     try {
@@ -193,6 +203,18 @@ export default function InvoicesPage() {
       }
     } catch (error) {
       console.error("Error loading users:", error);
+    }
+  }
+
+  async function loadServices() {
+    try {
+      const response = await fetch(`/api/c/${companySlug}/services`);
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data);
+      }
+    } catch (error) {
+      console.error("Error loading services:", error);
     }
   }
 
@@ -229,28 +251,53 @@ export default function InvoicesPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/c/${companySlug}/invoices`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: selectedUserId,
-          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
-          notes: notes || undefined,
-          lineItems: lineItems.map((item) => ({
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-          })),
-        }),
-      });
+      if (editingInvoice) {
+        // PATCH existing invoice
+        const response = await fetch(`/api/c/${companySlug}/invoices/${editingInvoice.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: selectedUserId,
+            dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+            notes: notes || undefined,
+            lineItems: lineItems.map((item) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to create invoice");
+        if (!response.ok) {
+          throw new Error("Failed to update invoice");
+        }
+
+        toast.success("Invoice updated");
+      } else {
+        // POST new invoice
+        const response = await fetch(`/api/c/${companySlug}/invoices`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: selectedUserId,
+            dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+            notes: notes || undefined,
+            lineItems: lineItems.map((item) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create invoice");
+        }
+
+        toast.success("Invoice created");
       }
 
-      toast.success("Invoice created");
-      setIsDialogOpen(false);
-      resetForm();
+      closeFormPanel();
       loadInvoices();
     } catch (error) {
       toast.error(tCommon("error"));
@@ -289,9 +336,9 @@ export default function InvoicesPage() {
   }
 
   function getStatusBadge(status: Invoice["status"]) {
-    const styles: Record<Invoice["status"], string> = {
+    const baseStyles: Record<Invoice["status"], string> = {
       DRAFT: "bg-gray-100 text-gray-700 border-gray-200",
-      SENT: "bg-primary/10 text-primary border-primary/20",
+      SENT: "", // Will be styled dynamically with primaryColor
       PAID: "bg-green-100 text-green-700 border-green-200",
       CANCELLED: "bg-red-100 text-red-700 border-red-200",
     };
@@ -303,8 +350,34 @@ export default function InvoicesPage() {
       CANCELLED: t("statusCancelled"),
     };
 
+    // For SENT status, use company primary color
+    if (status === "SENT" && primaryColor) {
+      return (
+        <Badge
+          variant="outline"
+          className="font-medium"
+          style={{
+            backgroundColor: `${primaryColor}15`,
+            color: primaryColor,
+            borderColor: `${primaryColor}30`,
+          }}
+        >
+          {labels[status]}
+        </Badge>
+      );
+    }
+
+    // For SENT without primaryColor, use default primary
+    if (status === "SENT") {
+      return (
+        <Badge variant="outline" className="font-medium bg-primary/10 text-primary border-primary/20">
+          {labels[status]}
+        </Badge>
+      );
+    }
+
     return (
-      <Badge variant="outline" className={`font-medium ${styles[status]}`}>
+      <Badge variant="outline" className={`font-medium ${baseStyles[status]}`}>
         {labels[status]}
       </Badge>
     );
@@ -492,10 +565,85 @@ export default function InvoicesPage() {
       .map((inv) => inv.invoiceNumber);
   }
 
-  // Close panel handler with delayed clearing
+  // Close view panel handler with delayed clearing
   function closePanel() {
     setIsViewPanelOpen(false);
     setTimeout(() => setViewingInvoice(null), 300);
+  }
+
+  // Form panel handlers
+  function openCreatePanel() {
+    resetForm();
+    setEditingInvoice(null);
+    setIsFormPanelOpen(true);
+  }
+
+  function openEditPanel(invoice: Invoice) {
+    setEditingInvoice(invoice);
+    setSelectedUserId(invoice.user.id);
+    setDueDate(invoice.dueDate ? format(parseISO(invoice.dueDate), "yyyy-MM-dd") : "");
+    setNotes(invoice.notes || "");
+    setLineItems(invoice.lineItems.map(item => ({
+      id: item.id,
+      serviceId: item.serviceId,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: Number(item.unitPrice),
+    })));
+    setIsFormPanelOpen(true);
+  }
+
+  function closeFormPanel() {
+    setIsFormPanelOpen(false);
+    setTimeout(() => {
+      setEditingInvoice(null);
+      resetForm();
+    }, 300);
+  }
+
+  // Single invoice delete handlers
+  function openDeleteDialog(invoice: Invoice) {
+    setDeletingInvoice(invoice);
+    setIsDeleteDialogOpen(true);
+  }
+
+  async function handleSingleDelete() {
+    if (!deletingInvoice) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/c/${companySlug}/invoices/${deletingInvoice.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete invoice");
+      }
+
+      toast.success(`Invoice ${deletingInvoice.invoiceNumber} deleted`);
+      setIsDeleteDialogOpen(false);
+      setDeletingInvoice(null);
+
+      // Close view panel if this invoice was being viewed
+      if (viewingInvoice?.id === deletingInvoice.id) {
+        closePanel();
+      }
+
+      loadInvoices();
+    } catch (error) {
+      toast.error("Failed to delete invoice");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  // Helper to open edit from view panel
+  function openEditFromViewPanel() {
+    if (!viewingInvoice) return;
+    closePanel();
+    setTimeout(() => {
+      openEditPanel(viewingInvoice);
+    }, 300);
   }
 
   if (isLoading) {
@@ -516,129 +664,13 @@ export default function InvoicesPage() {
             Manage and track your invoices
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm} className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("createInvoice")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{t("createInvoice")}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Customer</Label>
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select customer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name || user.email}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate">{t("dueDate")}</Label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>{t("lineItems")}</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                      <Plus className="h-3 w-3 mr-1" />
-                      {t("addLineItem")}
-                    </Button>
-                  </div>
-                  {lineItems.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <Input
-                        placeholder="Description"
-                        value={item.description}
-                        onChange={(e) =>
-                          updateLineItem(index, { description: e.target.value })
-                        }
-                        className="flex-1"
-                      />
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          updateLineItem(index, { quantity: parseInt(e.target.value) || 1 })
-                        }
-                        className="w-20"
-                        placeholder="Qty"
-                      />
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateLineItem(index, { unitPrice: parseFloat(e.target.value) || 0 })
-                        }
-                        className="w-28"
-                        placeholder="Price"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeLineItem(index)}
-                        disabled={lineItems.length === 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className="text-right text-sm text-muted-foreground">
-                    Subtotal: RSD {calculateTotal().toLocaleString()}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  {tCommon("cancel")}
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  )}
-                  {tCommon("create")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={openCreatePanel}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          {t("createInvoice")}
+        </Button>
       </div>
 
       {/* Filters */}
@@ -649,32 +681,50 @@ export default function InvoicesPage() {
           <div className="flex items-center gap-1.5">
             {([
               { value: "DRAFT" as const, label: t("statusDraft"), activeClass: "bg-gray-700 text-white border-gray-700", inactiveClass: "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200" },
-              { value: "SENT" as const, label: t("statusSent"), activeClass: "bg-primary text-primary-foreground border-primary", inactiveClass: "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" },
+              { value: "SENT" as const, label: t("statusSent"), activeClass: "", inactiveClass: "" }, // Will be styled with primaryColor
               { value: "PAID" as const, label: t("statusPaid"), activeClass: "bg-green-700 text-white border-green-700", inactiveClass: "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" },
               { value: "CANCELLED" as const, label: t("statusCancelled"), activeClass: "bg-red-700 text-white border-red-700", inactiveClass: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200" },
-            ]).map((status) => (
-              <Badge
-                key={status.value}
-                variant="outline"
-                className={cn(
-                  "cursor-pointer transition-colors",
-                  statusFilters.has(status.value)
-                    ? status.activeClass
-                    : status.inactiveClass
-                )}
-                onClick={() => {
-                  const newFilters = new Set(statusFilters);
-                  if (newFilters.has(status.value)) {
-                    newFilters.delete(status.value);
-                  } else {
-                    newFilters.add(status.value);
-                  }
-                  setStatusFilters(newFilters);
-                }}
-              >
-                {status.label}
-              </Badge>
-            ))}
+            ]).map((status) => {
+              const isActive = statusFilters.has(status.value);
+              const isSent = status.value === "SENT";
+
+              // Special styling for SENT with company primaryColor
+              const sentStyle = isSent && primaryColor
+                ? isActive
+                  ? { backgroundColor: primaryColor, color: "white", borderColor: primaryColor }
+                  : { backgroundColor: `${primaryColor}15`, color: primaryColor, borderColor: `${primaryColor}30` }
+                : undefined;
+
+              const sentClass = isSent && !primaryColor
+                ? isActive
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                : "";
+
+              return (
+                <Badge
+                  key={status.value}
+                  variant="outline"
+                  className={cn(
+                    "cursor-pointer transition-colors",
+                    !isSent && (isActive ? status.activeClass : status.inactiveClass),
+                    sentClass
+                  )}
+                  style={sentStyle}
+                  onClick={() => {
+                    const newFilters = new Set(statusFilters);
+                    if (newFilters.has(status.value)) {
+                      newFilters.delete(status.value);
+                    } else {
+                      newFilters.add(status.value);
+                    }
+                    setStatusFilters(newFilters);
+                  }}
+                >
+                  {status.label}
+                </Badge>
+              );
+            })}
             {statusFilters.size > 0 && (
               <button
                 className="text-xs text-muted-foreground hover:text-foreground ml-1"
@@ -819,10 +869,7 @@ export default function InvoicesPage() {
             </div>
             <p className="text-muted-foreground">{t("noInvoices")}</p>
             <Button
-              onClick={() => {
-                resetForm();
-                setIsDialogOpen(true);
-              }}
+              onClick={openCreatePanel}
               variant="link"
               className="mt-2 text-primary"
             >
@@ -927,6 +974,7 @@ export default function InvoicesPage() {
                       {getSortIcon("status")}
                     </button>
                   </TableHead>
+                  <TableHead className="text-xs font-medium text-center">Status Actions</TableHead>
                   <TableHead className="text-xs font-medium text-right">{tCommon("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -964,14 +1012,16 @@ export default function InvoicesPage() {
                       <span className="font-medium">{invoice.currency} {Number(invoice.total).toLocaleString()}</span>
                     </TableCell>
                     <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1">
+                    {/* Status Actions Column */}
+                    <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1">
                         {invoice.status === "DRAFT" && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-8 hover:bg-primary/10 hover:text-primary hover:border-primary/20"
+                            className="h-8"
                             onClick={() => updateStatus(invoice.id, "SENT")}
+                            style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
                           >
                             Send
                           </Button>
@@ -986,6 +1036,33 @@ export default function InvoicesPage() {
                             Mark Paid
                           </Button>
                         )}
+                        {(invoice.status === "PAID" || invoice.status === "CANCELLED") && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    {/* Edit/Delete Actions Column */}
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:text-primary"
+                          disabled={invoice.status === "PAID" || invoice.status === "CANCELLED"}
+                          onClick={() => openEditPanel(invoice)}
+                          title={invoice.status === "PAID" || invoice.status === "CANCELLED" ? "Cannot edit finalized invoice" : "Edit invoice"}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => openDeleteDialog(invoice)}
+                          title="Delete invoice"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1076,6 +1153,32 @@ export default function InvoicesPage() {
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
               Delete {selectedIds.size} Invoice{selectedIds.size !== 1 ? "s" : ""}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Single Invoice Delete AlertDialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete invoice <strong>{deletingInvoice?.invoiceNumber}</strong>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>{tCommon("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSingleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1203,34 +1306,282 @@ export default function InvoicesPage() {
             </div>
 
             {/* Panel Footer */}
-            <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30">
-              <Button variant="outline" onClick={closePanel}>
-                Close
-              </Button>
-              {viewingInvoice.status === "DRAFT" && (
-                <Button
-                  onClick={() => {
-                    updateStatus(viewingInvoice.id, "SENT");
-                    closePanel();
-                  }}
-                >
-                  Send Invoice
+            <div className="flex items-center justify-between p-4 border-t bg-muted/30">
+              <div>
+                {(viewingInvoice.status === "DRAFT" || viewingInvoice.status === "SENT") && (
+                  <Button
+                    variant="outline"
+                    onClick={openEditFromViewPanel}
+                    style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={closePanel}>
+                  Close
                 </Button>
-              )}
-              {viewingInvoice.status === "SENT" && (
-                <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => {
-                    updateStatus(viewingInvoice.id, "PAID");
-                    closePanel();
-                  }}
-                >
-                  Mark as Paid
-                </Button>
-              )}
+                {viewingInvoice.status === "DRAFT" && (
+                  <Button
+                    onClick={() => {
+                      updateStatus(viewingInvoice.id, "SENT");
+                      closePanel();
+                    }}
+                    style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+                  >
+                    Send Invoice
+                  </Button>
+                )}
+                {viewingInvoice.status === "SENT" && (
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      updateStatus(viewingInvoice.id, "PAID");
+                      closePanel();
+                    }}
+                  >
+                    Mark as Paid
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
+      </div>
+
+      {/* Backdrop overlay for form panel on mobile */}
+      {isFormPanelOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closeFormPanel}
+        />
+      )}
+
+      {/* Create/Edit Invoice Slide-in Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] lg:w-[560px] bg-background border-l shadow-xl",
+          "transform transition-transform duration-300 ease-in-out",
+          isFormPanelOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Panel Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-xl font-semibold">
+              {editingInvoice ? "Edit Invoice" : t("createInvoice")}
+            </h2>
+            <Button type="button" variant="ghost" size="icon" onClick={closeFormPanel}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Panel Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Customer</Label>
+                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name || user.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>{t("dueDate")}</Label>
+                <Popover open={isDueDateOpen} onOpenChange={setIsDueDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dueDate && "text-muted-foreground"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {dueDate ? format(new Date(dueDate), "PPP") : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <style>{`
+                      .due-date-calendar button[data-selected-single="true"] {
+                        background-color: ${primaryColor || "hsl(var(--primary))"} !important;
+                      }
+                    `}</style>
+                    <CalendarPicker
+                      mode="single"
+                      selected={dueDate ? new Date(dueDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setDueDate(format(date, "yyyy-MM-dd"));
+                        }
+                        setIsDueDateOpen(false);
+                      }}
+                      className="due-date-calendar"
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>{t("lineItems")}</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addLineItem}
+                  style={primaryColor ? { borderColor: primaryColor, color: primaryColor } : undefined}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  {t("addLineItem")}
+                </Button>
+              </div>
+              {lineItems.map((item, index) => (
+                <div key={index} className="space-y-2 p-3 rounded-lg border bg-muted/30">
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <Select
+                        value={item.serviceId || "custom"}
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            updateLineItem(index, {
+                              serviceId: undefined,
+                              description: "",
+                              unitPrice: 0,
+                            });
+                          } else {
+                            const service = services.find((s) => s.id === value);
+                            if (service) {
+                              updateLineItem(index, {
+                                serviceId: service.id,
+                                description: service.name,
+                                unitPrice: service.price,
+                              });
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select service or custom" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {services.map((service) => (
+                            <SelectItem key={service.id} value={service.id}>
+                              <div className="flex items-center justify-between gap-4">
+                                <span>{service.name}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {service.currency} {service.price.toLocaleString()}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">
+                            <span className="text-muted-foreground">+ Custom Item</span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeLineItem(index)}
+                      disabled={lineItems.length === 1}
+                      className="shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {/* Show custom description input only for custom items */}
+                  {!item.serviceId && (
+                    <Input
+                      placeholder="Enter item description"
+                      value={item.description}
+                      onChange={(e) =>
+                        updateLineItem(index, { description: e.target.value })
+                      }
+                    />
+                  )}
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Qty</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateLineItem(index, { quantity: parseInt(e.target.value) || 1 })
+                        }
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Unit Price</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          updateLineItem(index, { unitPrice: parseFloat(e.target.value) || 0 })
+                        }
+                        disabled={!!item.serviceId}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label className="text-xs text-muted-foreground">Total</Label>
+                      <div className="h-9 px-3 py-2 text-sm font-medium bg-muted rounded-md">
+                        {(item.quantity * item.unitPrice).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="text-right text-sm font-medium pt-2 border-t">
+                Subtotal: RSD {calculateTotal().toLocaleString()}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          {/* Panel Footer */}
+          <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30">
+            <Button type="button" variant="outline" onClick={closeFormPanel}>
+              {tCommon("cancel")}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+            >
+              {isSubmitting && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              {editingInvoice ? "Save Changes" : tCommon("create")}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
