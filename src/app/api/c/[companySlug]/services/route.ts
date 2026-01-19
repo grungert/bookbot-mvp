@@ -10,6 +10,40 @@ const createServiceSchema = z.object({
   price: z.number().min(0),
   currency: z.string().default("RSD"),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  // Discount fields
+  discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
+  discountValue: z.number().min(0).nullable().optional(),
+  discountStartDate: z.string().datetime().nullable().optional(),
+  discountEndDate: z.string().datetime().nullable().optional(),
+  promotionalBadge: z.enum(["SALE", "NEW", "POPULAR", "HOT"]).nullable().optional(),
+  customBadgeLabel: z.string().max(20).nullable().optional(),
+}).refine((data) => {
+  // If discount type is percentage, value must be 0-100
+  if (data.discountType === "percentage" && data.discountValue != null) {
+    return data.discountValue >= 0 && data.discountValue <= 100;
+  }
+  return true;
+}, {
+  message: "Percentage discount must be between 0 and 100",
+  path: ["discountValue"],
+}).refine((data) => {
+  // If discount type is fixed, value must be less than or equal to price
+  if (data.discountType === "fixed" && data.discountValue != null) {
+    return data.discountValue <= data.price;
+  }
+  return true;
+}, {
+  message: "Fixed discount cannot exceed the service price",
+  path: ["discountValue"],
+}).refine((data) => {
+  // End date must be after start date
+  if (data.discountStartDate && data.discountEndDate) {
+    return new Date(data.discountEndDate) > new Date(data.discountStartDate);
+  }
+  return true;
+}, {
+  message: "End date must be after start date",
+  path: ["discountEndDate"],
 });
 
 interface RouteParams {
@@ -79,6 +113,12 @@ export async function POST(request: Request, { params }: RouteParams) {
         price: parsed.data.price,
         currency: parsed.data.currency,
         color: parsed.data.color,
+        discountType: parsed.data.discountType,
+        discountValue: parsed.data.discountValue,
+        discountStartDate: parsed.data.discountStartDate ? new Date(parsed.data.discountStartDate) : null,
+        discountEndDate: parsed.data.discountEndDate ? new Date(parsed.data.discountEndDate) : null,
+        promotionalBadge: parsed.data.promotionalBadge,
+        customBadgeLabel: parsed.data.customBadgeLabel,
       },
     });
 

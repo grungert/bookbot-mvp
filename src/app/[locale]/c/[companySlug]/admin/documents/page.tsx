@@ -524,15 +524,17 @@ export default function DocumentsPage() {
 
             <div className="space-y-2" data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
               <Label htmlFor="content">Content</Label>
-              <MDEditor
-                value={content}
-                onChange={(value) => setContent(value || "")}
-                height={500}
-                preview="edit"
-                textareaProps={{
-                  placeholder: "Enter the document content that will be used by the AI...",
-                }}
-              />
+              <div className="md-editor-wrapper">
+                <MDEditor
+                  value={content}
+                  onChange={(value) => setContent(value || "")}
+                  height={500}
+                  preview="edit"
+                  textareaProps={{
+                    placeholder: "Enter the document content that will be used by the AI...",
+                  }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 Supports Markdown formatting (headings, bold, lists, etc.)
               </p>

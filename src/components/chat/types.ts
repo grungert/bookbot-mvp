@@ -1,5 +1,8 @@
 // Types for rich chat messages with embedded UI components
 
+// Promotional badge type
+export type PromotionalBadge = "SALE" | "NEW" | "POPULAR" | "HOT" | null;
+
 // Service data for the service selector
 export interface ChatService {
   id: string;
@@ -9,6 +12,13 @@ export interface ChatService {
   price: number;
   currency: string;
   color?: string | null;
+  // Discount fields
+  discountType?: "percentage" | "fixed" | null;
+  discountValue?: number | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
+  promotionalBadge?: PromotionalBadge;
+  customBadgeLabel?: string | null;
 }
 
 // Time slot data for the time picker

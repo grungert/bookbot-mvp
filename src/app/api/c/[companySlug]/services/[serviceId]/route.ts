@@ -11,6 +11,13 @@ const updateServiceSchema = z.object({
   currency: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   isActive: z.boolean().optional(),
+  // Discount fields
+  discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
+  discountValue: z.number().min(0).nullable().optional(),
+  discountStartDate: z.string().datetime().nullable().optional(),
+  discountEndDate: z.string().datetime().nullable().optional(),
+  promotionalBadge: z.enum(["SALE", "NEW", "POPULAR", "HOT"]).nullable().optional(),
+  customBadgeLabel: z.string().max(20).nullable().optional(),
 });
 
 interface RouteParams {
@@ -89,16 +96,25 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Transform date strings to Date objects
+    const updateData: Record<string, unknown> = { ...parsed.data };
+    if (parsed.data.discountStartDate !== undefined) {
+      updateData.discountStartDate = parsed.data.discountStartDate ? new Date(parsed.data.discountStartDate) : null;
+    }
+    if (parsed.data.discountEndDate !== undefined) {
+      updateData.discountEndDate = parsed.data.discountEndDate ? new Date(parsed.data.discountEndDate) : null;
+    }
+
     const service = await prisma.service.update({
       where: { id: serviceId },
-      data: parsed.data,
+      data: updateData,
     });
 
     return NextResponse.json(service);
   } catch (error) {
     console.error("Error updating service:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error instanceof Error ? error.message : "Internal server error" },
       { status: 500 }
     );
   }

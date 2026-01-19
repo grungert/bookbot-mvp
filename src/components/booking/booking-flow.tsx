@@ -15,6 +15,15 @@ import { toast } from "sonner";
 import { Clock, CheckCircle, Loader2, CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
+import { ServicePriceDisplay } from "@/components/service/service-price-display";
+import { PromotionalBadge } from "@/components/service/promotional-badge";
+import {
+  calculateDiscountedPrice,
+  formatPrice,
+  getSavingsText,
+  isDiscountActive,
+  type PromotionalBadge as PromotionalBadgeType,
+} from "@/lib/utils/discount";
 
 interface Service {
   id: string;
@@ -24,6 +33,12 @@ interface Service {
   price: number;
   currency: string;
   color: string | null;
+  discountType?: "percentage" | "fixed" | null;
+  discountValue?: number | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
+  promotionalBadge?: PromotionalBadgeType;
+  customBadgeLabel?: string | null;
 }
 
 interface TimeSlot {
@@ -361,12 +376,22 @@ export function BookingFlow({
                 key={service.id}
                 onClick={() => handleServiceSelect(service)}
                 className={cn(
-                  "w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition-all duration-200 text-left hover-lift press-feedback",
+                  "w-full p-4 border rounded-lg hover:border-primary hover:bg-muted/50 transition-all duration-200 text-left hover-lift press-feedback relative",
                   !prefersReducedMotion && "animate-fade-up",
                   !prefersReducedMotion && index > 0 && `stagger-${Math.min(index, 5)}`
                 )}
                 style={!prefersReducedMotion ? { opacity: 0 } : undefined}
               >
+                {/* Promotional Badge - top right corner */}
+                {(service.promotionalBadge || service.customBadgeLabel) && (
+                  <div className="absolute top-2 right-2">
+                    <PromotionalBadge
+                      badge={service.promotionalBadge}
+                      customLabel={service.customBadgeLabel}
+                      size="sm"
+                    />
+                  </div>
+                )}
                 <div className="flex justify-between items-start">
                   <div className="flex gap-3">
                     <div
@@ -386,14 +411,18 @@ export function BookingFlow({
                       </div>
                     </div>
                   </div>
-                  <Badge
-                    style={{
-                      backgroundColor: service.color || undefined,
-                      borderColor: service.color || undefined,
-                    }}
-                  >
-                    {service.currency} {Number(service.price).toLocaleString()}
-                  </Badge>
+                  {isDiscountActive(service) ? (
+                    <ServicePriceDisplay service={service} size="sm" showCountdown={true} />
+                  ) : (
+                    <Badge
+                      style={{
+                        backgroundColor: service.color || undefined,
+                        borderColor: service.color || undefined,
+                      }}
+                    >
+                      {service.currency} {Number(service.price).toLocaleString()}
+                    </Badge>
+                  )}
                 </div>
               </button>
             ))}
@@ -599,7 +628,10 @@ export function BookingFlow({
       )}
 
       {/* Confirmation */}
-      {step === "confirm" && selectedService && selectedDate && selectedSlot && (
+      {step === "confirm" && selectedService && selectedDate && selectedSlot && (() => {
+        const discountResult = calculateDiscountedPrice(selectedService);
+        const savingsText = getSavingsText(discountResult, selectedService.currency);
+        return (
         <Card className={getStepAnimationClass()}>
           <CardHeader>
             <CardTitle>{t("confirmBooking")}</CardTitle>
@@ -629,14 +661,36 @@ export function BookingFlow({
                   {t("minutes", { count: selectedService.duration })}
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">{tCommon("price")}:</span>
-                <span className="font-medium">
-                  {selectedService.currency}{" "}
-                  {Number(selectedService.price).toLocaleString()}
-                </span>
+                {discountResult.isDiscounted ? (
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground line-through">
+                        {formatPrice(discountResult.originalPrice, selectedService.currency)}
+                      </span>
+                      <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                        {formatPrice(Math.round(discountResult.finalPrice), selectedService.currency)}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="font-medium">
+                    {selectedService.currency}{" "}
+                    {Number(selectedService.price).toLocaleString()}
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* You save message */}
+            {savingsText && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg text-center">
+                <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                  {savingsText}
+                </span>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">{t("notes")}</Label>
@@ -665,7 +719,8 @@ export function BookingFlow({
             </Button>
           </div>
         </Card>
-      )}
+        );
+      })()}
 
       {/* Success */}
       {step === "success" && (

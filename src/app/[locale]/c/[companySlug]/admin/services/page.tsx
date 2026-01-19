@@ -9,14 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -37,7 +29,15 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, PackageOpen, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, PackageOpen, ArrowUpDown, ArrowUp, ArrowDown, Percent, Tag, X, CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import type { DateRange } from "react-day-picker";
+import { cn } from "@/lib/utils";
+import { ServicePriceDisplay } from "@/components/service/service-price-display";
+import { PromotionalBadge } from "@/components/service/promotional-badge";
+import { isDiscountActive, type PromotionalBadge as PromotionalBadgeType } from "@/lib/utils/discount";
 
 interface Service {
   id: string;
@@ -48,6 +48,12 @@ interface Service {
   currency: string;
   color: string | null;
   isActive: boolean;
+  discountType: "percentage" | "fixed" | null;
+  discountValue: number | null;
+  discountStartDate: string | null;
+  discountEndDate: string | null;
+  promotionalBadge: PromotionalBadgeType;
+  customBadgeLabel: string | null;
 }
 
 const DEFAULT_COLORS = [
@@ -69,7 +75,7 @@ export default function ServicesPage() {
 
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState<string | null>(null);
@@ -81,12 +87,41 @@ export default function ServicesPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
+  // Get primary color from CSS variable set by parent layout
+  const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const el = document.querySelector("[data-theme-wrapper]") as HTMLElement;
+    if (el) {
+      const color = getComputedStyle(el).getPropertyValue("--company-primary").trim();
+      if (color) setPrimaryColor(color);
+    }
+  }, []);
+
+  // Body scroll lock when panel is open
+  useEffect(() => {
+    if (isPanelOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isPanelOpen]);
+
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [duration, setDuration] = useState("60");
   const [price, setPrice] = useState("0");
   const [color, setColor] = useState("");
+
+  // Discount form state
+  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("none");
+  const [discountValue, setDiscountValue] = useState("");
+  const [discountDateRange, setDiscountDateRange] = useState<DateRange | undefined>(undefined);
+  const [promotionalBadge, setPromotionalBadge] = useState<PromotionalBadgeType>(null);
+  const [customBadgeLabel, setCustomBadgeLabel] = useState("");
 
   const loadServices = useCallback(async () => {
     try {
@@ -203,24 +238,48 @@ export default function ServicesPage() {
       .map((s) => s.name);
   }
 
-  function openCreateDialog() {
+  function openCreatePanel() {
     setEditingService(null);
     setName("");
     setDescription("");
     setDuration("60");
     setPrice("0");
     setColor("");
-    setIsDialogOpen(true);
+    setDiscountType("none");
+    setDiscountValue("");
+    setDiscountDateRange(undefined);
+    setPromotionalBadge(null);
+    setCustomBadgeLabel("");
+    setIsPanelOpen(true);
   }
 
-  function openEditDialog(service: Service) {
+  function openEditPanel(service: Service) {
     setEditingService(service);
     setName(service.name);
     setDescription(service.description || "");
     setDuration(service.duration.toString());
     setPrice(service.price.toString());
     setColor(service.color || "");
-    setIsDialogOpen(true);
+    setDiscountType(service.discountType || "none");
+    setDiscountValue(service.discountValue?.toString() || "");
+    setDiscountDateRange(
+      service.discountStartDate || service.discountEndDate
+        ? {
+            from: service.discountStartDate ? new Date(service.discountStartDate) : undefined,
+            to: service.discountEndDate ? new Date(service.discountEndDate) : undefined,
+          }
+        : undefined
+    );
+    setPromotionalBadge(service.promotionalBadge);
+    setCustomBadgeLabel(service.customBadgeLabel || "");
+    setIsPanelOpen(true);
+  }
+
+  function closePanel() {
+    setIsPanelOpen(false);
+    setTimeout(() => {
+      setEditingService(null);
+    }, 300);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -232,32 +291,47 @@ export default function ServicesPage() {
         ? `/api/c/${companySlug}/services/${editingService.id}`
         : `/api/c/${companySlug}/services`;
 
+      const requestBody: Record<string, unknown> = {
+        name,
+        description: description || undefined,
+        duration: parseInt(duration),
+        price: parseFloat(price),
+        color: color || undefined,
+      };
+
+      // Add discount fields
+      if (discountType !== "none" && discountValue) {
+        requestBody.discountType = discountType;
+        requestBody.discountValue = parseFloat(discountValue);
+        requestBody.discountStartDate = discountDateRange?.from ? discountDateRange.from.toISOString() : null;
+        requestBody.discountEndDate = discountDateRange?.to ? discountDateRange.to.toISOString() : null;
+      } else {
+        requestBody.discountType = null;
+        requestBody.discountValue = null;
+        requestBody.discountStartDate = null;
+        requestBody.discountEndDate = null;
+      }
+
+      // Add promotional badge
+      requestBody.promotionalBadge = promotionalBadge;
+      requestBody.customBadgeLabel = customBadgeLabel || null;
+
       const response = await fetch(url, {
         method: editingService ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          description: description || undefined,
-          duration: parseInt(duration),
-          price: parseFloat(price),
-          color: color || undefined,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        if (response.status === 400) {
-          toast.error(data.error || "Validation failed. Please check your input.");
-        } else {
-          toast.error("Failed to save service. Please try again.");
-        }
+        toast.error(data.error || "Failed to save service. Please try again.");
         return;
       }
 
       toast.success(
         editingService ? t("serviceUpdated") : t("serviceCreated")
       );
-      setIsDialogOpen(false);
+      closePanel();
       loadServices();
     } catch {
       toast.error("Failed to save service. Please try again.");
@@ -305,131 +379,23 @@ export default function ServicesPage() {
         <div>
           <h1 className="text-2xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your service offerings
+            {t("subtitle")}
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog} className="bg-primary hover:bg-primary/90">
-              <Plus className="h-4 w-4 mr-2" />
-              {t("addService")}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingService ? t("editService") : t("addService")}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t("serviceName")}</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">{t("serviceDescription")}</Label>
-                  <Textarea
-                    id="description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">{t("serviceDuration")}</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      min="5"
-                      max="480"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">{t("servicePrice")}</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>{t("serviceColor")}</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {DEFAULT_COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setColor(c)}
-                        className={`w-8 h-8 rounded-full border-2 transition-all ${
-                          color === c ? "border-foreground scale-110" : "border-transparent"
-                        }`}
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
-                    <div className="relative">
-                      <input
-                        type="color"
-                        value={color || "#3B82F6"}
-                        onChange={(e) => setColor(e.target.value)}
-                        className="absolute inset-0 w-8 h-8 opacity-0 cursor-pointer"
-                      />
-                      <div
-                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs ${
-                          color && !DEFAULT_COLORS.includes(color)
-                            ? "border-foreground"
-                            : "border-dashed border-muted-foreground"
-                        }`}
-                        style={{
-                          backgroundColor:
-                            color && !DEFAULT_COLORS.includes(color) ? color : "transparent",
-                        }}
-                      >
-                        {(!color || DEFAULT_COLORS.includes(color)) && "+"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  {tCommon("cancel")}
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  )}
-                  {tCommon("save")}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button
+          onClick={openCreatePanel}
+          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          {t("addService")}
+        </Button>
       </div>
 
       {/* Services Table Container */}
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="p-4 border-b">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            All Services
+            {t("allServices")}
           </h3>
         </div>
         {services.length === 0 ? (
@@ -439,7 +405,7 @@ export default function ServicesPage() {
             </div>
             <p className="text-muted-foreground">{t("noServices")}</p>
             <Button
-              onClick={openCreateDialog}
+              onClick={openCreatePanel}
               variant="link"
               className="mt-2 text-primary"
             >
@@ -532,7 +498,16 @@ export default function ServicesPage() {
                         style={{ backgroundColor: service.color || "#3B82F6" }}
                       />
                       <div>
-                        <div className="font-medium">{service.name}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{service.name}</span>
+                          {(service.promotionalBadge || service.customBadgeLabel) && (
+                            <PromotionalBadge
+                              badge={service.promotionalBadge}
+                              customLabel={service.customBadgeLabel}
+                              size="sm"
+                            />
+                          )}
+                        </div>
                         {service.description && (
                           <div className="text-sm text-muted-foreground line-clamp-1">
                             {service.description}
@@ -545,9 +520,13 @@ export default function ServicesPage() {
                     <span className="text-sm">{service.duration} min</span>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="font-medium">
-                      {service.currency} {Number(service.price).toLocaleString()}
-                    </Badge>
+                    {isDiscountActive(service) ? (
+                      <ServicePriceDisplay service={service} size="sm" showCountdown={true} />
+                    ) : (
+                      <Badge variant="secondary" className="font-medium">
+                        {service.currency} {Number(service.price).toLocaleString()}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -555,7 +534,7 @@ export default function ServicesPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-                        onClick={() => openEditDialog(service)}
+                        onClick={() => openEditPanel(service)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -633,6 +612,315 @@ export default function ServicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Backdrop overlay for panel on mobile */}
+      {isPanelOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={closePanel}
+        />
+      )}
+
+      {/* Create/Edit Service Slide-in Panel */}
+      <div
+        className={cn(
+          "fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] lg:w-[520px] bg-background border-l shadow-xl",
+          "transform transition-transform duration-300 ease-in-out",
+          isPanelOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+          {/* Panel Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-xl font-semibold">
+              {editingService ? t("editService") : t("addService")}
+            </h2>
+            <Button type="button" variant="ghost" size="icon" onClick={closePanel}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Panel Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">{t("serviceName")}</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">{t("serviceDescription")}</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="duration">{t("serviceDuration")}</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="5"
+                  max="480"
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price">{t("servicePrice")}</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t("serviceColor")}</Label>
+              <div className="flex flex-wrap gap-2">
+                {DEFAULT_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all ${
+                      color === c ? "border-foreground scale-110" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={color || "#3B82F6"}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="absolute inset-0 w-8 h-8 opacity-0 cursor-pointer"
+                  />
+                  <div
+                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs ${
+                      color && !DEFAULT_COLORS.includes(color)
+                        ? "border-foreground"
+                        : "border-dashed border-muted-foreground"
+                    }`}
+                    style={{
+                      backgroundColor:
+                        color && !DEFAULT_COLORS.includes(color) ? color : "transparent",
+                    }}
+                  >
+                    {(!color || DEFAULT_COLORS.includes(color)) && "+"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Discount Section */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Percent className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">{t("discountSettings")}</Label>
+              </div>
+
+              <div className="space-y-4">
+                {/* Discount Type */}
+                <div className="space-y-2">
+                  <Label>{t("discountType")}</Label>
+                  <div className="flex gap-2">
+                    {(["none", "percentage", "fixed"] as const).map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setDiscountType(type)}
+                        className={cn(
+                          "px-3 py-1.5 text-sm rounded-md border transition-all",
+                          discountType === type
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:border-primary/50"
+                        )}
+                        style={discountType === type && primaryColor ? {
+                          borderColor: primaryColor,
+                          backgroundColor: `${primaryColor}15`,
+                          color: primaryColor
+                        } : undefined}
+                      >
+                        {type === "none" ? t("discountNone") : type === "percentage" ? t("discountPercentage") : t("discountFixed")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Discount Value */}
+                {discountType !== "none" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="discountValue">
+                        {discountType === "percentage" ? t("discountPercentageLabel") : t("discountAmountLabel")}
+                      </Label>
+                      <Input
+                        id="discountValue"
+                        type="number"
+                        min="0"
+                        max={discountType === "percentage" ? "100" : undefined}
+                        step="0.01"
+                        value={discountValue}
+                        onChange={(e) => setDiscountValue(e.target.value)}
+                        placeholder={discountType === "percentage" ? "20" : "500"}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Date Range */}
+                {discountType !== "none" && (
+                  <div className="space-y-2">
+                    <Label>{t("discountPeriod")}</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !discountDateRange && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {discountDateRange?.from ? (
+                            discountDateRange.to ? (
+                              <>
+                                {format(discountDateRange.from, "dd MMM yyyy")} –{" "}
+                                {format(discountDateRange.to, "dd MMM yyyy")}
+                              </>
+                            ) : (
+                              format(discountDateRange.from, "dd MMM yyyy")
+                            )
+                          ) : (
+                            <span>{t("selectDateRange")}</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0"
+                        align="start"
+                        style={primaryColor ? {
+                          "--primary": primaryColor,
+                          "--accent": `${primaryColor}20`,
+                        } as React.CSSProperties : undefined}
+                      >
+                        <Calendar
+                          mode="range"
+                          defaultMonth={discountDateRange?.from}
+                          selected={discountDateRange}
+                          onSelect={setDiscountDateRange}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Promotional Badge Section */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm font-medium">{t("promotionalBadge")}</Label>
+              </div>
+
+              <div className="space-y-4">
+                {/* Preset Badges */}
+                <div className="space-y-2">
+                  <Label>{t("presetBadge")}</Label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPromotionalBadge(null)}
+                      className={cn(
+                        "px-3 py-1.5 text-sm rounded-md border transition-all",
+                        !promotionalBadge
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/50"
+                      )}
+                      style={!promotionalBadge && primaryColor ? {
+                        borderColor: primaryColor,
+                        backgroundColor: `${primaryColor}15`,
+                        color: primaryColor
+                      } : undefined}
+                    >
+                      {t("discountNone")}
+                    </button>
+                    {(["SALE", "NEW", "POPULAR", "HOT"] as const).map((badge) => (
+                      <button
+                        key={badge}
+                        type="button"
+                        onClick={() => {
+                          setPromotionalBadge(badge);
+                          setCustomBadgeLabel("");
+                        }}
+                        className={cn(
+                          "px-3 py-1.5 text-sm rounded-md border transition-all",
+                          promotionalBadge === badge
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        )}
+                        style={promotionalBadge === badge && primaryColor ? {
+                          borderColor: primaryColor,
+                          backgroundColor: `${primaryColor}15`
+                        } : undefined}
+                      >
+                        <PromotionalBadge badge={badge} size="sm" animate={false} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Label */}
+                <div className="space-y-2">
+                  <Label htmlFor="customBadgeLabel">{t("customLabel")}</Label>
+                  <Input
+                    id="customBadgeLabel"
+                    value={customBadgeLabel}
+                    onChange={(e) => {
+                      setCustomBadgeLabel(e.target.value);
+                      if (e.target.value) setPromotionalBadge(null);
+                    }}
+                    placeholder={t("customLabelPlaceholder")}
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Panel Footer */}
+          <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30">
+            <Button type="button" variant="outline" onClick={closePanel}>
+              {tCommon("cancel")}
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+            >
+              {isSubmitting && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              {tCommon("save")}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
