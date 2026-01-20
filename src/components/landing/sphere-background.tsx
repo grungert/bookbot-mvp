@@ -436,11 +436,11 @@ export function SphereBackground() {
       );
       bloomPass.threshold = THREE.MathUtils.lerp(bloomPass.threshold, targetBloomThreshold, 0.05);
 
-      // Spawn more spheres based on scroll
+      // Spawn/remove spheres based on scroll
       const additionalSpheres = settings.maxCount - settings.baseCount;
       const targetCount = settings.baseCount + Math.floor(additionalSpheres * easeT);
 
-      // Spawn in batches at thresholds (every 10% scroll)
+      // Spawn spheres when scrolling down
       const currentThreshold = Math.floor(t * 10);
       if (currentThreshold > lastSpawnThreshold && followers.length < targetCount) {
         const toSpawn = Math.min(
@@ -450,6 +450,26 @@ export function SphereBackground() {
         for (let i = 0; i < toSpawn; i++) {
           followers.push(spawnFollower(currentColorA, currentColorB));
         }
+        lastSpawnThreshold = currentThreshold;
+      }
+
+      // Remove spheres when scrolling back up
+      if (followers.length > targetCount && followers.length > settings.baseCount) {
+        const toRemove = Math.min(
+          Math.ceil(additionalSpheres / 20), // Remove slower than spawn
+          followers.length - targetCount
+        );
+        for (let i = 0; i < toRemove; i++) {
+          const removed = followers.pop();
+          if (removed) {
+            scene.remove(removed.mesh);
+            (removed.mesh.material as THREE.Material).dispose();
+          }
+        }
+      }
+
+      // Update threshold when scrolling up
+      if (currentThreshold < lastSpawnThreshold) {
         lastSpawnThreshold = currentThreshold;
       }
 
