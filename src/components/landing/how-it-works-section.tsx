@@ -12,10 +12,30 @@ interface StepProps {
   title: string;
   description: string;
   delay?: number;
+  index?: number;
 }
 
-function Step({ number, icon: Icon, title, description, delay = 0 }: StepProps) {
+// Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
+function getGradientColor(index: number, totalItems: number = 3): { bg: string; icon: string; border: string } {
+  // For a single row, factor goes from 0 (blue) to 1 (purple)
+  const factor = index / (totalItems - 1);
+  const clampedFactor = Math.max(0, Math.min(1, factor));
+
+  // Blue: rgb(59, 130, 246) - Purple: rgb(168, 85, 247)
+  const r = Math.round(59 + (168 - 59) * clampedFactor);
+  const g = Math.round(130 + (85 - 130) * clampedFactor);
+  const b = Math.round(246 + (247 - 246) * clampedFactor);
+
+  return {
+    bg: `rgba(${r}, ${g}, ${b}, 0.3)`,
+    icon: `rgb(${r}, ${g}, ${b})`,
+    border: `rgba(${r}, ${g}, ${b}, 0.4)`
+  };
+}
+
+function Step({ number, icon: Icon, title, description, delay = 0, index = 0 }: StepProps) {
   const prefersReducedMotion = useReducedMotion();
+  const colors = getGradientColor(index);
 
   return (
     <motion.div
@@ -37,20 +57,13 @@ function Step({ number, icon: Icon, title, description, delay = 0 }: StepProps) 
     >
       {/* Step Number Circle */}
       <div
-        className={cn(
-          "relative w-16 h-16 rounded-full flex items-center justify-center mb-4",
-          "bg-primary/20",
-          "border-2 border-primary/40"
-        )}
+        className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 border-2"
+        style={{ backgroundColor: colors.bg, borderColor: colors.border }}
       >
-        <Icon className="h-7 w-7 text-primary" />
+        <Icon className="h-7 w-7" style={{ color: colors.icon }} />
         <div
-          className={cn(
-            "absolute -top-1 -right-1 w-7 h-7 rounded-full",
-            "bg-primary text-primary-foreground",
-            "flex items-center justify-center",
-            "text-sm font-bold shadow-lg"
-          )}
+          className="absolute -top-1 -right-1 w-7 h-7 rounded-full text-white flex items-center justify-center text-sm font-bold shadow-lg"
+          style={{ backgroundColor: colors.icon }}
         >
           {number}
         </div>
@@ -117,6 +130,7 @@ export function HowItWorksSection() {
               title={t(step.titleKey)}
               description={t(step.descKey)}
               delay={index * 0.15}
+              index={index}
             />
           ))}
         </div>

@@ -10,10 +10,29 @@ interface UseCaseItemProps {
   icon: typeof Scissors;
   label: string;
   delay?: number;
+  index?: number;
 }
 
-function UseCaseItem({ icon: Icon, label, delay = 0 }: UseCaseItemProps) {
+// Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
+function getGradientColor(index: number, totalItems: number = 6): { bg: string; icon: string } {
+  // For a single row of items, factor goes from 0 (blue) to 1 (purple)
+  const factor = index / (totalItems - 1);
+  const clampedFactor = Math.max(0, Math.min(1, factor));
+
+  // Blue: rgb(59, 130, 246) - Purple: rgb(168, 85, 247)
+  const r = Math.round(59 + (168 - 59) * clampedFactor);
+  const g = Math.round(130 + (85 - 130) * clampedFactor);
+  const b = Math.round(246 + (247 - 246) * clampedFactor);
+
+  return {
+    bg: `rgba(${r}, ${g}, ${b}, 0.3)`,
+    icon: `rgb(${r}, ${g}, ${b})`
+  };
+}
+
+function UseCaseItem({ icon: Icon, label, delay = 0, index = 0 }: UseCaseItemProps) {
   const prefersReducedMotion = useReducedMotion();
+  const colors = getGradientColor(index);
 
   return (
     <motion.div
@@ -35,13 +54,10 @@ function UseCaseItem({ icon: Icon, label, delay = 0 }: UseCaseItemProps) {
       )}
     >
       <div
-        className={cn(
-          "w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0",
-          "bg-primary/15",
-          "group-hover:bg-primary/25 transition-colors"
-        )}
+        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
+        style={{ backgroundColor: colors.bg }}
       >
-        <Icon className="h-4 w-4 text-primary" />
+        <Icon className="h-4 w-4" style={{ color: colors.icon }} />
       </div>
       <span className="font-medium text-sm whitespace-nowrap">{label}</span>
     </motion.div>
@@ -91,6 +107,7 @@ export function UseCasesSection() {
               icon={useCase.icon}
               label={t(useCase.labelKey)}
               delay={index * 0.05}
+              index={index}
             />
           ))}
         </div>

@@ -15,6 +15,21 @@ interface PricingCardProps {
   popularLabel?: string;
   ctaText: string;
   delay?: number;
+  index?: number;
+}
+
+// Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
+function getGradientColor(index: number, totalItems: number = 3): string {
+  // For a single row, factor goes from 0 (blue) to 1 (purple)
+  const factor = index / (totalItems - 1);
+  const clampedFactor = Math.max(0, Math.min(1, factor));
+
+  // Blue: rgb(59, 130, 246) - Purple: rgb(168, 85, 247)
+  const r = Math.round(59 + (168 - 59) * clampedFactor);
+  const g = Math.round(130 + (85 - 130) * clampedFactor);
+  const b = Math.round(246 + (247 - 246) * clampedFactor);
+
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export function PricingCard({
@@ -26,8 +41,10 @@ export function PricingCard({
   popularLabel,
   ctaText,
   delay = 0,
+  index = 0,
 }: PricingCardProps) {
   const prefersReducedMotion = useReducedMotion();
+  const checkColor = getGradientColor(index);
 
   return (
     <motion.div
@@ -50,16 +67,16 @@ export function PricingCard({
           "border border-white/20 dark:border-white/10",
           "shadow-lg shadow-black/5",
           isPopular && [
-            "border-primary/50",
+            "border-2 border-blue-500/50",
             "bg-white/80 dark:bg-gray-900/80",
-            "shadow-xl shadow-primary/10"
+            "shadow-xl shadow-blue-500/20"
           ]
         )}
         whileHover={prefersReducedMotion ? {} : {
           scale: isPopular ? 1.05 : 1.03,
           y: -8,
           boxShadow: isPopular
-            ? "0 25px 50px -12px rgba(22, 93, 252, 0.25)"
+            ? "0 25px 50px -12px rgba(59, 130, 246, 0.3), 0 15px 30px -8px rgba(168, 85, 247, 0.25)"
             : "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
         }}
         transition={{
@@ -74,7 +91,7 @@ export function PricingCard({
         {/* Popular Badge */}
         {isPopular && popularLabel && (
           <div className="absolute -top-0 left-1/2 -translate-x-1/2">
-            <span className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1 rounded-b-lg">
+            <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-sm font-medium px-4 py-1 rounded-b-lg">
               {popularLabel}
             </span>
           </div>
@@ -116,7 +133,7 @@ export function PricingCard({
                 }}
                 className="flex items-center gap-3 text-sm"
               >
-                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                <Check className="h-4 w-4 flex-shrink-0" style={{ color: checkColor }} />
                 <span>{feature}</span>
               </motion.li>
             ))}

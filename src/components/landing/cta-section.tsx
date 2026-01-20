@@ -13,13 +13,13 @@ export function CtaSection() {
   return (
     <section className="py-24 relative overflow-hidden">
       {/* Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/15 via-purple-500/10 to-purple-500/15" />
 
       {/* Animated Background Elements */}
       {!prefersReducedMotion && (
         <>
           <motion.div
-            className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-3xl"
+            className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl"
             animate={{
               scale: [1, 1.2, 1],
               x: [0, 30, 0],
@@ -32,7 +32,7 @@ export function CtaSection() {
             }}
           />
           <motion.div
-            className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"
+            className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl"
             animate={{
               scale: [1.2, 1, 1.2],
               x: [0, -30, 0],

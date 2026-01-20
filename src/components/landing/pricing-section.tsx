@@ -85,6 +85,7 @@ export function PricingSection() {
               popularLabel={plan.isPopular ? t("mostPopular") : undefined}
               ctaText={t("choosePlan")}
               delay={index * 0.1}
+              index={index}
             />
           ))}
         </div>

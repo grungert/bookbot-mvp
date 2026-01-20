@@ -10,6 +10,32 @@ interface FeatureCardProps {
   description: string;
   features: string[];
   delay?: number;
+  index?: number; // Position in grid for unified gradient effect
+}
+
+// Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
+function getGradientColor(index: number, totalCards: number = 6): { bg: string; icon: string } {
+  // For a 3-column grid at 30 degrees, calculate position factor
+  // Row and column affect the gradient position
+  const row = Math.floor(index / 3);
+  const col = index % 3;
+
+  // 30-degree angle: combine horizontal and slight vertical offset
+  // Factor goes from 0 (blue) to 1 (purple)
+  const factor = (col + row * 0.3) / 2.5;
+
+  // Clamp factor between 0 and 1
+  const clampedFactor = Math.max(0, Math.min(1, factor));
+
+  // Blue: rgb(59, 130, 246) - Purple: rgb(168, 85, 247)
+  const r = Math.round(59 + (168 - 59) * clampedFactor);
+  const g = Math.round(130 + (85 - 130) * clampedFactor);
+  const b = Math.round(246 + (247 - 246) * clampedFactor);
+
+  return {
+    bg: `rgba(${r}, ${g}, ${b}, 0.3)`,
+    icon: `rgb(${r}, ${g}, ${b})`
+  };
 }
 
 export function FeatureCard({
@@ -18,8 +44,10 @@ export function FeatureCard({
   description,
   features,
   delay = 0,
+  index = 0,
 }: FeatureCardProps) {
   const prefersReducedMotion = useReducedMotion();
+  const colors = getGradientColor(index);
 
   return (
     <motion.div
@@ -50,11 +78,12 @@ export function FeatureCard({
           <div
             className={cn(
               "w-14 h-14 rounded-xl flex items-center justify-center",
-              "bg-primary/20 backdrop-blur-sm",
-              "group-hover:bg-primary/30 transition-colors"
+              "backdrop-blur-sm transition-all",
+              "group-hover:scale-105"
             )}
+            style={{ backgroundColor: colors.bg }}
           >
-            <Icon className="h-7 w-7 text-primary" />
+            <Icon className="h-7 w-7" style={{ color: colors.icon }} />
           </div>
 
           {/* Title & Description */}
@@ -77,7 +106,7 @@ export function FeatureCard({
                 }}
                 className="flex items-center gap-2 text-sm text-muted-foreground"
               >
-                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                <Check className="h-4 w-4 flex-shrink-0" style={{ color: colors.icon }} />
                 <span>{feature}</span>
               </motion.div>
             ))}

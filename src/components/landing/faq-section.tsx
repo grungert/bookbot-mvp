@@ -13,10 +13,25 @@ interface FAQItemProps {
   isOpen: boolean;
   onToggle: () => void;
   delay?: number;
+  index?: number;
 }
 
-function FAQItem({ question, answer, isOpen, onToggle, delay = 0 }: FAQItemProps) {
+// Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
+function getGradientColor(index: number, totalItems: number = 5): string {
+  const factor = index / (totalItems - 1);
+  const clampedFactor = Math.max(0, Math.min(1, factor));
+
+  // Blue: rgb(59, 130, 246) - Purple: rgb(168, 85, 247)
+  const r = Math.round(59 + (168 - 59) * clampedFactor);
+  const g = Math.round(130 + (85 - 130) * clampedFactor);
+  const b = Math.round(246 + (247 - 246) * clampedFactor);
+
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function FAQItem({ question, answer, isOpen, onToggle, delay = 0, index = 0 }: FAQItemProps) {
   const prefersReducedMotion = useReducedMotion();
+  const borderColor = getGradientColor(index);
 
   return (
     <motion.div
@@ -33,8 +48,10 @@ function FAQItem({ question, answer, isOpen, onToggle, delay = 0 }: FAQItemProps
         "bg-white/60 dark:bg-gray-900/60",
         "backdrop-blur-md",
         "border border-white/20 dark:border-white/10",
-        "shadow-sm"
+        "shadow-sm",
+        isOpen && "border-l-[3px]"
       )}
+      style={isOpen ? { borderLeftColor: borderColor } : undefined}
     >
       <button
         onClick={onToggle}
@@ -118,6 +135,7 @@ export function FAQSection() {
               isOpen={openIndex === index}
               onToggle={() => setOpenIndex(openIndex === index ? null : index)}
               delay={index * 0.05}
+              index={index}
             />
           ))}
         </div>

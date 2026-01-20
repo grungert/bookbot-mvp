@@ -166,7 +166,7 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
             )}
           >
             <div
-              className="h-full bg-primary transition-all duration-100"
+              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-100"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -260,7 +260,7 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
               {/* Progress bar for expanded */}
                 <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
                   <div
-                    className="h-full bg-primary transition-all duration-100"
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-100"
                     style={{ width: `${progress}%` }}
                   />
                 </div>

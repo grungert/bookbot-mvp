@@ -80,6 +80,7 @@ export function FeaturesSection() {
               description={t(feature.descKey)}
               features={feature.pointKeys.map((key) => t(key))}
               delay={index * 0.1}
+              index={index}
             />
           ))}
         </div>
