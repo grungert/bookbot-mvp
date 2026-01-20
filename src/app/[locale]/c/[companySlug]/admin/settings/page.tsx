@@ -2,13 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -59,7 +59,7 @@ interface CompanySettings {
   taxRate: number;
 }
 
-type SettingsTab = "general" | "branding" | "ai" | "bot" | "business";
+type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed";
 
 const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
   { id: "general", labelKey: "tabGeneral", icon: Building2 },
@@ -67,11 +67,13 @@ const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[]
   { id: "ai", labelKey: "tabAiChatbot", icon: Bot },
   { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
   { id: "business", labelKey: "tabBusinessDetails", icon: FileText },
+  { id: "embed", labelKey: "tabEmbed", icon: Code },
 ];
 
 export default function SettingsPage() {
   const params = useParams();
   const router = useRouter();
+  const locale = useLocale();
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
@@ -716,6 +718,100 @@ export default function SettingsPage() {
     </div>
   );
 
+  const EmbedSection = () => {
+    const [copied, setCopied] = useState(false);
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const embedUrl = `${baseUrl}/${locale}/embed/${companySlug}`;
+
+    const embedCode = `<iframe
+  src="${embedUrl}"
+  width="400"
+  height="600"
+  frameborder="0"
+  style="position:fixed;bottom:0;right:0;border:none;z-index:9999;"
+  allow="clipboard-write"
+></iframe>`;
+
+    const handleCopy = async () => {
+      try {
+        await navigator.clipboard.writeText(embedCode);
+        setCopied(true);
+        toast.success(t("embedCodeCopied"));
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        toast.error(tCommon("error"));
+      }
+    };
+
+    return (
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          {t("embedChatbot")}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          {t("embedDescription")}
+        </p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t("embedCode")}</Label>
+            <div className="relative">
+              <pre className="bg-zinc-950 text-zinc-100 rounded-lg p-4 text-xs overflow-x-auto font-mono">
+                {embedCode}
+              </pre>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleCopy}
+                className="absolute top-2 right-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 mr-1" />
+                    {t("copied")}
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    {t("copy")}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t("embedInstructions")}</Label>
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p>1. {t("embedStep1")}</p>
+              <p>2. {t("embedStep2")}</p>
+              <p>3. {t("embedStep3")}</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">{t("embedPreview")}</Label>
+            <div className="border rounded-lg p-4 bg-muted/50">
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-muted-foreground">
+                  {t("embedDimensions")}: <span className="font-mono">400 × 600px</span>
+                </div>
+                <a
+                  href={embedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline"
+                >
+                  {t("openInNewTab")}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -783,6 +879,7 @@ export default function SettingsPage() {
           {activeTab === "ai" && <AiChatbotSection />}
           {activeTab === "bot" && <BotPersonalitySection />}
           {activeTab === "business" && <BusinessDetailsSection />}
+          {activeTab === "embed" && <EmbedSection />}
         </div>
       </div>
     </div>

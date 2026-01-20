@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -13,13 +14,15 @@ import type { ChatMessage, ChatService, ChatTimeSlot, ChatUICallbacks } from "./
 interface ChatWidgetProps {
   companySlug: string;
   primaryColor?: string;
+  embedded?: boolean;
 }
 
 const STORAGE_KEY_PREFIX = "chat-session-";
 
-export function ChatWidget({ companySlug, primaryColor }: ChatWidgetProps) {
+export function ChatWidget({ companySlug, primaryColor, embedded = false }: ChatWidgetProps) {
   const t = useTranslations("chat");
-  const [isOpen, setIsOpen] = useState(false);
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(embedded);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -190,6 +193,93 @@ export function ChatWidget({ companySlug, primaryColor }: ChatWidgetProps) {
     onDateSelect: handleDateSelect,
     onTimeSelect: handleTimeSelect,
   };
+
+  // Hide on admin pages (but not in embedded mode)
+  if (!embedded && pathname.includes('/admin')) {
+    return null;
+  }
+
+  // Embedded mode - render chat directly without toggle button
+  if (embedded) {
+    return (
+      <div className="h-full w-full flex flex-col bg-card overflow-hidden">
+        {/* Header */}
+        <div
+          className="flex items-center justify-between py-3 px-4 shrink-0"
+          style={{ backgroundColor: primaryColor }}
+        >
+          <div className="text-lg font-semibold text-white flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            {t("title")}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleNewConversation}
+            className="h-8 w-8 text-white hover:bg-white/20"
+            title={t("newConversation")}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {isLoadingHistory ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("loadingHistory")}
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.map((message, index) => (
+                <ChatMessageRenderer
+                  key={index}
+                  message={message}
+                  nextMessage={messages[index + 1]}
+                  isLatest={index === messages.length - 1}
+                  callbacks={uiCallbacks}
+                />
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("thinking")}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <form
+          onSubmit={handleSubmit}
+          className="p-3 border-t flex gap-2 shrink-0 bg-card"
+        >
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={t("placeholder")}
+            disabled={isLoading}
+            className="flex-1"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={isLoading || !input.trim()}
+            style={{ backgroundColor: primaryColor }}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <>
