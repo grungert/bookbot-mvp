@@ -3,9 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { validateCompanyAdminAccess } from "@/lib/db/tenant";
 import { z } from "zod";
 
+const MAX_CONTENT_SIZE = 100 * 1024; // 100KB
+
 const updateDocumentSchema = z.object({
-  title: z.string().min(1).optional(),
-  content: z.string().min(1).optional(),
+  title: z.string().min(1, "Title is required").max(200, "Title must be 200 characters or less").optional(),
+  content: z.string().min(1, "Content is required").max(MAX_CONTENT_SIZE, `Content must be ${MAX_CONTENT_SIZE / 1024}KB or less`).optional(),
 });
 
 interface RouteParams {

@@ -29,7 +29,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Search, Copy, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MDEditor from "@uiw/react-md-editor";
 
@@ -41,6 +41,16 @@ interface Document {
   updatedAt: string;
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+const MAX_CONTENT_SIZE = 100 * 1024; // 100KB - must match API
+const CONTENT_WARNING_THRESHOLD = 80 * 1024; // 80KB - show warning at 80%
+
 export default function DocumentsPage() {
   const params = useParams();
   const companySlug = params.companySlug as string;
@@ -49,6 +59,7 @@ export default function DocumentsPage() {
   const { resolvedTheme } = useTheme();
 
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
@@ -62,22 +73,38 @@ export default function DocumentsPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Form state
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [titleError, setTitleError] = useState("");
+  const [contentError, setContentError] = useState("");
+  const [isDirty, setIsDirty] = useState(false);
+  const [showDirtyWarning, setShowDirtyWarning] = useState(false);
 
-  const loadDocuments = useCallback(async () => {
+  // Track original values for dirty detection
+  const [originalTitle, setOriginalTitle] = useState("");
+  const [originalContent, setOriginalContent] = useState("");
+
+  const loadDocuments = useCallback(async (page = 1) => {
     try {
-      const response = await fetch(`/api/c/${companySlug}/documents`);
+      const response = await fetch(`/api/c/${companySlug}/documents?page=${page}&limit=20`);
       if (response.ok) {
         const data = await response.json();
-        setDocuments(data);
+        setDocuments(data.documents);
+        setPagination(data.pagination);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || t("loadError") || tCommon("error"));
       }
     } catch {
-      toast.error(tCommon("error"));
+      toast.error(t("networkError") || tCommon("error"));
     } finally {
       setIsLoading(false);
     }
-  }, [companySlug, tCommon]);
+  }, [companySlug, t, tCommon]);
 
   useEffect(() => {
     loadDocuments();
@@ -95,9 +122,32 @@ export default function DocumentsPage() {
     };
   }, [isPanelOpen]);
 
+  // Escape key handler
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isPanelOpen) {
+        e.preventDefault();
+        handleClosePanel();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isPanelOpen, isDirty]);
+
+  // Check dirty state
+  useEffect(() => {
+    const hasChanges = title !== originalTitle || content !== originalContent;
+    setIsDirty(hasChanges);
+  }, [title, content, originalTitle, originalContent]);
+
   function resetForm() {
     setTitle("");
     setContent("");
+    setOriginalTitle("");
+    setOriginalContent("");
+    setTitleError("");
+    setContentError("");
+    setIsDirty(false);
   }
 
   function openCreatePanel() {
@@ -110,19 +160,66 @@ export default function DocumentsPage() {
     setEditingDocument(doc);
     setTitle(doc.title);
     setContent(doc.content);
+    setOriginalTitle(doc.title);
+    setOriginalContent(doc.content);
+    setTitleError("");
+    setContentError("");
+    setIsDirty(false);
     setIsPanelOpen(true);
+  }
+
+  function handleClosePanel() {
+    if (isDirty) {
+      setShowDirtyWarning(true);
+    } else {
+      closePanel();
+    }
   }
 
   function closePanel() {
     setIsPanelOpen(false);
+    setShowDirtyWarning(false);
     setTimeout(() => {
       setEditingDocument(null);
       resetForm();
     }, 300);
   }
 
+  function validateForm(): boolean {
+    let isValid = true;
+
+    // Validate title
+    if (!title.trim()) {
+      setTitleError(t("titleRequired") || "Title is required");
+      isValid = false;
+    } else if (title.length > 200) {
+      setTitleError(t("titleTooLong") || "Title must be 200 characters or less");
+      isValid = false;
+    } else {
+      setTitleError("");
+    }
+
+    // Validate content
+    if (!content.trim()) {
+      setContentError(t("contentRequired") || "Content is required");
+      isValid = false;
+    } else if (content.length > MAX_CONTENT_SIZE) {
+      setContentError(t("contentTooLarge") || `Content must be ${MAX_CONTENT_SIZE / 1024}KB or less`);
+      isValid = false;
+    } else {
+      setContentError("");
+    }
+
+    return isValid;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -133,24 +230,41 @@ export default function DocumentsPage() {
       const response = await fetch(url, {
         method: editingDocument ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title: title.trim(), content }),
       });
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
+
         if (response.status === 400) {
-          toast.error(data.error || "Validation failed. Please check your input.");
+          // Handle validation errors from API
+          if (data.details?.fieldErrors) {
+            const fieldErrors = data.details.fieldErrors;
+            if (fieldErrors.title?.[0]) {
+              setTitleError(fieldErrors.title[0]);
+            }
+            if (fieldErrors.content?.[0]) {
+              setContentError(fieldErrors.content[0]);
+            }
+          }
+          toast.error(data.error || t("validationFailed") || "Validation failed. Please check your input.");
+        } else if (response.status === 401) {
+          toast.error(t("unauthorized") || "You are not authorized to perform this action.");
+        } else if (response.status === 403) {
+          toast.error(t("forbidden") || "Access denied.");
+        } else if (response.status === 404) {
+          toast.error(t("documentNotFound") || "Document not found.");
         } else {
-          toast.error("Failed to save document. Please try again.");
+          toast.error(data.error || t("saveFailed") || "Failed to save document. Please try again.");
         }
         return;
       }
 
-      toast.success(editingDocument ? "Document updated" : "Document created");
+      toast.success(editingDocument ? t("documentUpdated") || "Document updated" : t("documentCreated") || "Document created");
       closePanel();
-      loadDocuments();
+      loadDocuments(pagination.page);
     } catch {
-      toast.error("Failed to save document. Please try again.");
+      toast.error(t("networkError") || "Network error. Please check your connection and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -166,25 +280,56 @@ export default function DocumentsPage() {
       );
 
       if (!response.ok) {
-        const data = await response.json();
-        toast.error(data.error || "Failed to delete document. Please try again.");
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          toast.error(t("documentNotFound") || "Document not found.");
+        } else {
+          toast.error(data.error || t("deleteFailed") || "Failed to delete document. Please try again.");
+        }
         return;
       }
 
-      toast.success("Document deleted");
-      loadDocuments();
+      toast.success(t("documentDeleted") || "Document deleted");
+      loadDocuments(pagination.page);
     } catch {
-      toast.error("Failed to delete document. Please try again.");
+      toast.error(t("networkError") || "Network error. Please check your connection and try again.");
     } finally {
       setDeletingDocumentId(null);
     }
   }
 
-  // Sorting helper
-  const sortedDocuments = useMemo(() => {
-    if (!sortColumn) return documents;
+  // Document duplication
+  async function handleDuplicate(doc: Document) {
+    const duplicatedTitle = `${doc.title} (${t("copy") || "Copy"})`;
+    setEditingDocument(null);
+    setTitle(duplicatedTitle);
+    setContent(doc.content);
+    setOriginalTitle("");
+    setOriginalContent("");
+    setTitleError("");
+    setContentError("");
+    setIsDirty(true);
+    setIsPanelOpen(true);
+  }
 
-    return [...documents].sort((a, b) => {
+  // Sorting helper - now includes search filtering
+  const filteredAndSortedDocuments = useMemo(() => {
+    let filtered = documents;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = documents.filter(
+        (doc) =>
+          doc.title.toLowerCase().includes(query) ||
+          doc.content.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    if (!sortColumn) return filtered;
+
+    return [...filtered].sort((a, b) => {
       let comparison = 0;
 
       if (sortColumn === "title") {
@@ -195,14 +340,15 @@ export default function DocumentsPage() {
 
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [documents, sortColumn, sortDirection]);
+  }, [documents, sortColumn, sortDirection, searchQuery]);
 
-  // Selection helpers
+  // Selection helpers - only select from filtered documents
   function toggleSelectAll() {
-    if (selectedIds.size === documents.length) {
+    const filteredIds = filteredAndSortedDocuments.map((doc) => doc.id);
+    if (selectedIds.size === filteredIds.length && filteredIds.every((id) => selectedIds.has(id))) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(documents.map((doc) => doc.id)));
+      setSelectedIds(new Set(filteredIds));
     }
   }
 
@@ -238,31 +384,48 @@ export default function DocumentsPage() {
     );
   }
 
-  // Bulk delete handler
+  // Bulk delete handler - fixed race condition
   async function handleBulkDelete() {
     setIsBulkDeleting(true);
 
     try {
       const deletePromises = Array.from(selectedIds).map((id) =>
         fetch(`/api/c/${companySlug}/documents/${id}`, { method: "DELETE" })
+          .then((response) => ({ id, ok: response.ok, response }))
+          .catch(() => ({ id, ok: false, response: null }))
       );
 
       const results = await Promise.allSettled(deletePromises);
-      const successCount = results.filter((r) => r.status === "fulfilled" && (r as PromiseFulfilledResult<Response>).value.ok).length;
-      const failCount = selectedIds.size - successCount;
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const result of results) {
+        if (result.status === "fulfilled" && result.value.ok) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
 
       if (successCount > 0) {
-        toast.success(`${successCount} document(s) deleted successfully`);
+        toast.success(
+          t("documentsDeletedCount", { count: successCount }) ||
+          `${successCount} document(s) deleted successfully`
+        );
       }
       if (failCount > 0) {
-        toast.error(`Failed to delete ${failCount} document(s)`);
+        toast.error(
+          t("documentsDeleteFailedCount", { count: failCount }) ||
+          `Failed to delete ${failCount} document(s)`
+        );
       }
 
       setSelectedIds(new Set());
       setIsBulkDeleteOpen(false);
-      loadDocuments();
+      loadDocuments(pagination.page);
     } catch {
-      toast.error("Failed to delete documents. Please try again.");
+      toast.error(t("networkError") || "Network error. Please try again.");
     } finally {
       setIsBulkDeleting(false);
     }
@@ -274,6 +437,25 @@ export default function DocumentsPage() {
       .filter((doc) => selectedIds.has(doc.id))
       .map((doc) => doc.title);
   }
+
+  // Pagination handlers
+  function handlePageChange(newPage: number) {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      setSelectedIds(new Set());
+      loadDocuments(newPage);
+    }
+  }
+
+  // Character and word count
+  const characterCount = content.length;
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+  const contentSizePercent = Math.round((characterCount / MAX_CONTENT_SIZE) * 100);
+  const isApproachingLimit = characterCount > CONTENT_WARNING_THRESHOLD;
+  const isOverLimit = characterCount > MAX_CONTENT_SIZE;
+
+  // Check if all filtered documents are selected
+  const allFilteredSelected = filteredAndSortedDocuments.length > 0 &&
+    filteredAndSortedDocuments.every((doc) => selectedIds.has(doc.id));
 
   if (isLoading) {
     return (
@@ -301,10 +483,26 @@ export default function DocumentsPage() {
 
       {/* Documents Table Container */}
       <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {t("knowledgeBase")}
+            {pagination.total > 0 && (
+              <span className="ml-2 text-xs font-normal normal-case">
+                ({pagination.total} {pagination.total === 1 ? t("document") : t("documentsPlural")})
+              </span>
+            )}
           </h3>
+          {/* Search Input */}
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder={t("searchDocuments") || "Search documents..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
         </div>
         {documents.length === 0 ? (
           <div className="py-16 text-center">
@@ -316,6 +514,18 @@ export default function DocumentsPage() {
             </p>
             <Button onClick={openCreatePanel} variant="link" className="text-primary">
               {t("addFirstDocument")}
+            </Button>
+          </div>
+        ) : filteredAndSortedDocuments.length === 0 ? (
+          <div className="py-16 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <Search className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground mb-2">
+              {t("noSearchResults") || "No documents match your search"}
+            </p>
+            <Button onClick={() => setSearchQuery("")} variant="link" className="text-primary">
+              {t("clearSearch") || "Clear search"}
             </Button>
           </div>
         ) : (
@@ -342,7 +552,7 @@ export default function DocumentsPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="w-12">
                     <Checkbox
-                      checked={documents.length > 0 && selectedIds.size === documents.length}
+                      checked={allFilteredSelected}
                       onCheckedChange={toggleSelectAll}
                       aria-label="Select all"
                     />
@@ -372,7 +582,7 @@ export default function DocumentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedDocuments.map((doc, index) => (
+                {filteredAndSortedDocuments.map((doc, index) => (
                   <TableRow
                     key={doc.id}
                     className={cn(
@@ -399,6 +609,15 @@ export default function DocumentsPage() {
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 hover:bg-muted"
+                          onClick={() => handleDuplicate(doc)}
+                          title={t("duplicate") || "Duplicate"}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -445,6 +664,39 @@ export default function DocumentsPage() {
                 ))}
               </TableBody>
             </Table>
+
+            {/* Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t">
+                <p className="text-sm text-muted-foreground">
+                  {t("showing") || "Showing"} {((pagination.page - 1) * pagination.limit) + 1}-
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} {t("of") || "of"} {pagination.total}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    {tCommon("previous")}
+                  </Button>
+                  <span className="text-sm text-muted-foreground px-2">
+                    {pagination.page} / {pagination.totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    {tCommon("next")}
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -482,11 +734,29 @@ export default function DocumentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Dirty State Warning Dialog */}
+      <AlertDialog open={showDirtyWarning} onOpenChange={setShowDirtyWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("unsavedChanges") || "Unsaved Changes"}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("unsavedChangesDescription") || "You have unsaved changes. Are you sure you want to close without saving?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("keepEditing") || "Keep Editing"}</AlertDialogCancel>
+            <AlertDialogAction onClick={closePanel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {t("discardChanges") || "Discard Changes"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Backdrop overlay for mobile */}
       {isPanelOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={closePanel}
+          onClick={handleClosePanel}
         />
       )}
 
@@ -504,7 +774,7 @@ export default function DocumentsPage() {
             <h2 className="text-xl font-semibold">
               {editingDocument ? t("editDocument") : t("addDocument")}
             </h2>
-            <Button type="button" variant="ghost" size="icon" onClick={closePanel}>
+            <Button type="button" variant="ghost" size="icon" onClick={handleClosePanel}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -516,10 +786,20 @@ export default function DocumentsPage() {
               <Input
                 id="title"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (titleError) setTitleError("");
+                }}
                 placeholder={t("documentTitlePlaceholder")}
-                required
+                className={cn(titleError && "border-destructive focus-visible:ring-destructive")}
+                aria-invalid={!!titleError}
               />
+              {titleError && (
+                <p className="text-sm text-destructive">{titleError}</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {title.length}/200 {t("characters") || "characters"}
+              </p>
             </div>
 
             <div className="space-y-2" data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
@@ -527,13 +807,33 @@ export default function DocumentsPage() {
               <div className="md-editor-wrapper">
                 <MDEditor
                   value={content}
-                  onChange={(value) => setContent(value || "")}
+                  onChange={(value) => {
+                    setContent(value || "");
+                    if (contentError) setContentError("");
+                  }}
                   height={500}
                   preview="edit"
                   textareaProps={{
                     placeholder: t("documentContentPlaceholder"),
                   }}
                 />
+              </div>
+              {contentError && (
+                <p className="text-sm text-destructive">{contentError}</p>
+              )}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {wordCount} {t("words") || "words"} · {characterCount.toLocaleString()} {t("characters") || "characters"}
+                </span>
+                <span className={cn(
+                  isOverLimit && "text-destructive",
+                  isApproachingLimit && !isOverLimit && "text-yellow-600 dark:text-yellow-500"
+                )}>
+                  {isApproachingLimit && (
+                    <AlertTriangle className="inline h-3 w-3 mr-1" />
+                  )}
+                  {contentSizePercent}% {t("ofLimit") || "of limit"}
+                </span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {t("markdownSupport")}
@@ -542,16 +842,28 @@ export default function DocumentsPage() {
           </div>
 
           {/* Panel Footer */}
-          <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/30 shrink-0">
-            <Button type="button" variant="outline" onClick={closePanel}>
-              {tCommon("cancel")}
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          <div className="flex items-center justify-between gap-2 p-4 border-t bg-muted/30 shrink-0">
+            <div className="text-xs text-muted-foreground">
+              {isDirty && (
+                <span className="text-yellow-600 dark:text-yellow-500">
+                  {t("unsaved") || "Unsaved changes"}
+                </span>
               )}
-              {tCommon("save")}
-            </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" onClick={handleClosePanel}>
+                {tCommon("cancel")}
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting || !title.trim() || isOverLimit}
+              >
+                {isSubmitting && (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                )}
+                {tCommon("save")}
+              </Button>
+            </div>
           </div>
         </form>
       </div>
