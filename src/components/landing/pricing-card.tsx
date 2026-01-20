@@ -3,7 +3,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/routing";
 
@@ -42,22 +41,35 @@ export function PricingCard({
       }}
       className={cn(isPopular && "md:-mt-4 md:mb-4")}
     >
-      <Card
+      {/* Glass Card */}
+      <div
         className={cn(
-          "relative h-full transition-all duration-300 hover:shadow-lg",
-          isPopular && "border-primary shadow-lg scale-105 md:scale-110"
+          "relative h-full rounded-xl overflow-hidden",
+          "bg-white/60 dark:bg-gray-900/60",
+          "backdrop-blur-md",
+          "border border-white/20 dark:border-white/10",
+          "shadow-lg shadow-black/5",
+          "hover:shadow-xl hover:shadow-black/10",
+          "transition-all duration-300",
+          isPopular && [
+            "border-primary/50",
+            "bg-white/80 dark:bg-gray-900/80",
+            "scale-105 md:scale-110",
+            "shadow-xl shadow-primary/10"
+          ]
         )}
       >
         {/* Popular Badge */}
         {isPopular && popularLabel && (
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-            <span className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1 rounded-full">
+          <div className="absolute -top-0 left-1/2 -translate-x-1/2">
+            <span className="bg-primary text-primary-foreground text-sm font-medium px-4 py-1 rounded-b-lg">
               {popularLabel}
             </span>
           </div>
         )}
 
-        <CardHeader className="text-center pb-2 pt-8">
+        {/* Header */}
+        <div className="text-center px-6 pb-2 pt-8">
           <h3 className="text-xl font-semibold mb-4">{name}</h3>
           <div className="flex items-baseline justify-center gap-1">
             <motion.span
@@ -74,9 +86,10 @@ export function PricingCard({
             </motion.span>
             <span className="text-muted-foreground text-sm">{priceDetail}</span>
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="pt-6">
+        {/* Content */}
+        <div className="px-6 pt-6 pb-6">
           {/* Features List */}
           <ul className="space-y-3 mb-8">
             {features.map((feature, index) => (
@@ -100,15 +113,18 @@ export function PricingCard({
           {/* CTA Button */}
           <Link href="/register" className="block">
             <Button
-              className="w-full"
+              className={cn(
+                "w-full",
+                !isPopular && "bg-white/50 hover:bg-white/80 text-foreground border border-white/20"
+              )}
               variant={isPopular ? "default" : "outline"}
               size="lg"
             >
               {ctaText}
             </Button>
           </Link>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }

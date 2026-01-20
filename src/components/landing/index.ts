@@ -7,3 +7,4 @@ export { CtaSection } from "./cta-section";
 export { ScrollReveal } from "./scroll-reveal";
 export { SphereBackground } from "./sphere-background";
 export { VideoPlayer, VideoPlaceholder } from "./video-player";
+export { LandingPage } from "./landing-page";

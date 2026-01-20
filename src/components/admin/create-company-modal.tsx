@@ -70,6 +70,29 @@ export function CreateCompanyModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState<string | null>(null);
+
+  // Listen for real-time color changes from settings page
+  useEffect(() => {
+    const handleColorChange = (event: CustomEvent<{ color: string }>) => {
+      setPrimaryColor(event.detail.color);
+    };
+
+    window.addEventListener("company-color-change", handleColorChange as EventListener);
+
+    // Get initial color from CSS variable
+    const wrapper = document.querySelector('[data-theme-wrapper]') as HTMLElement;
+    if (wrapper) {
+      const currentColor = wrapper.style.getPropertyValue("--company-primary");
+      if (currentColor) {
+        setPrimaryColor(currentColor);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("company-color-change", handleColorChange as EventListener);
+    };
+  }, []);
 
   // Auto-generate slug from name unless manually edited
   useEffect(() => {
@@ -221,7 +244,11 @@ export function CreateCompanyModal({
             >
               {tCommon("cancel")}
             </Button>
-            <Button type="submit" disabled={isSubmitting || !name || !slug}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || !name || !slug}
+              style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+            >
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {tCommon("create")}
             </Button>

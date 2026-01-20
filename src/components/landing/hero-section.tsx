@@ -8,17 +8,6 @@ import { ArrowRight, Play, ChevronDown } from "lucide-react";
 import dynamic from "next/dynamic";
 import { VideoPlaceholder } from "./video-player";
 
-// Lazy load Three.js component
-const SphereBackground = dynamic(
-  () => import("./sphere-background").then((mod) => mod.SphereBackground),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
-    ),
-  }
-);
-
 // Lazy load video player
 const VideoPlayer = dynamic(
   () => import("./video-player").then((mod) => mod.VideoPlayer),
@@ -61,12 +50,9 @@ export function HeroSection() {
   };
 
   return (
-    <section className="relative min-h-screen flex flex-col overflow-hidden">
-      {/* Three.js Background */}
-      <SphereBackground />
-
+    <section className="relative min-h-screen flex flex-col">
       {/* Header */}
-      <header className="relative z-10 border-b bg-background/80 backdrop-blur-sm">
+      <header className="relative z-10 border-b border-white/20 dark:border-white/10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="text-2xl font-bold">{tCommon("appName")}</div>
           <div className="flex items-center gap-4">

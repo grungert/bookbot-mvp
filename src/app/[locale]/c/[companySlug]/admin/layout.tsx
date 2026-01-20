@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getCompanyBySlug } from "@/lib/db/tenant";
+import { getCompanyBySlug, validateCompanyMembershipAccess } from "@/lib/db/tenant";
 import { AdminSidebar, AdminMobileNav, SidebarProvider, AdminMainContent } from "@/components/admin/admin-sidebar";
 import { UserMenu } from "@/components/navigation/user-menu";
 import { LanguageSwitcher } from "@/components/navigation/language-switcher";
@@ -30,14 +30,10 @@ export default async function AdminLayout({
     redirect(`/${locale}/c/${companySlug}`);
   }
 
-  const company = await getCompanyBySlug(companySlug);
+  // Validate company access using membership (supports multi-company)
+  const { error, company } = await validateCompanyMembershipAccess(companySlug);
 
-  if (!company) {
-    redirect(`/${locale}`);
-  }
-
-  // Company admin must belong to this company
-  if (user.role === "COMPANY_ADMIN" && user.companyId !== company.id) {
+  if (error || !company) {
     redirect(`/${locale}`);
   }
 

@@ -430,7 +430,8 @@
     "slugTaken": "This URL is already taken. Please choose a different one.",
     "slugHint": "This will be your company's URL. Only lowercase letters, numbers, and hyphens.",
     "companiesUsed": "companies",
-    "upgradeForMore": "Upgrade for more"
+    "upgradeForMore": "Upgrade for more",
+    "buyMore": "Buy more"
   },
   "landing": {
     "heroTitle": "Automate Your Business Operations",

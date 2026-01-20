@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getCompanyBySlug } from "@/lib/db/tenant";
+import { getCompanyBySlug, checkUserCompanyAccess } from "@/lib/db/tenant";
 import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/navigation/header";
@@ -26,10 +26,10 @@ export default async function CompanyLayout({
 
   // Check if user can access admin
   const user = await getCurrentUser();
-  const canAccessAdmin =
-    user?.role === "SUPER_ADMIN" ||
-    (user?.role === "COMPANY_ADMIN" && user.companyId === company.id);
   const isLoggedIn = !!user;
+  const canAccessAdmin = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN"
+    ? await checkUserCompanyAccess(user.id, company.id)
+    : false;
 
   // Get upcoming appointments count for the user
   let appointmentCount = 0;

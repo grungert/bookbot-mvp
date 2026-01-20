@@ -140,14 +140,24 @@ export function CompanySwitcher({
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-56">
             {/* Company counter */}
-            {maxCount !== null && (
-              <>
-                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                  {companies.length}/{maxCount} {t("companiesUsed") || "companies"}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-              </>
-            )}
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal flex items-center justify-between">
+              <span>
+                {maxCount !== null
+                  ? `${companies.length}/${maxCount} ${t("companiesUsed") || "companies"}`
+                  : `${companies.length} ${t("companiesUsed") || "companies"}`}
+              </span>
+              {maxCount !== null && (
+                <a
+                  href="#"
+                  className="hover:opacity-80 text-[10px] font-medium"
+                  style={{ color: checkColor }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t("buyMore") || "Buy more"}
+                </a>
+              )}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
             {companies.map((company) => (
               <DropdownMenuItem
                 key={company.companyId}
@@ -208,14 +218,24 @@ export function CompanySwitcher({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
           {/* Company counter */}
-          {maxCount !== null && (
-            <>
-              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                {companies.length}/{maxCount} {t("companiesUsed") || "companies"}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-            </>
-          )}
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-normal flex items-center justify-between">
+            <span>
+              {maxCount !== null
+                ? `${companies.length}/${maxCount} ${t("companiesUsed") || "companies"}`
+                : `${companies.length} ${t("companiesUsed") || "companies"}`}
+            </span>
+            {maxCount !== null && (
+              <a
+                href="#"
+                className="hover:opacity-80 text-[10px] font-medium"
+                style={{ color: checkColor }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {t("buyMore") || "Buy more"}
+              </a>
+            )}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
           {companies.map((company) => (
             <DropdownMenuItem
               key={company.companyId}

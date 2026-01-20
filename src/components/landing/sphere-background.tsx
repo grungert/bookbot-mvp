@@ -10,7 +10,6 @@ export function SphereBackground() {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    // Check for reduced motion preference
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     setPrefersReducedMotion(mediaQuery.matches);
 
@@ -27,12 +26,10 @@ export function SphereBackground() {
 
     const initBackground = async () => {
       try {
-        // Dynamic import to avoid SSR issues
         const { Spheres2Background } = await import("threejs-components");
 
         if (!mounted || !canvasRef.current) return;
 
-        // Adjust sphere count based on device
         const isMobile = window.innerWidth < 768;
         const count = isMobile ? 80 : 200;
 
@@ -44,10 +41,9 @@ export function SphereBackground() {
           colors,
           minSize: 0.3,
           maxSize: 0.8,
-          // Speed up animation
-          attraction: 0.25,      // default 0.15 - stronger pull
-          maxVelocity: 0.25,     // default 0.15 - faster movement
-          friction: 0.995,       // default 0.999 - slightly more responsive
+          attraction: 0.25,
+          maxVelocity: 0.25,
+          friction: 0.995,
         });
 
         setIsLoaded(true);
@@ -74,7 +70,6 @@ export function SphereBackground() {
 
   return (
     <>
-      {/* Loading gradient shown while Three.js initializes */}
       {!isLoaded && (
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
       )}

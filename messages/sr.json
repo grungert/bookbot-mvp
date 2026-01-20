@@ -430,7 +430,8 @@
     "slugTaken": "Ovaj URL je vec zauzet. Izaberite drugi.",
     "slugHint": "Ovo ce biti URL vase kompanije. Samo mala slova, brojevi i crtice.",
     "companiesUsed": "kompanija",
-    "upgradeForMore": "Nadogradite za vise"
+    "upgradeForMore": "Nadogradite za vise",
+    "buyMore": "Kupi vise"
   },
   "landing": {
     "heroTitle": "Automatizujte Poslovanje",

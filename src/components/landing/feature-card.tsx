@@ -1,25 +1,11 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Check } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import dynamic from "next/dynamic";
-
-// Lazy load 3D icon to avoid SSR issues
-const Feature3DIcon = dynamic(
-  () => import("./feature-3d-icon").then((mod) => mod.Feature3DIcon),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/40 animate-pulse" />
-    ),
-  }
-);
-
-type IconType = "calendar" | "invoice" | "chat";
+import { LucideIcon, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface FeatureCardProps {
-  iconType: IconType;
+  icon: LucideIcon;
   title: string;
   description: string;
   features: string[];
@@ -27,7 +13,7 @@ interface FeatureCardProps {
 }
 
 export function FeatureCard({
-  iconType,
+  icon: Icon,
   title,
   description,
   features,
@@ -46,17 +32,35 @@ export function FeatureCard({
         ease: "easeOut",
       }}
     >
-      <Card className="group h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-2 overflow-hidden">
-        <CardHeader className="space-y-4">
-          {/* 3D Icon */}
-          <div className="flex justify-center -mt-2 -mb-2">
-            <Feature3DIcon type={iconType} />
+      {/* Glass Card */}
+      <div
+        className={cn(
+          "group h-full rounded-xl p-6",
+          "bg-white/60 dark:bg-gray-900/60",
+          "backdrop-blur-md",
+          "border border-white/20 dark:border-white/10",
+          "shadow-lg shadow-black/5",
+          "hover:shadow-xl hover:shadow-black/10",
+          "hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-gray-900/70",
+          "transition-all duration-300"
+        )}
+      >
+        <div className="space-y-4">
+          {/* Icon */}
+          <div
+            className={cn(
+              "w-14 h-14 rounded-xl flex items-center justify-center",
+              "bg-primary/20 backdrop-blur-sm",
+              "group-hover:bg-primary/30 transition-colors"
+            )}
+          >
+            <Icon className="h-7 w-7 text-primary" />
           </div>
 
           {/* Title & Description */}
-          <div className="text-center">
-            <CardTitle className="text-xl mb-2">{title}</CardTitle>
-            <CardDescription className="text-base">{description}</CardDescription>
+          <div>
+            <h3 className="text-xl font-semibold mb-2">{title}</h3>
+            <p className="text-muted-foreground">{description}</p>
           </div>
 
           {/* Feature List */}
@@ -78,8 +82,8 @@ export function FeatureCard({
               </motion.div>
             ))}
           </div>
-        </CardHeader>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }

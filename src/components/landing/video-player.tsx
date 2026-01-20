@@ -35,7 +35,10 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
   return (
     <div
       className={cn(
-        "relative rounded-xl overflow-hidden shadow-2xl bg-black/5 aspect-video",
+        "relative rounded-xl overflow-hidden shadow-2xl aspect-video",
+        "bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm",
+        "border border-white/20 dark:border-white/10",
+        "p-1",
         className
       )}
     >
@@ -98,13 +101,15 @@ export function VideoPlaceholder({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative rounded-xl overflow-hidden shadow-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 aspect-video flex items-center justify-center",
+        "relative rounded-xl overflow-hidden shadow-2xl aspect-video flex items-center justify-center",
+        "bg-white/40 dark:bg-gray-900/40 backdrop-blur-md",
+        "border border-white/20 dark:border-white/10",
         className
       )}
     >
       <div className="text-center p-8">
-        <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-          <Play className="h-8 w-8 text-white/60" />
+        <div className="w-16 h-16 rounded-full bg-white/20 dark:bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-4">
+          <Play className="h-8 w-8 text-muted-foreground" />
         </div>
         <p className="text-muted-foreground">Demo video coming soon</p>
       </div>

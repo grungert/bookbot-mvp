@@ -49,54 +49,57 @@ export function CtaSection() {
 
       <div className="container mx-auto px-4 relative z-10">
         <motion.div
-          className="max-w-3xl mx-auto text-center"
+          className="max-w-3xl mx-auto"
           initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
-          {/* Headline */}
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
-            {t("ctaTitle")}
-          </h2>
+          {/* Glass Card */}
+          <div className="rounded-2xl p-8 md:p-12 text-center bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-xl shadow-black/5">
+            {/* Headline */}
+            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
+              {t("ctaTitle")}
+            </h2>
 
-          {/* Subtitle */}
-          <p className="text-xl text-muted-foreground mb-8">
-            {t("ctaSubtitle")}
-          </p>
+            {/* Subtitle */}
+            <p className="text-xl text-muted-foreground mb-8">
+              {t("ctaSubtitle")}
+            </p>
 
-          {/* CTA Button */}
-          <motion.div
-            initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{
-              duration: prefersReducedMotion ? 0 : 0.3,
-              delay: prefersReducedMotion ? 0 : 0.2,
-            }}
-          >
-            <Link href="/register">
-              <Button size="lg" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-shadow">
-                {t("startFreeTrial")}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </motion.div>
+            {/* CTA Button */}
+            <motion.div
+              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.3,
+                delay: prefersReducedMotion ? 0 : 0.2,
+              }}
+            >
+              <Link href="/register">
+                <Button size="lg" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-shadow">
+                  {t("startFreeTrial")}
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </motion.div>
 
-          {/* Trust Badge */}
-          <motion.div
-            className="mt-8 flex items-center justify-center gap-2 text-muted-foreground"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{
-              duration: prefersReducedMotion ? 0 : 0.3,
-              delay: prefersReducedMotion ? 0 : 0.4,
-            }}
-          >
-            <Shield className="h-4 w-4" />
-            <span className="text-sm">{t("noCardRequired")}</span>
-          </motion.div>
+            {/* Trust Badge */}
+            <motion.div
+              className="mt-8 flex items-center justify-center gap-2 text-muted-foreground"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.3,
+                delay: prefersReducedMotion ? 0 : 0.4,
+              }}
+            >
+              <Shield className="h-4 w-4" />
+              <span className="text-sm">{t("noCardRequired")}</span>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
     </section>

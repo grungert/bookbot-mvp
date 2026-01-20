@@ -48,12 +48,26 @@ export async function validateCompanyAccess(companySlug: string) {
     return { error: null, company, user };
   }
 
-  // Company admin/user must belong to this company
-  if (user.companyId !== company.id) {
-    return { error: "Access denied", company: null };
+  // Check membership first (multi-company support)
+  const membership = await prisma.companyMembership.findUnique({
+    where: {
+      userId_companyId: {
+        userId: user.id,
+        companyId: company.id,
+      },
+    },
+  });
+
+  if (membership) {
+    return { error: null, company, user };
   }
 
-  return { error: null, company, user };
+  // Fall back to legacy companyId check
+  if (user.companyId === company.id) {
+    return { error: null, company, user };
+  }
+
+  return { error: "Access denied", company: null };
 }
 
 // Validate company admin access
@@ -111,6 +125,31 @@ export async function validateCompanyMembershipAccess(companySlug: string) {
   }
 
   return { error: "Access denied", company: null, membership: null };
+}
+
+// Check if a user has admin access to a specific company
+export async function checkUserCompanyAccess(userId: string, companyId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, companyId: true },
+  });
+
+  if (!user) return false;
+
+  // Super admin can access any company
+  if (user.role === "SUPER_ADMIN") return true;
+
+  // Check membership
+  const membership = await prisma.companyMembership.findUnique({
+    where: {
+      userId_companyId: { userId, companyId },
+    },
+  });
+
+  if (membership) return true;
+
+  // Fall back to legacy companyId
+  return user.companyId === companyId;
 }
 
 // Get all companies a user can access
@@ -229,9 +268,12 @@ export async function checkCanCreateCompany(userId: string) {
     select: { role: true },
   });
 
-  // SUPER_ADMIN has no limit
+  // SUPER_ADMIN has no limit (maxCount: null means unlimited)
   if (user?.role === "SUPER_ADMIN") {
-    return { allowed: true, reason: null, currentCount: 0, maxCount: Infinity };
+    const ownerCount = await prisma.companyMembership.count({
+      where: { userId, role: "OWNER" },
+    });
+    return { allowed: true, reason: null, currentCount: ownerCount, maxCount: null };
   }
 
   // Count existing memberships with OWNER role
