@@ -2,8 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { HeroSection } from "./hero-section";
+import { HowItWorksSection } from "./how-it-works-section";
 import { FeaturesSection } from "./features-section";
+import { UseCasesSection } from "./use-cases-section";
 import { PricingSection } from "./pricing-section";
+import { FAQSection } from "./faq-section";
 import { CtaSection } from "./cta-section";
 
 // Lazy load sphere background - covers full page
@@ -27,8 +30,11 @@ export function LandingPage() {
 
       {/* Content */}
       <HeroSection />
+      <HowItWorksSection />
       <FeaturesSection />
+      <UseCasesSection />
       <PricingSection />
+      <FAQSection />
       <CtaSection />
 
       {/* Footer */}

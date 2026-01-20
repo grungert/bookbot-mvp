@@ -3,6 +3,7 @@ import { getCompanyBySlug, checkUserCompanyAccess } from "@/lib/db/tenant";
 import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Header } from "@/components/navigation/header";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import { generateThemePalette } from "@/lib/utils/colors";
 import { prisma } from "@/lib/prisma";
 
@@ -32,12 +33,16 @@ export default async function CompanyLayout({
     : false;
 
   // Get upcoming appointments count for the user
+  // Admin users see all company appointments, regular users see only their own
   let appointmentCount = 0;
   if (user) {
+    const isAdmin = user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN";
+
     appointmentCount = await prisma.appointment.count({
       where: {
         companyId: company.id,
-        userId: user.id,
+        // Admin sees all company appointments, regular users see only their own
+        ...(isAdmin ? {} : { userId: user.id }),
         startTime: { gte: new Date() },
         status: { in: ["PENDING", "CONFIRMED"] },
       },
@@ -70,6 +75,7 @@ export default async function CompanyLayout({
         appointmentCount={appointmentCount}
       />
       {children}
+      <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
     </div>
   );
 }

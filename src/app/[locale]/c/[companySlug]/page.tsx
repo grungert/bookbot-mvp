@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
-import { ChatWidget } from "@/components/chat/chat-widget";
 import { AboutSection } from "@/components/customer/about-section";
 import { cn } from "@/lib/utils";
 import { ServicePriceDisplay } from "@/components/service/service-price-display";
@@ -223,9 +222,6 @@ function CompanyContent({ company, companySlug }: CompanyContentProps) {
         businessAddress={company.businessAddress}
         workingHours={company.workingHours}
       />
-
-      {/* Chat Widget */}
-      <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
     </div>
   );
 }

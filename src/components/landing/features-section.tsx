@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Calendar, FileText, MessageSquare } from "lucide-react";
+import { Calendar, FileText, MessageSquare, Coins, BadgePercent, Palette } from "lucide-react";
 import { FeatureCard } from "./feature-card";
 import { ScrollReveal } from "./scroll-reveal";
 
@@ -26,6 +26,24 @@ export function FeaturesSection() {
       titleKey: "feature3Title",
       descKey: "feature3Desc",
       pointKeys: ["feature3Point1", "feature3Point2", "feature3Point3"],
+    },
+    {
+      icon: Coins,
+      titleKey: "feature4Title",
+      descKey: "feature4Desc",
+      pointKeys: ["feature4Point1", "feature4Point2", "feature4Point3"],
+    },
+    {
+      icon: BadgePercent,
+      titleKey: "feature5Title",
+      descKey: "feature5Desc",
+      pointKeys: ["feature5Point1", "feature5Point2", "feature5Point3"],
+    },
+    {
+      icon: Palette,
+      titleKey: "feature6Title",
+      descKey: "feature6Desc",
+      pointKeys: ["feature6Point1", "feature6Point2", "feature6Point3"],
     },
   ];
 
