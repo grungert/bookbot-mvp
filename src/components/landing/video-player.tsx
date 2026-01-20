@@ -84,15 +84,12 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
       {/* Normal view */}
       <motion.div
         className={cn(
-          "relative rounded-2xl overflow-hidden aspect-video",
-          "bg-blue-500/10 dark:bg-blue-900/30 backdrop-blur-md",
-          "border border-blue-500/30 dark:border-blue-400/20",
+          "relative rounded-2xl overflow-hidden shadow-2xl aspect-video",
+          "bg-white/60 dark:bg-gray-900/60 backdrop-blur-md",
+          "border border-white/30 dark:border-white/20",
           "p-0.5",
           className
         )}
-        style={{
-          boxShadow: "0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 0 30px rgba(59, 130, 246, 0.1)"
-        }}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         layoutId="video-container"
@@ -180,7 +177,7 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-blue-500/5 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -188,10 +185,7 @@ export function VideoPlayer({ src, poster, className }: VideoPlayerProps) {
             onClick={toggleExpanded}
           >
             <motion.div
-              className="relative w-full max-w-7xl mx-4 aspect-video rounded-2xl overflow-hidden bg-blue-500/10 dark:bg-blue-900/30 backdrop-blur-md border border-blue-500/30 dark:border-blue-400/20 p-1"
-              style={{
-                boxShadow: "0 25px 50px -12px rgba(59, 130, 246, 0.35), 0 0 40px rgba(59, 130, 246, 0.15)"
-              }}
+              className="relative w-full max-w-7xl mx-4 aspect-video rounded-2xl overflow-hidden shadow-2xl bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/30 dark:border-white/20 p-1"
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
@@ -284,15 +278,12 @@ export function VideoPlaceholder({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden aspect-video flex items-center justify-center",
-        "bg-blue-500/10 dark:bg-blue-900/30 backdrop-blur-md",
-        "border border-blue-500/30 dark:border-blue-400/20",
+        "relative rounded-2xl overflow-hidden shadow-2xl aspect-video flex items-center justify-center",
+        "bg-white/60 dark:bg-gray-900/60 backdrop-blur-md",
+        "border border-white/30 dark:border-white/20",
         "p-0.5",
         className
       )}
-      style={{
-        boxShadow: "0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 0 30px rgba(59, 130, 246, 0.1)"
-      }}
     >
       <div className="text-center p-8">
         <div className="w-20 h-20 rounded-full bg-white/40 dark:bg-white/20 backdrop-blur-sm flex items-center justify-center mx-auto mb-4">

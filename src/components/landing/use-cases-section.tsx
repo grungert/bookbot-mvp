@@ -29,12 +29,10 @@ function UseCaseItem({ icon: Icon, label, delay = 0 }: UseCaseItemProps) {
         "group flex items-center gap-3 px-5 py-3 rounded-full",
         "bg-white/70 dark:bg-gray-900/70",
         "border border-white/30 dark:border-white/10",
+        "shadow-sm hover:shadow-md",
         "hover:bg-white/90 dark:hover:bg-gray-900/90",
         "transition-all duration-200"
       )}
-      style={{ boxShadow: "0 4px 15px -3px rgba(59, 130, 246, 0.1), 0 0 6px rgba(59, 130, 246, 0.05)" }}
-      onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 8px 20px -5px rgba(59, 130, 246, 0.2), 0 0 10px rgba(59, 130, 246, 0.08)"}
-      onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 4px 15px -3px rgba(59, 130, 246, 0.1), 0 0 6px rgba(59, 130, 246, 0.05)"}
     >
       <div
         className={cn(

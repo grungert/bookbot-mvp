@@ -31,9 +31,9 @@ function Step({ number, icon: Icon, title, description, delay = 0 }: StepProps) 
         "flex flex-col items-center text-center p-6 rounded-2xl",
         "bg-white/70 dark:bg-gray-900/70",
         "backdrop-blur-md",
-        "border border-white/30 dark:border-white/10"
+        "border border-white/30 dark:border-white/10",
+        "shadow-lg"
       )}
-      style={{ boxShadow: "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)" }}
     >
       {/* Step Number Circle */}
       <div
@@ -49,7 +49,7 @@ function Step({ number, icon: Icon, title, description, delay = 0 }: StepProps) 
             "absolute -top-1 -right-1 w-7 h-7 rounded-full",
             "bg-primary text-primary-foreground",
             "flex items-center justify-center",
-            "text-sm font-bold"
+            "text-sm font-bold shadow-lg"
           )}
         >
           {number}

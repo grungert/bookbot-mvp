@@ -48,28 +48,27 @@ export function PricingCard({
           "bg-white/60 dark:bg-gray-900/60",
           "backdrop-blur-md",
           "border border-white/20 dark:border-white/10",
+          "shadow-lg shadow-black/5",
           isPopular && [
             "border-primary/50",
-            "bg-white/80 dark:bg-gray-900/80"
+            "bg-white/80 dark:bg-gray-900/80",
+            "shadow-xl shadow-primary/10"
           ]
         )}
-        style={{
-          boxShadow: isPopular
-            ? "0 15px 35px -10px rgba(59, 130, 246, 0.25), 0 0 20px rgba(59, 130, 246, 0.1)"
-            : "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)",
-          scale: isPopular ? 1.05 : 1,
-        }}
         whileHover={prefersReducedMotion ? {} : {
           scale: isPopular ? 1.05 : 1.03,
           y: -8,
           boxShadow: isPopular
-            ? "0 25px 50px -12px rgba(59, 130, 246, 0.35), 0 0 30px rgba(59, 130, 246, 0.15)"
-            : "0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 0 25px rgba(59, 130, 246, 0.1)",
+            ? "0 25px 50px -12px rgba(22, 93, 252, 0.25)"
+            : "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
         }}
         transition={{
           type: "spring",
           stiffness: 300,
           damping: 20,
+        }}
+        style={{
+          scale: isPopular ? 1.05 : 1,
         }}
       >
         {/* Popular Badge */}

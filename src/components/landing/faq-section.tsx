@@ -32,9 +32,9 @@ function FAQItem({ question, answer, isOpen, onToggle, delay = 0 }: FAQItemProps
         "rounded-xl overflow-hidden",
         "bg-white/60 dark:bg-gray-900/60",
         "backdrop-blur-md",
-        "border border-white/20 dark:border-white/10"
+        "border border-white/20 dark:border-white/10",
+        "shadow-sm"
       )}
-      style={{ boxShadow: "0 4px 15px -3px rgba(59, 130, 246, 0.1), 0 0 6px rgba(59, 130, 246, 0.05)" }}
     >
       <button
         onClick={onToggle}
