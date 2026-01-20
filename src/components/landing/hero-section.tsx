@@ -57,10 +57,10 @@ export function HeroSection() {
           <div className="text-2xl font-bold">{tCommon("appName")}</div>
           <div className="flex items-center gap-4">
             <Link href="/login">
-              <Button variant="ghost">{t("login")}</Button>
+              <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>
             </Link>
             <Link href="/register">
-              <Button>{t("getStarted")}</Button>
+              <Button className="cursor-pointer">{t("getStarted")}</Button>
             </Link>
           </div>
         </div>
@@ -78,6 +78,9 @@ export function HeroSection() {
             {/* Headline */}
             <motion.h1
               className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
+              style={{
+                textShadow: "rgb(255 255 255 / 80%) 0px 0px 20px, rgb(255 255 255 / 60%) 0px 0px 40px"
+              }}
               variants={itemVariants}
             >
               {t("heroTitle")}
@@ -85,7 +88,10 @@ export function HeroSection() {
 
             {/* Subtitle */}
             <motion.p
-              className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto"
+              className="text-xl md:text-2xl text-foreground/80 mb-8 max-w-2xl mx-auto"
+              style={{
+                textShadow: "rgb(255 255 255 / 80%) 0px 0px 20px, rgb(255 255 255 / 60%) 0px 0px 40px"
+              }}
               variants={itemVariants}
             >
               {t("heroSubtitle")}
@@ -97,7 +103,7 @@ export function HeroSection() {
               variants={itemVariants}
             >
               <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6">
+                <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 cursor-pointer">
                   {t("startFreeTrial")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
@@ -105,7 +111,7 @@ export function HeroSection() {
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full sm:w-auto text-lg px-8 py-6"
+                className="w-full sm:w-auto text-lg px-8 py-6 cursor-pointer"
                 onClick={scrollToFeatures}
               >
                 <Play className="mr-2 h-5 w-5" />
@@ -120,7 +126,6 @@ export function HeroSection() {
             >
               <VideoPlayer
                 src="/videos/bookbot-demo.mp4"
-                poster="/videos/bookbot-demo-poster.jpg"
               />
             </motion.div>
           </motion.div>
@@ -136,10 +141,13 @@ export function HeroSection() {
       >
         <button
           onClick={scrollToFeatures}
-          className="text-muted-foreground hover:text-foreground transition-colors flex flex-col items-center gap-2"
+          className="text-foreground/70 hover:text-foreground transition-colors flex flex-col items-center gap-2"
+          style={{
+            textShadow: "rgb(255 255 255 / 80%) 0px 0px 20px, rgb(255 255 255 / 60%) 0px 0px 40px"
+          }}
           aria-label={t("scrollToLearnMore")}
         >
-          <span className="text-sm">{t("scrollToLearnMore")}</span>
+          <span className="text-sm font-medium">{t("scrollToLearnMore")}</span>
           <motion.div
             animate={{ y: [0, 8, 0] }}
             transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}

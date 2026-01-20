@@ -78,7 +78,7 @@ export function CtaSection() {
               }}
             >
               <Link href="/register">
-                <Button size="lg" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-shadow">
+                <Button size="lg" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
                   {t("startFreeTrial")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

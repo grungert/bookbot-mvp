@@ -33,8 +33,8 @@ export function SphereBackground() {
         const isMobile = window.innerWidth < 768;
         const count = isMobile ? 80 : 200;
 
-        // Vibrant: blue → teal → rose → orange
-        const colors = [0x3B82F6, 0x14B8A6, 0xF43F5E, 0xF97316];
+        // All blues: deep blue → medium blue → light blue → very light blue
+        const colors = [0x165DFC, 0x3B82F6, 0x93C5FD, 0xBFDBFE];
 
         bgRef.current = Spheres2Background(canvasRef.current, {
           count,
@@ -45,6 +45,11 @@ export function SphereBackground() {
           maxVelocity: 0.25,
           friction: 0.995,
         });
+
+        // Change light color to blue to remove pink tint
+        if (bgRef.current?.spheres?.light1?.color) {
+          bgRef.current.spheres.light1.color.set(0x3B82F6);
+        }
 
         setIsLoaded(true);
       } catch (error) {
@@ -78,7 +83,6 @@ export function SphereBackground() {
         id="webgl-canvas"
         className="absolute inset-0 w-full h-full"
         style={{
-          zIndex: 1,
           opacity: isLoaded ? 1 : 0,
           transition: "opacity 0.5s ease-in-out"
         }}

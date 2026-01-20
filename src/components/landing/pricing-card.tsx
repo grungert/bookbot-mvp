@@ -42,22 +42,34 @@ export function PricingCard({
       className={cn(isPopular && "md:-mt-4 md:mb-4")}
     >
       {/* Glass Card */}
-      <div
+      <motion.div
         className={cn(
           "relative h-full rounded-xl overflow-hidden",
           "bg-white/60 dark:bg-gray-900/60",
           "backdrop-blur-md",
           "border border-white/20 dark:border-white/10",
           "shadow-lg shadow-black/5",
-          "hover:shadow-xl hover:shadow-black/10",
-          "transition-all duration-300",
           isPopular && [
             "border-primary/50",
             "bg-white/80 dark:bg-gray-900/80",
-            "scale-105 md:scale-110",
             "shadow-xl shadow-primary/10"
           ]
         )}
+        whileHover={prefersReducedMotion ? {} : {
+          scale: isPopular ? 1.05 : 1.03,
+          y: -8,
+          boxShadow: isPopular
+            ? "0 25px 50px -12px rgba(22, 93, 252, 0.25)"
+            : "0 25px 50px -12px rgba(0, 0, 0, 0.15)",
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 20,
+        }}
+        style={{
+          scale: isPopular ? 1.05 : 1,
+        }}
       >
         {/* Popular Badge */}
         {isPopular && popularLabel && (
@@ -114,7 +126,7 @@ export function PricingCard({
           <Link href="/register" className="block">
             <Button
               className={cn(
-                "w-full",
+                "w-full transition-all duration-200 cursor-pointer",
                 !isPopular && "bg-white/50 hover:bg-white/80 text-foreground border border-white/20"
               )}
               variant={isPopular ? "default" : "outline"}
@@ -124,7 +136,7 @@ export function PricingCard({
             </Button>
           </Link>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
