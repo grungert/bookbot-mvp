@@ -34,22 +34,17 @@ export function SphereBackground() {
         const count = isMobile ? 80 : 200;
 
         // All blues: deep blue → medium blue → light blue → very light blue
-        const colors = [0x165DFC, 0x3B82F6, 0x93C5FD, 0xBFDBFE];
+        const colors = [0x165DFC, 0x3B82F6, 0x93C5FD];
 
         bgRef.current = Spheres2Background(canvasRef.current, {
           count,
           colors,
           minSize: 0.3,
-          maxSize: 0.8,
+          maxSize: 1,
           attraction: 0.25,
           maxVelocity: 0.25,
           friction: 0.995,
         });
-
-        // Change light color to blue to remove pink tint
-        if (bgRef.current?.spheres?.light1?.color) {
-          bgRef.current.spheres.light1.color.set(0x3B82F6);
-        }
 
         setIsLoaded(true);
       } catch (error) {

@@ -65,6 +65,9 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const serviceIds = searchParams.get("serviceIds"); // Comma-separated service IDs
+    const customerId = searchParams.get("customerId"); // Filter by customer/user ID
+    const search = searchParams.get("search"); // Search by invoice number
 
     const where: Prisma.InvoiceWhereInput = {
       companyId: company.id,
@@ -77,6 +80,33 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     if (status) {
       where.status = status as InvoiceStatus;
+    }
+
+    // Filter by customer (admin only)
+    if (customerId && (user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN")) {
+      where.userId = customerId;
+    }
+
+    // Search by invoice number (case-insensitive partial match)
+    if (search) {
+      where.invoiceNumber = {
+        contains: search,
+        mode: Prisma.QueryMode.insensitive,
+      };
+    }
+
+    // Filter by services (invoices containing any of the specified services)
+    if (serviceIds) {
+      const serviceIdArray = serviceIds.split(",").filter(Boolean);
+      if (serviceIdArray.length > 0) {
+        where.lineItems = {
+          some: {
+            serviceId: {
+              in: serviceIdArray,
+            },
+          },
+        };
+      }
     }
 
     const invoices = await prisma.invoice.findMany({

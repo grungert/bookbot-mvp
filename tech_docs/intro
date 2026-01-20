@@ -102,7 +102,7 @@ import Spheres2Background from 'https://cdn.jsdelivr.net/npm/threejs-components@
 const bg = Spheres2Background(document.getElementById('webgl-canvas'), {
   count: 200,
   colors: [0xff0000, 0x0, 0xffffff],
-  minSize: 0.5,
+minSize: 0.5,
   maxSize: 1
 })
 

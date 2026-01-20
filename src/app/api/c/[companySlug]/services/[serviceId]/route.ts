@@ -19,6 +19,24 @@ const updateServiceSchema = z.object({
   discountEndDate: z.string().datetime().nullable().optional(),
   promotionalBadge: z.enum(["SALE", "NEW", "POPULAR", "HOT"]).nullable().optional(),
   customBadgeLabel: z.string().max(20).nullable().optional(),
+}).refine((data) => {
+  // If discount type is percentage, value must be 0-100
+  if (data.discountType === "percentage" && data.discountValue != null) {
+    return data.discountValue >= 0 && data.discountValue <= 100;
+  }
+  return true;
+}, {
+  message: "Percentage discount must be between 0 and 100",
+  path: ["discountValue"],
+}).refine((data) => {
+  // End date must be after start date
+  if (data.discountStartDate && data.discountEndDate) {
+    return new Date(data.discountEndDate) > new Date(data.discountStartDate);
+  }
+  return true;
+}, {
+  message: "End date must be after start date",
+  path: ["discountEndDate"],
 });
 
 interface RouteParams {
@@ -29,6 +47,9 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { companySlug, serviceId } = await params;
+    const { searchParams } = new URL(request.url);
+    const checkAppointments = searchParams.get("checkAppointments") === "true";
+
     const company = await getCompanyBySlug(companySlug);
 
     if (!company) {
@@ -50,6 +71,18 @@ export async function GET(request: Request, { params }: RouteParams) {
         { error: "Service not found" },
         { status: 404 }
       );
+    }
+
+    // If checking for appointments, count future appointments
+    if (checkAppointments) {
+      const futureAppointmentCount = await prisma.appointment.count({
+        where: {
+          serviceId: serviceId,
+          startTime: { gte: new Date() },
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+      });
+      return NextResponse.json({ ...service, futureAppointmentCount });
     }
 
     return NextResponse.json(service);
@@ -95,6 +128,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         { error: "Invalid input", details: parsed.error.flatten() },
         { status: 400 }
       );
+    }
+
+    // Validate fixed discount doesn't exceed price
+    const effectivePrice = parsed.data.price ?? Number(existingService.price);
+    if (parsed.data.discountType === "fixed" && parsed.data.discountValue != null) {
+      if (parsed.data.discountValue > effectivePrice) {
+        return NextResponse.json(
+          {
+            error: "Invalid input",
+            details: {
+              fieldErrors: { discountValue: ["Fixed discount cannot exceed the service price"] },
+              formErrors: []
+            }
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Transform date strings to Date objects

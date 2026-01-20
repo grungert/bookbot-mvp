@@ -135,6 +135,8 @@
     "serviceCreated": "Usluga uspesno kreirana",
     "serviceUpdated": "Usluga uspesno azurirana",
     "serviceDeleted": "Usluga uspesno obrisana",
+    "serviceActivated": "Usluga aktivirana",
+    "serviceDeactivated": "Usluga deaktivirana",
     "allServices": "Sve usluge",
     "discountSettings": "Podesavanja popusta",
     "discountType": "Tip popusta",
@@ -160,7 +162,44 @@
     "endsInHours": "Istice za {count} sati",
     "endsInHour": "Istice za 1 sat",
     "endsInMinutes": "Istice za {count} min",
-    "endsSoon": "Uskoro istice!"
+    "endsSoon": "Uskoro istice!",
+    "searchPlaceholder": "Pretrazi usluge...",
+    "filterByDiscount": "Filtriraj po popustu",
+    "filterAll": "Sve usluge",
+    "filterWithDiscount": "Sa popustom",
+    "filterNoDiscount": "Bez popusta",
+    "noMatchingServices": "Nema usluga koje odgovaraju pretrazi",
+    "clearFilters": "Obrisi filtere",
+    "showing": "Prikazano",
+    "of": "od",
+    "active": "Aktivna",
+    "inactive": "Neaktivna",
+    "activate": "Aktiviraj uslugu",
+    "deactivate": "Deaktiviraj uslugu",
+    "toggleError": "Greska pri promeni statusa usluge",
+    "deleteConfirmation": "Da li ste sigurni da zelite da obrisete \"{name}\"? Ova akcija se ne moze ponistiti.",
+    "deleteWarningTitle": "Usluga ima termine",
+    "deleteWarningDescription": "Ova usluga ima {count} buduc(ih) termin(a). Brisanje moze uticati na zakazane rezervacije.",
+    "deleteAnyway": "Obrisi svejedno",
+    "unsavedChanges": "Nesacuvane izmene",
+    "unsavedChangesDescription": "Imate nesacuvane izmene. Da li ste sigurni da zelite da zatvorite bez cuvanja?",
+    "keepEditing": "Nastavi sa izmenama",
+    "discardChanges": "Odbaci izmene",
+    "unsaved": "Nesacuvano",
+    "validation": {
+      "nameRequired": "Naziv usluge je obavezan",
+      "durationRange": "Trajanje mora biti izmedju 5 i 480 minuta",
+      "pricePositive": "Cena mora biti 0 ili veca",
+      "percentageRange": "Procenat mora biti izmedju 0 i 100",
+      "fixedExceedsPrice": "Popust ne moze biti veci od cene usluge",
+      "endAfterStart": "Krajnji datum mora biti posle pocetnog"
+    },
+    "error": {
+      "saveFailed": "Greska pri cuvanju usluge",
+      "deleteFailed": "Greska pri brisanju usluge",
+      "networkError": "Greska u mrezi. Pokusajte ponovo.",
+      "hasAppointments": "Ova usluga ima {count} buduc(ih) termin(a)"
+    }
   },
   "appointments": {
     "title": "Termini",
@@ -268,7 +307,11 @@
     "apply": "Primeni",
     "from": "Od",
     "to": "Do",
-    "appointmentDate": "Termin"
+    "appointmentDate": "Termin",
+    "searchInvoiceNumber": "Pretrazi broj fakture...",
+    "allCustomers": "Svi klijenti",
+    "service": "Usluga",
+    "paidOn": "Placeno"
   },
   "workingHours": {
     "title": "Radno vreme",

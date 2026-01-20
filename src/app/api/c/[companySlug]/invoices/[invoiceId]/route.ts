@@ -135,6 +135,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       ...(userId && { userId }),
     };
 
+    // Set paidAt when status changes to PAID
+    if (parsed.data.status === "PAID" && invoice.status !== "PAID") {
+      updateData.paidAt = new Date();
+    }
+    // Clear paidAt if status changes from PAID to something else
+    if (parsed.data.status && parsed.data.status !== "PAID" && invoice.status === "PAID") {
+      updateData.paidAt = null;
+    }
+
     // If lineItems are provided, delete existing and recreate
     if (lineItems && lineItems.length > 0) {
       // Delete existing line items
@@ -208,6 +217,66 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating invoice:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/c/[companySlug]/invoices/[invoiceId]
+export async function DELETE(request: Request, { params }: RouteParams) {
+  try {
+    const { companySlug, invoiceId } = await params;
+    const { error, company, user } = await validateCompanyAdminAccess(companySlug);
+
+    if (error || !company) {
+      return NextResponse.json(
+        { error: error || "Company not found" },
+        { status: error === "Unauthorized" ? 401 : 403 }
+      );
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: {
+        id: invoiceId,
+        companyId: company.id,
+      },
+    });
+
+    if (!invoice) {
+      return NextResponse.json(
+        { error: "Invoice not found" },
+        { status: 404 }
+      );
+    }
+
+    // Delete the invoice (line items will be cascade deleted due to onDelete: Cascade)
+    await prisma.invoice.delete({
+      where: { id: invoiceId },
+    });
+
+    // Log audit event
+    if (user) {
+      await logAuditEvent({
+        companyId: company.id,
+        userId: user.id,
+        action: "DELETE",
+        entityType: "Invoice",
+        entityId: invoiceId,
+        changes: {
+          invoiceNumber: { old: invoice.invoiceNumber },
+          status: { old: invoice.status },
+          total: { old: Number(invoice.total) },
+        },
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting invoice:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

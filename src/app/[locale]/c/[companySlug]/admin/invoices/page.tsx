@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -73,6 +73,11 @@ interface LineItem {
   discountType?: string | null;
   discountValue?: number | null;
   discountPercentage?: number | null;
+  // Service relation
+  service?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface Invoice {
@@ -81,6 +86,7 @@ interface Invoice {
   status: "DRAFT" | "SENT" | "PAID" | "CANCELLED";
   issueDate: string;
   dueDate: string | null;
+  paidAt: string | null;
   appointmentDate: string | null;
   subtotal: number;
   tax: number;
@@ -146,6 +152,11 @@ export default function InvoicesPage() {
     }
     return undefined;
   });
+
+  // New filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
   // Get primary color from CSS variable set by parent layout
   const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
@@ -420,9 +431,56 @@ export default function InvoicesPage() {
     );
   }
 
+  // Get unique customers from invoices for filter dropdown
+  const uniqueCustomers = useMemo(() => {
+    const customerMap = new Map<string, { id: string; name: string | null; email: string }>();
+    invoices.forEach((inv) => {
+      if (!customerMap.has(inv.user.id)) {
+        customerMap.set(inv.user.id, inv.user);
+      }
+    });
+    return Array.from(customerMap.values()).sort((a, b) =>
+      (a.name || a.email).localeCompare(b.name || b.email)
+    );
+  }, [invoices]);
+
+  // Get unique services from invoice line items for filter dropdown
+  // Uses serviceId from lineItems and matches with the services list
+  const uniqueServicesInInvoices = useMemo(() => {
+    const serviceIds = new Set<string>();
+    invoices.forEach((inv) => {
+      inv.lineItems.forEach((item) => {
+        if (item.serviceId) {
+          serviceIds.add(item.serviceId);
+        }
+      });
+    });
+    return services.filter((s) => serviceIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [invoices, services]);
+
   // Filtering and sorting helper
   const filteredAndSortedInvoices = useMemo(() => {
     let filtered = [...invoices];
+
+    // Apply search filter (invoice number)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((inv) =>
+        inv.invoiceNumber.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply customer filter
+    if (selectedCustomerId) {
+      filtered = filtered.filter((inv) => inv.user.id === selectedCustomerId);
+    }
+
+    // Apply service filter
+    if (selectedServiceIds.size > 0) {
+      filtered = filtered.filter((inv) =>
+        inv.lineItems.some((item) => item.serviceId && selectedServiceIds.has(item.serviceId))
+      );
+    }
 
     // Apply status filter (multi-select)
     if (statusFilters.size > 0) {
@@ -475,7 +533,7 @@ export default function InvoicesPage() {
 
       return sortDirection === "asc" ? comparison : -comparison;
     });
-  }, [invoices, sortColumn, sortDirection, statusFilters, datePeriod, customDateFrom, customDateTo]);
+  }, [invoices, sortColumn, sortDirection, statusFilters, datePeriod, customDateFrom, customDateTo, searchQuery, selectedCustomerId, selectedServiceIds]);
 
   // Calculate total paid amount for the selected period
   const paidTotalForPeriod = useMemo(() => {
@@ -522,7 +580,7 @@ export default function InvoicesPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilters, datePeriod, customDateFrom, customDateTo]);
+  }, [statusFilters, datePeriod, customDateFrom, customDateTo, searchQuery, selectedCustomerId, selectedServiceIds]);
 
   // Selection helpers
   function toggleSelectAll() {
@@ -710,8 +768,83 @@ export default function InvoicesPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
+      {/* Search and Filters Row */}
+      <div className="flex flex-col lg:flex-row lg:items-center gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
+        {/* Search Input */}
+        <div className="relative w-full lg:w-64">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t("searchInvoiceNumber")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* Customer Filter */}
+        <div className="w-full lg:w-48">
+          <Select value={selectedCustomerId || "all"} onValueChange={(value) => setSelectedCustomerId(value === "all" ? "" : value)}>
+            <SelectTrigger>
+              <SelectValue placeholder={t("allCustomers")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allCustomers")}</SelectItem>
+              {uniqueCustomers.map((customer) => (
+                <SelectItem key={customer.id} value={customer.id}>
+                  {customer.name || customer.email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Service Filter - Multi-select badges */}
+        {uniqueServicesInInvoices.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">{t("service")}:</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {uniqueServicesInInvoices.map((service) => {
+                const isActive = selectedServiceIds.has(service.id);
+                return (
+                  <Badge
+                    key={service.id}
+                    variant="outline"
+                    className={cn(
+                      "cursor-pointer transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted hover:bg-muted/80"
+                    )}
+                    style={isActive && primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
+                    onClick={() => {
+                      const newSet = new Set(selectedServiceIds);
+                      if (newSet.has(service.id)) {
+                        newSet.delete(service.id);
+                      } else {
+                        newSet.add(service.id);
+                      }
+                      setSelectedServiceIds(newSet);
+                    }}
+                  >
+                    {service.name}
+                  </Badge>
+                );
+              })}
+              {selectedServiceIds.size > 0 && (
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground ml-1"
+                  onClick={() => setSelectedServiceIds(new Set())}
+                >
+                  {t("clear")}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Status and Date Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up" style={{ animationDelay: "75ms" }}>
         {/* Status Filter - Multi-select */}
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground">Status:</span>
@@ -1289,6 +1422,12 @@ export default function InvoicesPage() {
                     <p className="text-sm">
                       <span className="text-muted-foreground">{t("due")}:</span>{" "}
                       {format(parseISO(viewingInvoice.dueDate), "MMM d, yyyy")}
+                    </p>
+                  )}
+                  {viewingInvoice.paidAt && (
+                    <p className="text-sm text-green-600">
+                      <span className="text-green-600">{t("paidOn")}:</span>{" "}
+                      {format(parseISO(viewingInvoice.paidAt), "MMM d, yyyy HH:mm")}
                     </p>
                   )}
                 </div>

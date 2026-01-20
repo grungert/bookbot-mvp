@@ -135,6 +135,8 @@
     "serviceCreated": "Service created successfully",
     "serviceUpdated": "Service updated successfully",
     "serviceDeleted": "Service deleted successfully",
+    "serviceActivated": "Service activated",
+    "serviceDeactivated": "Service deactivated",
     "allServices": "All Services",
     "discountSettings": "Discount Settings",
     "discountType": "Discount Type",
@@ -160,7 +162,44 @@
     "endsInHours": "Ends in {count} hours",
     "endsInHour": "Ends in 1 hour",
     "endsInMinutes": "Ends in {count} min",
-    "endsSoon": "Ends soon!"
+    "endsSoon": "Ends soon!",
+    "searchPlaceholder": "Search services...",
+    "filterByDiscount": "Filter by discount",
+    "filterAll": "All services",
+    "filterWithDiscount": "With discount",
+    "filterNoDiscount": "No discount",
+    "noMatchingServices": "No services match your search",
+    "clearFilters": "Clear filters",
+    "showing": "Showing",
+    "of": "of",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activate": "Activate service",
+    "deactivate": "Deactivate service",
+    "toggleError": "Failed to update service status",
+    "deleteConfirmation": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+    "deleteWarningTitle": "Service Has Appointments",
+    "deleteWarningDescription": "This service has {count} future appointment(s). Deleting it may affect scheduled bookings.",
+    "deleteAnyway": "Delete Anyway",
+    "unsavedChanges": "Unsaved Changes",
+    "unsavedChangesDescription": "You have unsaved changes. Are you sure you want to close without saving?",
+    "keepEditing": "Keep Editing",
+    "discardChanges": "Discard Changes",
+    "unsaved": "Unsaved",
+    "validation": {
+      "nameRequired": "Service name is required",
+      "durationRange": "Duration must be between 5 and 480 minutes",
+      "pricePositive": "Price must be 0 or greater",
+      "percentageRange": "Percentage must be between 0 and 100",
+      "fixedExceedsPrice": "Discount cannot exceed the service price",
+      "endAfterStart": "End date must be after start date"
+    },
+    "error": {
+      "saveFailed": "Failed to save service",
+      "deleteFailed": "Failed to delete service",
+      "networkError": "Network error. Please try again.",
+      "hasAppointments": "This service has {count} future appointments"
+    }
   },
   "appointments": {
     "title": "Appointments",
@@ -268,7 +307,11 @@
     "apply": "Apply",
     "from": "From",
     "to": "To",
-    "appointmentDate": "Appointment"
+    "appointmentDate": "Appointment",
+    "searchInvoiceNumber": "Search invoice number...",
+    "allCustomers": "All Customers",
+    "service": "Service",
+    "paidOn": "Paid"
   },
   "workingHours": {
     "title": "Working Hours",

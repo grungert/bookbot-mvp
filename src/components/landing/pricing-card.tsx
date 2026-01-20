@@ -56,7 +56,8 @@ export function PricingCard({
         style={{
           boxShadow: isPopular
             ? "0 15px 35px -10px rgba(59, 130, 246, 0.25), 0 0 20px rgba(59, 130, 246, 0.1)"
-            : "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)"
+            : "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)",
+          scale: isPopular ? 1.05 : 1,
         }}
         whileHover={prefersReducedMotion ? {} : {
           scale: isPopular ? 1.05 : 1.03,
@@ -69,9 +70,6 @@ export function PricingCard({
           type: "spring",
           stiffness: 300,
           damping: 20,
-        }}
-        style={{
-          scale: isPopular ? 1.05 : 1,
         }}
       >
         {/* Popular Badge */}

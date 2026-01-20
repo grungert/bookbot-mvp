@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import { VideoPlaceholder } from "./video-player";
+import { Logo } from "@/components/ui/logo";
 
 // Lazy load video player
 const VideoPlayer = dynamic(
@@ -19,7 +20,6 @@ const VideoPlayer = dynamic(
 
 export function HeroSection() {
   const t = useTranslations("landing");
-  const tCommon = useTranslations("common");
   const prefersReducedMotion = useReducedMotion();
 
   const containerVariants: Variants = {
@@ -54,7 +54,7 @@ export function HeroSection() {
       {/* Header */}
       <header className="relative z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="text-2xl font-bold">{tCommon("appName")}</div>
+          <Logo size="lg" showText />
           <div className="flex items-center gap-4">
             <Link href="/login">
               <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>

@@ -55,6 +55,13 @@ interface RouteParams {
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const { companySlug } = await params;
+    const { searchParams } = new URL(request.url);
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const skip = (page - 1) * limit;
+
     const company = await getCompanyBySlug(companySlug);
 
     if (!company) {
@@ -64,15 +71,29 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    const services = await prisma.service.findMany({
-      where: {
-        companyId: company.id,
-        isActive: true,
-      },
-      orderBy: { name: "asc" },
-    });
+    const where = {
+      companyId: company.id,
+      isActive: true,
+    };
 
-    return NextResponse.json(services);
+    // Get total count and services in parallel
+    const [total, services] = await Promise.all([
+      prisma.service.count({ where }),
+      prisma.service.findMany({
+        where,
+        orderBy: { name: "asc" },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return NextResponse.json({
+      services,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error("Error fetching services:", error);
     return NextResponse.json(
