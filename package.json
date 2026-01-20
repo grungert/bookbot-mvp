@@ -55,7 +55,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "three": "^0.182.0",
-    "threejs-components": "^0.0.30",
     "zod": "^4.3.5"
   },
   "devDependencies": {
