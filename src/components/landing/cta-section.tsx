@@ -56,7 +56,10 @@ export function CtaSection() {
           transition={{ duration: prefersReducedMotion ? 0 : 0.5 }}
         >
           {/* Glass Card */}
-          <div className="rounded-2xl p-8 md:p-12 text-center bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-xl shadow-black/5">
+          <div
+            className="rounded-2xl p-8 md:p-12 text-center bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-white/10"
+            style={{ boxShadow: "0 20px 40px -12px rgba(59, 130, 246, 0.2), 0 0 20px rgba(59, 130, 246, 0.08)" }}
+          >
             {/* Headline */}
             <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-6">
               {t("ctaTitle")}
@@ -78,7 +81,11 @@ export function CtaSection() {
               }}
             >
               <Link href="/register">
-                <Button size="lg" className="text-lg px-10 py-6 shadow-lg hover:shadow-xl transition-shadow cursor-pointer">
+                <Button
+                  size="lg"
+                  className="text-lg px-10 py-6 transition-shadow cursor-pointer"
+                  style={{ boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.3), 0 0 10px rgba(59, 130, 246, 0.1)" }}
+                >
                   {t("startFreeTrial")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

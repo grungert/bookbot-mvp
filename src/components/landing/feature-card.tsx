@@ -39,11 +39,12 @@ export function FeatureCard({
           "bg-white/60 dark:bg-gray-900/60",
           "backdrop-blur-md",
           "border border-white/20 dark:border-white/10",
-          "shadow-lg shadow-black/5",
-          "hover:shadow-xl hover:shadow-black/10",
           "hover:-translate-y-1 hover:bg-white/70 dark:hover:bg-gray-900/70",
           "transition-all duration-300"
         )}
+        style={{ boxShadow: "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)" }}
+        onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 20px 40px -10px rgba(59, 130, 246, 0.25), 0 0 20px rgba(59, 130, 246, 0.1)"}
+        onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 10px 30px -10px rgba(59, 130, 246, 0.15), 0 0 15px rgba(59, 130, 246, 0.05)"}
       >
         <div className="space-y-4">
           {/* Icon */}
