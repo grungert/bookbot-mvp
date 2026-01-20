@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
+import { logAuditEvent, getClientIp, getUserAgent } from "@/lib/db/audit";
 import { z } from "zod";
 
 const createServiceSchema = z.object({
@@ -104,6 +105,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
+    const { user } = await validateCompanyAdminAccess(companySlug);
+
     const service = await prisma.service.create({
       data: {
         companyId: company.id,
@@ -121,6 +124,23 @@ export async function POST(request: Request, { params }: RouteParams) {
         customBadgeLabel: parsed.data.customBadgeLabel,
       },
     });
+
+    // Log audit event
+    if (user) {
+      await logAuditEvent({
+        companyId: company.id,
+        userId: user.id,
+        action: "CREATE",
+        entityType: "Service",
+        entityId: service.id,
+        changes: {
+          name: { new: parsed.data.name },
+          price: { new: parsed.data.price },
+        },
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+      });
+    }
 
     return NextResponse.json(service, { status: 201 });
   } catch (error) {

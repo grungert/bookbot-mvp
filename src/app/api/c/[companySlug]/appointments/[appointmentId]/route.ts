@@ -4,11 +4,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { sendCancellationEmail } from "@/lib/email/send";
 import { createInvoiceForAppointment } from "@/lib/invoices";
+import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
+import { updateCustomerMetrics } from "@/lib/db/customer-metrics";
 import { z } from "zod";
 
 const updateAppointmentSchema = z.object({
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]).optional(),
   notes: z.string().optional(),
+  cancellationReason: z.string().optional(),
 });
 
 interface RouteParams {
@@ -137,9 +140,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Build update data
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = {
+      ...(parsed.data.status && { status: parsed.data.status }),
+      ...(parsed.data.notes && { notes: parsed.data.notes }),
+    };
+
+    // Add cancellation tracking if status is being changed to CANCELLED
+    if (parsed.data.status === "CANCELLED") {
+      updateData.cancellationReason = parsed.data.cancellationReason || null;
+      updateData.cancelledBy = isAdmin ? "admin" : "customer";
+      updateData.cancelledAt = new Date();
+    }
+
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
-      data: parsed.data,
+      data: updateData,
       include: {
         service: {
           select: {
@@ -197,6 +214,34 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         console.error("Error auto-generating invoice:", invoiceError);
         // Don't fail the appointment update if invoice generation fails
       }
+    }
+
+    // Update customer metrics when appointment is completed or cancelled
+    if (parsed.data.status === "COMPLETED" || parsed.data.status === "CANCELLED") {
+      // Run in background - don't block the response
+      updateCustomerMetrics(updated.userId).catch((error) => {
+        console.error("Error updating customer metrics:", error);
+      });
+    }
+
+    // Log audit event
+    const changes = computeChanges(
+      { status: appointment.status, notes: appointment.notes },
+      { status: parsed.data.status, notes: parsed.data.notes },
+      ["status", "notes"]
+    );
+
+    if (changes) {
+      await logAuditEvent({
+        companyId: company.id,
+        userId: user.id,
+        action: "UPDATE",
+        entityType: "Appointment",
+        entityId: appointmentId,
+        changes,
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+      });
     }
 
     return NextResponse.json(updated);

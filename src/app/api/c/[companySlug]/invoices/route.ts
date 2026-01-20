@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
+import { logAuditEvent, getClientIp, getUserAgent } from "@/lib/db/audit";
 import { z } from "zod";
 import { InvoiceStatus, Prisma } from "@prisma/client";
 import { calculateDiscountedPrice } from "@/lib/utils/discount";
@@ -205,6 +206,8 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const invoiceNumber = await generateInvoiceNumber(company.id);
 
+    const { user: adminUser } = await validateCompanyAdminAccess(companySlug);
+
     const invoice = await prisma.invoice.create({
       data: {
         companyId: company.id,
@@ -240,6 +243,24 @@ export async function POST(request: Request, { params }: RouteParams) {
         },
       },
     });
+
+    // Log audit event
+    if (adminUser) {
+      await logAuditEvent({
+        companyId: company.id,
+        userId: adminUser.id,
+        action: "CREATE",
+        entityType: "Invoice",
+        entityId: invoice.id,
+        changes: {
+          invoiceNumber: { new: invoiceNumber },
+          total: { new: total },
+          status: { new: "DRAFT" },
+        },
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+      });
+    }
 
     return NextResponse.json(invoice, { status: 201 });
   } catch (error) {

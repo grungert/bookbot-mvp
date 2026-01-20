@@ -69,14 +69,14 @@ export function SphereBackground() {
 
   if (prefersReducedMotion) {
     return (
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-transparent" />
     );
   }
 
   return (
     <>
       {!isLoaded && (
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-transparent" />
       )}
       <canvas
         ref={canvasRef}

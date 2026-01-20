@@ -16,6 +16,7 @@ import {
   type RecentBooking,
   type RecentConversation,
 } from "./recent-activity";
+import { CustomerSegmentsChart } from "./customer-segments-chart";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import type { DashboardPeriod } from "@/lib/db/tenant";
@@ -74,6 +75,14 @@ interface DashboardContentProps {
   recentActivity: {
     bookings: RecentBooking[];
     conversations: RecentConversation[];
+  };
+  customerSegments: {
+    new: number;
+    active: number;
+    loyal: number;
+    vip: number;
+    at_risk: number;
+    churned: number;
   };
   companySlug: string;
   locale: string;
@@ -142,6 +151,15 @@ interface DashboardContentProps {
     completed: string;
     cancelled: string;
   };
+  segmentLabels: {
+    title: string;
+    new: string;
+    active: string;
+    loyal: string;
+    vip: string;
+    at_risk: string;
+    churned: string;
+  };
   currency?: string;
   primaryColor?: string;
 }
@@ -151,6 +169,7 @@ export function DashboardContent({
   todaySummary,
   quickActionsData,
   recentActivity,
+  customerSegments,
   companySlug,
   locale,
   period,
@@ -158,6 +177,7 @@ export function DashboardContent({
   customEndDate,
   translations,
   statusLabels,
+  segmentLabels,
   currency = "RSD",
   primaryColor,
 }: DashboardContentProps) {
@@ -467,6 +487,31 @@ export function DashboardContent({
           noDataMessage={translations.noData}
           sessionsLabel={translations.sessions}
           messagesLabel={translations.messages}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+      </div>
+
+      {/* Charts Row 4 - Customer Segments */}
+      <div
+        key={`charts-row4-${animationKey}`}
+        className={cn(
+          "grid gap-4 lg:grid-cols-2",
+          !prefersReducedMotion && "animate-fade-up stagger-7"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        <CustomerSegmentsChart
+          data={customerSegments}
+          title={segmentLabels.title}
+          noDataMessage={translations.noData}
+          labels={{
+            new: segmentLabels.new,
+            active: segmentLabels.active,
+            loyal: segmentLabels.loyal,
+            vip: segmentLabels.vip,
+            at_risk: segmentLabels.at_risk,
+            churned: segmentLabels.churned,
+          }}
           prefersReducedMotion={prefersReducedMotion}
         />
       </div>

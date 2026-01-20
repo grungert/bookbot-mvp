@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
+import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
 import { z } from "zod";
 
 const updateServiceSchema = z.object({
@@ -110,6 +111,41 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       data: updateData,
     });
 
+    // Log audit event
+    const { user } = await validateCompanyAdminAccess(companySlug);
+    if (user) {
+      const changes = computeChanges(
+        {
+          name: existingService.name,
+          price: Number(existingService.price),
+          isActive: existingService.isActive,
+          discountType: existingService.discountType,
+          discountValue: existingService.discountValue ? Number(existingService.discountValue) : null,
+        },
+        {
+          name: parsed.data.name,
+          price: parsed.data.price,
+          isActive: parsed.data.isActive,
+          discountType: parsed.data.discountType,
+          discountValue: parsed.data.discountValue,
+        },
+        ["name", "price", "isActive", "discountType", "discountValue"]
+      );
+
+      if (changes) {
+        await logAuditEvent({
+          companyId: company.id,
+          userId: user.id,
+          action: "UPDATE",
+          entityType: "Service",
+          entityId: serviceId,
+          changes,
+          ipAddress: getClientIp(request),
+          userAgent: getUserAgent(request),
+        });
+      }
+    }
+
     return NextResponse.json(service);
   } catch (error) {
     console.error("Error updating service:", error);
@@ -150,6 +186,24 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       where: { id: serviceId },
       data: { isActive: false },
     });
+
+    // Log audit event
+    const { user } = await validateCompanyAdminAccess(companySlug);
+    if (user) {
+      await logAuditEvent({
+        companyId: company.id,
+        userId: user.id,
+        action: "DELETE",
+        entityType: "Service",
+        entityId: serviceId,
+        changes: {
+          name: { old: existingService.name },
+          isActive: { old: true, new: false },
+        },
+        ipAddress: getClientIp(request),
+        userAgent: getUserAgent(request),
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

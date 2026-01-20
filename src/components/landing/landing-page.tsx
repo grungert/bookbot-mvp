@@ -15,10 +15,53 @@ const SphereBackground = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-transparent" />
     ),
   }
 );
+
+// Scrolling grid background
+function ScrollingGrid() {
+  return (
+    <div className="absolute inset-0 z-0 pointer-events-none">
+      {/* White/Gray Grid - base layer */}
+      <div
+        className="absolute inset-0 opacity-[0.03]"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #94a3b8 1px, transparent 1px),
+            linear-gradient(to bottom, #94a3b8 1px, transparent 1px)
+          `,
+          backgroundSize: "60px 60px"
+        }}
+      />
+      {/* Blue Grid with glow - starts from top-left, fades toward bottom-right */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, rgba(59, 130, 246, 0.12) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(59, 130, 246, 0.12) 1px, transparent 1px)
+          `,
+          backgroundSize: "60px 60px",
+          maskImage: "linear-gradient(to bottom right, black 0%, black 20%, transparent 70%)",
+          WebkitMaskImage: "linear-gradient(to bottom right, black 0%, black 20%, transparent 70%)",
+          filter: "drop-shadow(0 0 2px rgba(59, 130, 246, 0.3))"
+        }}
+      />
+      {/* Blue Gradient Glow - ambient light from top-left */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(ellipse 70% 50% at 0% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(ellipse 50% 40% at 20% 20%, rgba(59, 130, 246, 0.1) 0%, transparent 40%)
+          `
+        }}
+      />
+    </div>
+  );
+}
 
 export function LandingPage() {
   return (
@@ -28,14 +71,19 @@ export function LandingPage() {
         <SphereBackground />
       </div>
 
+      {/* Scrolling grid overlay */}
+      <ScrollingGrid />
+
       {/* Content */}
-      <HeroSection />
-      <HowItWorksSection />
-      <FeaturesSection />
-      <UseCasesSection />
-      <PricingSection />
-      <FAQSection />
-      <CtaSection />
+      <div className="relative z-10">
+        <HeroSection />
+        <HowItWorksSection />
+        <FeaturesSection />
+        <UseCasesSection />
+        <PricingSection />
+        <FAQSection />
+        <CtaSection />
+      </div>
 
       {/* Footer */}
       <footer className="border-t bg-background/80 backdrop-blur-sm relative z-10">

@@ -12,56 +12,54 @@ interface StepProps {
   title: string;
   description: string;
   delay?: number;
-  isLast?: boolean;
 }
 
-function Step({ number, icon: Icon, title, description, delay = 0, isLast = false }: StepProps) {
+function Step({ number, icon: Icon, title, description, delay = 0 }: StepProps) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <div className="relative flex flex-col items-center">
-      {/* Connector Line (hidden on mobile, shown on md+) */}
-      {!isLast && (
-        <div className="hidden md:block absolute top-10 left-[calc(50%+40px)] w-[calc(100%-80px)] h-0.5 bg-gradient-to-r from-primary/50 to-primary/20" />
+    <motion.div
+      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-100px" }}
+      transition={{
+        duration: prefersReducedMotion ? 0 : 0.5,
+        delay: prefersReducedMotion ? 0 : delay,
+        ease: "easeOut",
+      }}
+      className={cn(
+        "flex flex-col items-center text-center p-6 rounded-2xl",
+        "bg-white/70 dark:bg-gray-900/70",
+        "backdrop-blur-md",
+        "border border-white/30 dark:border-white/10",
+        "shadow-lg"
       )}
-
-      <motion.div
-        initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        transition={{
-          duration: prefersReducedMotion ? 0 : 0.5,
-          delay: prefersReducedMotion ? 0 : delay,
-          ease: "easeOut",
-        }}
-        className="flex flex-col items-center text-center max-w-xs"
+    >
+      {/* Step Number Circle */}
+      <div
+        className={cn(
+          "relative w-16 h-16 rounded-full flex items-center justify-center mb-4",
+          "bg-primary/20",
+          "border-2 border-primary/40"
+        )}
       >
-        {/* Step Number Circle */}
+        <Icon className="h-7 w-7 text-primary" />
         <div
           className={cn(
-            "relative w-20 h-20 rounded-full flex items-center justify-center mb-4",
-            "bg-primary/20 backdrop-blur-sm",
-            "border-2 border-primary/40"
+            "absolute -top-1 -right-1 w-7 h-7 rounded-full",
+            "bg-primary text-primary-foreground",
+            "flex items-center justify-center",
+            "text-sm font-bold shadow-lg"
           )}
         >
-          <Icon className="h-8 w-8 text-primary" />
-          <div
-            className={cn(
-              "absolute -top-2 -right-2 w-8 h-8 rounded-full",
-              "bg-primary text-primary-foreground",
-              "flex items-center justify-center",
-              "text-sm font-bold shadow-lg"
-            )}
-          >
-            {number}
-          </div>
+          {number}
         </div>
+      </div>
 
-        {/* Content */}
-        <h3 className="text-xl font-semibold mb-2">{title}</h3>
-        <p className="text-muted-foreground">{description}</p>
-      </motion.div>
-    </div>
+      {/* Content */}
+      <h3 className="text-lg font-semibold mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground">{description}</p>
+    </motion.div>
   );
 }
 
@@ -110,7 +108,7 @@ export function HowItWorksSection() {
         </ScrollReveal>
 
         {/* Steps */}
-        <div className="grid md:grid-cols-3 gap-12 md:gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {steps.map((step, index) => (
             <Step
               key={step.titleKey}
@@ -119,7 +117,6 @@ export function HowItWorksSection() {
               title={t(step.titleKey)}
               description={t(step.descKey)}
               delay={index * 0.15}
-              isLast={index === steps.length - 1}
             />
           ))}
         </div>

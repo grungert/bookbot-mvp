@@ -1,17 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Clock,
   CheckCircle,
@@ -28,7 +33,7 @@ interface AppointmentDetailModalProps {
   appointment: Appointment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onStatusChange?: (appointmentId: string, status: Appointment["status"]) => void;
+  onStatusChange?: (appointmentId: string, status: Appointment["status"], cancellationReason?: string) => void;
   onViewCustomer?: (userId: string) => void;
 }
 
@@ -72,6 +77,26 @@ export function AppointmentDetailModal({
   const t = useTranslations("calendar");
   const tAppointments = useTranslations("appointments");
   const tCommon = useTranslations("common");
+
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState("");
+
+  const handleCancelClick = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleCancelConfirm = () => {
+    if (appointment) {
+      onStatusChange?.(appointment.id, "CANCELLED", cancellationReason || undefined);
+    }
+    setShowCancelDialog(false);
+    setCancellationReason("");
+  };
+
+  const handleCancelDialogClose = () => {
+    setShowCancelDialog(false);
+    setCancellationReason("");
+  };
 
   if (!appointment) return null;
 
@@ -184,7 +209,7 @@ export function AppointmentDetailModal({
                 size="sm"
                 variant="destructive"
                 className="flex-1"
-                onClick={() => onStatusChange?.(appointment.id, "CANCELLED")}
+                onClick={handleCancelClick}
               >
                 <XCircle className="h-4 w-4 mr-1.5" />
                 {tCommon("cancel")}
@@ -205,7 +230,7 @@ export function AppointmentDetailModal({
                 size="sm"
                 variant="destructive"
                 className="flex-1"
-                onClick={() => onStatusChange?.(appointment.id, "CANCELLED")}
+                onClick={handleCancelClick}
               >
                 <XCircle className="h-4 w-4 mr-1.5" />
                 {tCommon("cancel")}
@@ -231,6 +256,37 @@ export function AppointmentDetailModal({
           </Badge>
         </div>
       </DialogContent>
+
+      {/* Cancellation Reason Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={handleCancelDialogClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogTitle>{tAppointments("cancelAppointment")}</DialogTitle>
+          <DialogDescription>
+            {tAppointments("cancelConfirmation")}
+          </DialogDescription>
+          <div className="py-4">
+            <Label htmlFor="cancellation-reason" className="text-sm font-medium">
+              {t("cancellationReason")}
+            </Label>
+            <Textarea
+              id="cancellation-reason"
+              placeholder={t("cancellationReasonPlaceholder")}
+              value={cancellationReason}
+              onChange={(e) => setCancellationReason(e.target.value)}
+              className="mt-2"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancelDialogClose}>
+              {tCommon("back")}
+            </Button>
+            <Button variant="destructive" onClick={handleCancelConfirm}>
+              {tAppointments("confirmCancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

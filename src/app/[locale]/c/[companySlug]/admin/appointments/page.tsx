@@ -120,15 +120,21 @@ export default function AppointmentsPage() {
 
   async function updateStatus(
     appointmentId: string,
-    status: Appointment["status"]
+    status: Appointment["status"],
+    cancellationReason?: string
   ) {
     try {
+      const body: { status: string; cancellationReason?: string } = { status };
+      if (cancellationReason) {
+        body.cancellationReason = cancellationReason;
+      }
+
       const response = await fetch(
         `/api/c/${companySlug}/appointments/${appointmentId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(body),
         }
       );
 

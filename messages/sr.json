@@ -88,7 +88,9 @@
     "typeTreatment": "Tip tretmana",
     "appointmentTime": "Vreme termina",
     "start": "Pocetak",
-    "end": "Kraj"
+    "end": "Kraj",
+    "cancellationReason": "Razlog otkazivanja (opciono)",
+    "cancellationReasonPlaceholder": "npr. Klijent je zatrazio promenu termina..."
   },
   "booking": {
     "title": "Zakazivanje termina",
@@ -663,7 +665,14 @@
     "noRecentConversations": "Nema nedavnih razgovora",
     "unread": "Novo",
     "loadMore": "Ucitaj vise",
-    "loading": "Ucitavanje..."
+    "loading": "Ucitavanje...",
+    "customerSegments": "Segmenti kupaca",
+    "segmentNew": "Novi",
+    "segmentActive": "Aktivni",
+    "segmentLoyal": "Lojalni",
+    "segmentVip": "VIP",
+    "segmentAtRisk": "Rizicni",
+    "segmentChurned": "Izgubljeni"
   },
   "profile": {
     "title": "Profil",

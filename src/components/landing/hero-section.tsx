@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, ChevronDown } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import { VideoPlaceholder } from "./video-player";
 
@@ -52,7 +52,7 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen flex flex-col">
       {/* Header */}
-      <header className="relative z-10 border-b border-white/20 dark:border-white/10 bg-white/60 dark:bg-gray-900/60 backdrop-blur-md">
+      <header className="relative z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="text-2xl font-bold">{tCommon("appName")}</div>
           <div className="flex items-center gap-4">
@@ -131,31 +131,6 @@ export function HeroSection() {
           </motion.div>
         </div>
       </div>
-
-      {/* Scroll Indicator */}
-      <motion.div
-        className="relative z-10 pb-8 flex flex-col items-center"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5, duration: 0.5 }}
-      >
-        <button
-          onClick={scrollToFeatures}
-          className="text-foreground/70 hover:text-foreground transition-colors flex flex-col items-center gap-2"
-          style={{
-            textShadow: "rgb(255 255 255 / 80%) 0px 0px 20px, rgb(255 255 255 / 60%) 0px 0px 40px"
-          }}
-          aria-label={t("scrollToLearnMore")}
-        >
-          <span className="text-sm font-medium">{t("scrollToLearnMore")}</span>
-          <motion.div
-            animate={{ y: [0, 8, 0] }}
-            transition={{ repeat: Infinity, duration: 1.5, ease: "easeInOut" }}
-          >
-            <ChevronDown className="h-6 w-6" />
-          </motion.div>
-        </button>
-      </motion.div>
     </section>
   );
 }

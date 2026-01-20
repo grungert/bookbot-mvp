@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
+import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
 import { z } from "zod";
 
 const updateInvoiceSchema = z.object({
@@ -180,6 +181,29 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       },
     });
+
+    // Log audit event
+    const { user: adminUser } = await validateCompanyAdminAccess(companySlug);
+    if (adminUser) {
+      const changes = computeChanges(
+        { status: invoice.status, notes: invoice.notes },
+        { status: parsed.data.status, notes: parsed.data.notes },
+        ["status", "notes"]
+      );
+
+      if (changes) {
+        await logAuditEvent({
+          companyId: company.id,
+          userId: adminUser.id,
+          action: "UPDATE",
+          entityType: "Invoice",
+          entityId: invoiceId,
+          changes,
+          ipAddress: getClientIp(request),
+          userAgent: getUserAgent(request),
+        });
+      }
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

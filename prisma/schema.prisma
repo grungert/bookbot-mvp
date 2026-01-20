@@ -84,6 +84,7 @@ model Company {
   invoices      Invoice[]
   documents     Document[]
   chatSessions  ChatSession[]
+  auditLogs     AuditLog[]
 }
 
 // User
@@ -101,6 +102,19 @@ model User {
   companyId     String?
   company       Company?  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  // Customer Segmentation
+  customerSource   String?   // "google", "referral", "direct", "social", "other"
+  customerSegment  String?   // "new", "active", "loyal", "vip", "at_risk", "churned"
+
+  // Customer Lifetime Value Metrics
+  firstBookingAt   DateTime?
+  lastBookingAt    DateTime?
+  totalBookings    Int       @default(0)
+  completedBookings Int      @default(0)
+  cancelledBookings Int      @default(0)
+  totalSpent       Decimal   @default(0) @db.Decimal(10, 2)
+  avgBookingValue  Decimal   @default(0) @db.Decimal(10, 2)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -111,6 +125,7 @@ model User {
   appointments  Appointment[]
   invoices      Invoice[]
   chatSessions  ChatSession[]
+  auditLogs     AuditLog[]
 }
 
 // NextAuth.js Account model
@@ -178,6 +193,7 @@ model Service {
 
   // Relations
   appointments Appointment[]
+  invoiceItems InvoiceLineItem[]
 
   @@index([companyId])
 }
@@ -214,6 +230,11 @@ model Appointment {
   status      AppointmentStatus @default(PENDING)
   notes       String?
 
+  // Cancellation tracking
+  cancellationReason String?
+  cancelledBy        String?   // "customer" | "admin" | "system"
+  cancelledAt        DateTime?
+
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -237,7 +258,8 @@ model Invoice {
 
   appointmentId  String?       @unique
   appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
-  appointmentDate DateTime?    // Date and time of the appointment
+  // @deprecated Use appointment.startTime instead. Kept for backwards compatibility.
+  appointmentDate DateTime?
 
   invoiceNumber  String
   status         InvoiceStatus @default(DRAFT)
@@ -268,6 +290,9 @@ model InvoiceLineItem {
   invoiceId   String
   invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id])
+
   description String
   quantity    Int     @default(1)
   unitPrice   Decimal @db.Decimal(10, 2)
@@ -280,6 +305,7 @@ model InvoiceLineItem {
   discountPercentage  Int?                          // Calculated percentage for display
 
   @@index([invoiceId])
+  @@index([serviceId])
 }
 
 // Document for AI context
@@ -349,4 +375,26 @@ model CompanyMembership {
   @@unique([userId, companyId])
   @@index([userId])
   @@index([companyId])
+}
+
+// Audit Log - tracks admin actions for accountability
+model AuditLog {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  action      String   // "CREATE" | "UPDATE" | "DELETE"
+  entityType  String   // "Appointment" | "Invoice" | "Service" etc.
+  entityId    String
+  changes     Json?    // Store old/new values
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
 }

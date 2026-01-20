@@ -88,7 +88,9 @@
     "typeTreatment": "Type Treatment",
     "appointmentTime": "Appointment Time",
     "start": "Start",
-    "end": "End"
+    "end": "End",
+    "cancellationReason": "Reason for cancellation (optional)",
+    "cancellationReasonPlaceholder": "e.g., Customer requested to reschedule..."
   },
   "booking": {
     "title": "Book an Appointment",
@@ -663,7 +665,14 @@
     "noRecentConversations": "No recent conversations",
     "unread": "New",
     "loadMore": "Load more",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "customerSegments": "Customer Segments",
+    "segmentNew": "New",
+    "segmentActive": "Active",
+    "segmentLoyal": "Loyal",
+    "segmentVip": "VIP",
+    "segmentAtRisk": "At Risk",
+    "segmentChurned": "Churned"
   },
   "profile": {
     "title": "Profile",

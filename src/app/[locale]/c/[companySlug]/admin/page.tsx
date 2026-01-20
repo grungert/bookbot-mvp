@@ -9,6 +9,7 @@ import {
   getRecentConversations,
   type DashboardPeriod,
 } from "@/lib/db/tenant";
+import { getCustomerSegmentStats } from "@/lib/db/customer-metrics";
 import { DashboardContent } from "@/components/admin/dashboard";
 
 interface AdminDashboardProps {
@@ -34,7 +35,7 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
       : "30d";
 
   // Get stats with custom dates if provided
-  const [stats, todaySummary, unreadConversations, overdueInvoices, recentBookings, recentConversations] =
+  const [stats, todaySummary, unreadConversations, overdueInvoices, recentBookings, recentConversations, customerSegments] =
     await Promise.all([
       getCompanyDashboardStats(
         company.id,
@@ -47,6 +48,7 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
       getOverdueInvoicesCount(company.id),
       getRecentBookings(company.id, 20),
       getRecentConversations(company.id, 20),
+      getCustomerSegmentStats(company.id),
     ]);
 
   const t = await getTranslations("dashboard");
@@ -65,6 +67,7 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
         bookings: recentBookings,
         conversations: recentConversations,
       }}
+      customerSegments={customerSegments}
       companySlug={companySlug}
       locale={locale}
       period={period}
@@ -133,6 +136,15 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
         confirmed: tAppointments("confirmed"),
         completed: tAppointments("completed"),
         cancelled: tAppointments("cancelled"),
+      }}
+      segmentLabels={{
+        title: t("customerSegments"),
+        new: t("segmentNew"),
+        active: t("segmentActive"),
+        loyal: t("segmentLoyal"),
+        vip: t("segmentVip"),
+        at_risk: t("segmentAtRisk"),
+        churned: t("segmentChurned"),
       }}
     />
   );
