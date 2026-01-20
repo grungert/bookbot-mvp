@@ -29,7 +29,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Search, Copy, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Search, Copy, ChevronLeft, ChevronRight, AlertTriangle, Eye, RefreshCw, RotateCcw, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import { cn } from "@/lib/utils";
 import MDEditor from "@uiw/react-md-editor";
 
@@ -88,6 +89,15 @@ export default function DocumentsPage() {
   const [originalTitle, setOriginalTitle] = useState("");
   const [originalContent, setOriginalContent] = useState("");
 
+  // System prompt preview state
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [isLoadingPrompt, setIsLoadingPrompt] = useState(false);
+
+  // Chat widget state
+  const [chatKey, setChatKey] = useState(0);
+  const [primaryColor, setPrimaryColor] = useState<string>("#10b981");
+
   const loadDocuments = useCallback(async (page = 1) => {
     try {
       const response = await fetch(`/api/c/${companySlug}/documents?page=${page}&limit=20`);
@@ -109,6 +119,48 @@ export default function DocumentsPage() {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  // Load company settings for primary color
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch(`/api/c/${companySlug}/settings`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.primaryColor) {
+            setPrimaryColor(data.primaryColor);
+          }
+        }
+      } catch {
+        // Ignore errors, use default color
+      }
+    }
+    loadSettings();
+  }, [companySlug]);
+
+  // Load system prompt preview
+  const loadSystemPrompt = useCallback(async () => {
+    setIsLoadingPrompt(true);
+    try {
+      const response = await fetch(`/api/c/${companySlug}/chat/preview`);
+      if (response.ok) {
+        const data = await response.json();
+        setSystemPrompt(data.prompt);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || t("loadError") || tCommon("error"));
+      }
+    } catch {
+      toast.error(t("networkError") || tCommon("error"));
+    } finally {
+      setIsLoadingPrompt(false);
+    }
+  }, [companySlug, t, tCommon]);
+
+  // Reset chat widget
+  const handleResetChat = () => {
+    setChatKey((prev) => prev + 1);
+  };
 
   // Body scroll lock when panel is open
   useEffect(() => {
@@ -699,6 +751,118 @@ export default function DocumentsPage() {
             )}
           </>
         )}
+      </div>
+
+      {/* System Prompt Preview Section */}
+      <div className="rounded-xl border bg-card overflow-hidden w-full max-w-full">
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("systemPromptPreview") || "System Prompt Preview"}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadSystemPrompt}
+              disabled={isLoadingPrompt}
+            >
+              {isLoadingPrompt ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              {systemPrompt ? (t("refresh") || "Refresh") : (t("loadPreview") || "Load Preview")}
+            </Button>
+            {systemPrompt && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPromptPreview(!showPromptPreview)}
+              >
+                {showPromptPreview ? (
+                  <ChevronUp className="h-4 w-4 mr-2" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 mr-2" />
+                )}
+                {showPromptPreview ? (t("collapse") || "Collapse") : (t("expand") || "Expand")}
+              </Button>
+            )}
+            {systemPrompt && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(systemPrompt);
+                  toast.success(t("copiedToClipboard") || "Copied to clipboard");
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                {t("copy") || "Copy"}
+              </Button>
+            )}
+          </div>
+        </div>
+        {!systemPrompt ? (
+          <div className="py-12 text-center">
+            <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
+              <Eye className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground mb-2">
+              {t("noPromptLoaded") || "Click \"Load Preview\" to see the full system prompt"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {t("promptDescription") || "This shows what the AI receives, including bot identity, services, tools, and knowledge base."}
+            </p>
+          </div>
+        ) : showPromptPreview ? (
+          <div className="p-4 w-full max-w-full overflow-hidden" data-color-mode={resolvedTheme === "dark" ? "dark" : "light"}>
+            <div className="max-h-[600px] w-full max-w-full overflow-y-auto overflow-x-hidden">
+              <div className="w-full max-w-full prose prose-sm dark:prose-invert break-words overflow-hidden [&>*]:max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_code]:break-all [&_code]:whitespace-pre-wrap">
+                <MDEditor.Markdown source={systemPrompt} style={{ background: "transparent", maxWidth: "100%", overflow: "hidden" }} />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <p className="text-sm text-muted-foreground">
+              {t("promptCollapsed") || "Prompt loaded. Click \"Expand\" to view."}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {systemPrompt.length.toLocaleString()} {t("characters") || "characters"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Test Chat Section */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="p-4 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("testChat") || "Test Chat"}
+            </h3>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetChat}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {t("resetChat") || "Reset"}
+          </Button>
+        </div>
+        <div className="h-[500px]">
+          <ChatWidget
+            key={chatKey}
+            companySlug={companySlug}
+            primaryColor={primaryColor}
+            embedded={true}
+          />
+        </div>
       </div>
 
       {/* Bulk Delete AlertDialog */}

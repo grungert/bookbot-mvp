@@ -203,26 +203,6 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   if (embedded) {
     return (
       <div className="h-full w-full flex flex-col bg-card overflow-hidden">
-        {/* Header */}
-        <div
-          className="flex items-center justify-between py-3 px-4 shrink-0"
-          style={{ backgroundColor: primaryColor }}
-        >
-          <div className="text-lg font-semibold text-white flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            {t("title")}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleNewConversation}
-            className="h-8 w-8 text-white hover:bg-white/20"
-            title={t("newConversation")}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {isLoadingHistory ? (
@@ -272,6 +252,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
             type="submit"
             size="icon"
             disabled={isLoading || !input.trim()}
+            className="text-white hover:opacity-90 [background-image:none]"
             style={{ backgroundColor: primaryColor }}
           >
             <Send className="h-4 w-4" />

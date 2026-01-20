@@ -38,6 +38,10 @@ export interface UserContext {
 // Maximum tool loop iterations to prevent infinite loops
 const MAX_TOOL_ITERATIONS = 5;
 
+// Maximum chat history messages to include (to avoid token limits)
+// This keeps the last N messages (user + assistant pairs)
+export const MAX_CHAT_HISTORY_MESSAGES = 20;
+
 // Create OpenAI client with custom config
 function createClient(config: ChatConfig): OpenAI {
   return new OpenAI({
@@ -501,14 +505,18 @@ export async function getOrCreateChatSession(
   });
 }
 
-// Get chat history
-export async function getChatHistory(sessionId: string) {
-  return prisma.chatMessage.findMany({
+// Get chat history (limited to last N messages to avoid token limits)
+export async function getChatHistory(sessionId: string, limit: number = MAX_CHAT_HISTORY_MESSAGES) {
+  const messages = await prisma.chatMessage.findMany({
     where: { sessionId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" }, // Get newest first
+    take: limit,
     select: {
       role: true,
       content: true,
     },
   });
+
+  // Reverse to get chronological order
+  return messages.reverse();
 }

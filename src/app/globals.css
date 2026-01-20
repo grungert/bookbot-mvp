@@ -89,7 +89,7 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.546 0.245 262.881);
+  --primary: oklch(0.541 0.281 293);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -529,6 +529,38 @@
   font-family: var(--font-sans), system-ui, sans-serif !important;
   font-size: 14px !important;
   line-height: 1.7 !important;
+}
+
+/* Markdown preview styles - constrain width */
+.wmde-markdown {
+  max-width: 100% !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  word-break: break-word !important;
+}
+
+.wmde-markdown pre {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+}
+
+.wmde-markdown code {
+  max-width: 100% !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  color: var(--foreground) !important;
+}
+
+.wmde-markdown pre code {
+  color: var(--foreground) !important;
+}
+
+.wmde-markdown table {
+  max-width: 100% !important;
+  display: block !important;
+  overflow-x: auto !important;
 }
 
 /* Dark mode adjustments */
