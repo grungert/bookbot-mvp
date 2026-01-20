@@ -173,46 +173,37 @@ export async function recalculateAllCustomerMetrics(companyId: string): Promise<
  */
 export async function getCustomerSegmentStats(companyId: string): Promise<Record<CustomerSegment, number>> {
   try {
-    // Get unique users who have appointments with this company
-    const usersWithAppointments = await prisma.appointment.findMany({
-      where: { companyId },
-      select: { userId: true },
-      distinct: ["userId"],
-    });
+    // Use raw SQL to count segments - more reliable across Prisma versions
+    const result = await prisma.$queryRaw<Array<{ segment: string | null; count: bigint }>>`
+      SELECT u."customerSegment" as segment, COUNT(*) as count
+      FROM "User" u
+      WHERE u.id IN (
+        SELECT DISTINCT "userId" FROM "Appointment" WHERE "companyId" = ${companyId}
+      )
+      GROUP BY u."customerSegment"
+    `;
 
-    const userIds = usersWithAppointments.map((a) => a.userId);
+    const stats: Record<CustomerSegment, number> = {
+      new: 0,
+      active: 0,
+      loyal: 0,
+      vip: 0,
+      at_risk: 0,
+      churned: 0,
+    };
 
-    if (userIds.length === 0) {
-      return {
-        new: 0,
-        active: 0,
-        loyal: 0,
-        vip: 0,
-        at_risk: 0,
-        churned: 0,
-      };
+    for (const row of result) {
+      const segment = (row.segment || "new") as CustomerSegment;
+      const count = Number(row.count);
+      if (segment in stats) {
+        stats[segment] += count;
+      } else {
+        // Unknown or null segments count as "new"
+        stats.new += count;
+      }
     }
 
-    // Count users by segment
-    const [newCount, activeCount, loyalCount, vipCount, atRiskCount, churnedCount, nullCount] = await Promise.all([
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "new" } }),
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "active" } }),
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "loyal" } }),
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "vip" } }),
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "at_risk" } }),
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: "churned" } }),
-      // Users with null segment are considered "new"
-      prisma.user.count({ where: { id: { in: userIds }, customerSegment: null } }),
-    ]);
-
-    return {
-      new: newCount + nullCount,
-      active: activeCount,
-      loyal: loyalCount,
-      vip: vipCount,
-      at_risk: atRiskCount,
-      churned: churnedCount,
-    };
+    return stats;
   } catch (error) {
     console.error("Failed to get customer segment stats:", error);
     return {
