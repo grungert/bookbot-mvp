@@ -136,6 +136,7 @@
     import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
     import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
     import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+    import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
     import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
     import { GUI } from "three/addons/libs/lil-gui.module.min.js";
 
@@ -155,33 +156,50 @@
       freezeLeader: false,
 
       // surround physics (THIS is what you want)
-      gravity: 12.0,           // stronger pull
+      gravity: 24.0,           // stronger pull
       shellRadius: 3.2,        // distance where spheres like to sit around leader
-      shellStrength: 3.5,      // stronger shell enforcement
-      orbit: 3.0,              // faster orbit
+      shellStrength: 6.5,      // stronger shell enforcement
+      orbit: 1.0,              // faster orbit
       separation: 0.8,         // repulsion
-      maxVelocity: 3.6,        // INCREASED per user request
+      maxVelocity: 15,         // High to allow intense leader bounces
       friction: 0.96,
-      soften: 1.2,             // prevents infinite force near leader
+      soften: 0.2,             // prevents infinite force near leader
       collisionRestitution: 0.7, // bounciness 0-1
 
       // colors
       colorA: "#1f56da",
       colorB: "#86b6ff",
-      leaderColor: "#2b64ff",
-      glowColor: "#8b5bff",
-      showGlowCore: true,
+      leaderColor: "#1f56da",
+      glowColor: "#532fa7",
+      showGlowCore: false,
+
+      // leader light
+      leaderLightIntensity: 600,   // high intensity needed to overcome env map
+      leaderLightDistance: 11,     // increased range
+      leaderLightColor: "#052c7a",
+      leaderEmissiveIntensity: 0.5,
+      leaderLightPulse: false,
+      leaderPulseSpeed: 1.5,
+      leaderPulseAmount: 0.3,
+      leaderColorInfluence: 0.6,  // 0-1: how much leader color tints nearby spheres
+      leaderColorRange: 12,       // distance at which color influence fades to zero
 
       // lighting
-      ambientIntensity: 1.5,   // increased
-      keyIntensity: 1.5,       // increased
-      rimIntensity: 0.75,
-      exposure: 1.0,
+      ambientIntensity: 0.25,  // reduced from 0.4 to let colored light show through
+      keyIntensity: 0.6,       // reduced from 0.9 to let colored light show through
+      rimIntensity: 1.2,       // strong rim for edge pop
+      exposure: 1.1,
 
       // bloom
-      bloomStrength: 0.0,      // disabled per screenshot
-      bloomRadius: 0.13,
-      bloomThreshold: 0.12,
+      bloomStrength: 0.25,     // subtle glow
+      bloomRadius: 0.6,
+      bloomThreshold: 0.75,
+
+      // depth of field
+      dofEnabled: false,       // disabled by default (breaks transparency)
+      dofFocus: 20.0,          // focus distance (matches camera z)
+      dofAperture: 0.025,      // blur amount
+      dofMaxBlur: 0.01,
 
       // actions
       respawn: () => spawnFollowers(),
@@ -269,16 +287,30 @@
     finalComposer.addPass(renderScene);
     finalComposer.addPass(finalPass);
 
+    // Depth of field pass
+    const bokehPass = new BokehPass(scene, camera, {
+      focus: settings.dofFocus,
+      aperture: settings.dofAperture,
+      maxblur: settings.dofMaxBlur
+    });
+    bokehPass.enabled = settings.dofEnabled;
+    finalComposer.addPass(bokehPass);
+
     // -----------------------------
     // Materials
     // -----------------------------
     function makeSphereMaterial(hex) {
       return new THREE.MeshPhysicalMaterial({
         color: new THREE.Color(hex),
-        roughness: 0.18,
-        metalness: 0.12,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.08,
+        roughness: 0.35,           // increased from 0.15 to respond more to direct lights
+        metalness: 0.1,
+        clearcoat: 0.5,            // reduced from 1.0 to let diffuse lighting show
+        clearcoatRoughness: 0.1,
+        envMapIntensity: 0.25,     // reduce environment reflection to let point light show
+        // Iridescence - color shift based on viewing angle
+        iridescence: 0.3,          // reduced slightly
+        iridescenceIOR: 1.3,
+        iridescenceThicknessRange: [100, 400],
       });
     }
 
@@ -287,10 +319,30 @@
     // -----------------------------
     const sphereGeo = new THREE.SphereGeometry(0.55, 40, 28);
 
-    const leader = new THREE.Mesh(sphereGeo, makeSphereMaterial(settings.leaderColor));
+    // Leader with subtle emissive material (radiates light)
+    const leaderMaterial = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(settings.leaderColor),
+      emissive: new THREE.Color(settings.leaderLightColor),
+      emissiveIntensity: settings.leaderEmissiveIntensity,
+      roughness: 0.15,
+      metalness: 0.1,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.08,
+    });
+    const leader = new THREE.Mesh(sphereGeo, leaderMaterial);
     leader.scale.setScalar(settings.leaderSize);
     leader.position.set(0, 0, 0);
     scene.add(leader);
+
+    // Point light attached to leader
+    const leaderLight = new THREE.PointLight(
+      new THREE.Color(settings.leaderLightColor),
+      settings.leaderLightIntensity,
+      settings.leaderLightDistance,
+      1  // decay: 1 = linear falloff (less aggressive than default 2)
+    );
+    leaderLight.position.set(0, 0, 0);
+    scene.add(leaderLight);
 
     const glow = new THREE.Mesh(
       new THREE.SphereGeometry(3.6, 48, 32),
@@ -327,7 +379,8 @@
       for (let i = 0; i < settings.count; i++) {
         const s = THREE.MathUtils.lerp(settings.minSize, settings.maxSize, Math.random());
         const m = new THREE.Mesh(sphereGeo, makeSphereMaterial("#ffffff"));
-        m.material.color.copy(new THREE.Color().lerpColors(colA, colB, Math.random()));
+        const originalColor = new THREE.Color().lerpColors(colA, colB, Math.random());
+        m.material.color.copy(originalColor);
         m.scale.setScalar(s);
 
         // spawn around the screen volume
@@ -351,7 +404,8 @@
         ).normalize();
 
         scene.add(m);
-        followers.push({ mesh: m, vel: v, axis: axis });
+        // Store original color for dynamic tinting
+        followers.push({ mesh: m, vel: v, axis: axis, baseColor: originalColor.clone() });
       }
     }
 
@@ -363,6 +417,8 @@
     const pointerNDC = new THREE.Vector2(0, 0);
     const raycaster = new THREE.Raycaster();
     const leaderTarget = new THREE.Vector3(0, 0, 0);
+    const leaderVel = new THREE.Vector3(0, 0, 0);
+    const leaderPrevPos = new THREE.Vector3(0, 0, 0);
 
     const planeNormal = new THREE.Vector3();
     const planePoint = new THREE.Vector3();
@@ -426,7 +482,7 @@
         const tangent = tmp3.copy(dir).cross(fi.axis);
         tmp2.addScaledVector(tangent, settings.orbit);
 
-        // D) Leader collision with bounce
+        // D) Leader collision with bounce (uses leader velocity for intense bounces)
         const radiusLeader = 0.55 * settings.leaderSize;
         const radiusFollower = 0.55 * fi.mesh.scale.x;
         const minDistLeader = radiusLeader + radiusFollower;
@@ -437,11 +493,23 @@
           // Push follower out
           p.addScaledVector(dir, -overlap);
 
-          // Bounce velocity
-          const velTowardLeader = fi.vel.dot(dir);
-          if (velTowardLeader > 0) {
-            const restitution = 0.6;
-            fi.vel.addScaledVector(dir, -(1 + restitution) * velTowardLeader);
+          // Calculate relative velocity (follower relative to leader)
+          const relVel = tmp3.copy(fi.vel).sub(leaderVel);
+          const velAlongNormal = relVel.dot(dir);
+
+          // Only resolve if moving toward each other
+          if (velAlongNormal > 0) {
+            const restitution = 1.2; // Higher = more bouncy
+            const impulse = -(1 + restitution) * velAlongNormal;
+
+            // Apply full impulse to follower (leader is "infinite mass")
+            fi.vel.addScaledVector(dir, impulse);
+
+            // Add extra kick based on leader speed for dramatic effect
+            const leaderSpeed = leaderVel.length();
+            if (leaderSpeed > 0.5) {
+              fi.vel.addScaledVector(dir, -leaderSpeed * 1.5);
+            }
           }
         }
 
@@ -506,6 +574,39 @@
     }
 
     // -----------------------------
+    // Dynamic color tinting based on distance to leader
+    // -----------------------------
+    let colorUpdateFrame = 0;
+    const leaderLightCol = new THREE.Color();
+    const tintedColor = new THREE.Color();
+
+    function updateFollowerColors() {
+      // Only update every 3 frames for performance
+      colorUpdateFrame++;
+      if (colorUpdateFrame % 3 !== 0) return;
+      if (settings.leaderColorInfluence <= 0) return;
+
+      leaderLightCol.set(settings.leaderLightColor);
+      const L = leader.position;
+      const range = settings.leaderColorRange;
+      const influence = settings.leaderColorInfluence;
+
+      for (let i = 0; i < followers.length; i++) {
+        const fi = followers[i];
+        const dist = fi.mesh.position.distanceTo(L);
+
+        // Calculate blend factor: 1 at distance 0, 0 at distance >= range
+        const t = Math.max(0, 1 - dist / range);
+        // Apply influence setting and smooth falloff (quadratic)
+        const blend = t * t * influence;
+
+        // Lerp from original color to leader light color
+        tintedColor.copy(fi.baseColor).lerp(leaderLightCol, blend);
+        fi.mesh.material.color.copy(tintedColor);
+      }
+    }
+
+    // -----------------------------
     // Animate
     // -----------------------------
     const clock = new THREE.Clock();
@@ -524,7 +625,21 @@
         leader.position.lerp(leaderTarget, a);
       }
 
+      // Track leader velocity for collision response
+      if (dt > 0) {
+        leaderVel.copy(leader.position).sub(leaderPrevPos).divideScalar(dt);
+      }
+      leaderPrevPos.copy(leader.position);
+
       leader.scale.setScalar(settings.leaderSize);
+
+      // Leader light follows leader position with pulsing effect
+      leaderLight.position.copy(leader.position);
+      if (settings.leaderLightPulse) {
+        const pulse = 1 + Math.sin(t * settings.leaderPulseSpeed) * settings.leaderPulseAmount;
+        leaderLight.intensity = settings.leaderLightIntensity * pulse;
+        leaderMaterial.emissiveIntensity = settings.leaderEmissiveIntensity * pulse;
+      }
 
       glow.visible = settings.showGlowCore;
       if (glow.visible) {
@@ -535,6 +650,7 @@
       }
 
       stepFollowers(dt);
+      updateFollowerColors();
 
       // small camera parallax
       camera.position.x = THREE.MathUtils.lerp(camera.position.x, leader.position.x * 0.02, 0.04);
@@ -576,6 +692,27 @@
     fLeader.add(settings, "leaderPlaneDist", 6, 40, 0.1);
     fLeader.add(settings, "freezeLeader");
     fLeader.add(settings, "centerLeader").name("Center leader");
+    fLeader.add(settings, "leaderLightIntensity", 0, 800, 5).name("Light Intensity").onChange(() => {
+      leaderLight.intensity = settings.leaderLightIntensity;
+    });
+    fLeader.add(settings, "leaderLightDistance", 5, 50, 1).name("Light Distance").onChange(() => {
+      leaderLight.distance = settings.leaderLightDistance;
+    });
+    fLeader.add(settings, "leaderEmissiveIntensity", 0, 3, 0.1).name("Glow Intensity").onChange(() => {
+      leaderMaterial.emissiveIntensity = settings.leaderEmissiveIntensity;
+    });
+    fLeader.addColor(settings, "leaderLightColor").name("Light Color").onChange(() => {
+      leaderLight.color.set(settings.leaderLightColor);
+      leaderMaterial.emissive.set(settings.leaderLightColor);
+      // Also update leader sphere color to match
+      leaderMaterial.color.set(settings.leaderLightColor);
+      settings.leaderColor = settings.leaderLightColor;
+    });
+    fLeader.add(settings, "leaderLightPulse").name("Pulse Light");
+    fLeader.add(settings, "leaderPulseSpeed", 0.5, 5, 0.1).name("Pulse Speed");
+    fLeader.add(settings, "leaderPulseAmount", 0, 0.8, 0.05).name("Pulse Amount");
+    fLeader.add(settings, "leaderColorInfluence", 0, 1, 0.05).name("Color Influence");
+    fLeader.add(settings, "leaderColorRange", 3, 25, 0.5).name("Color Range");
 
     const fMotion = gui.addFolder("Surround Physics");
     fMotion.add(settings, "gravity", 0.1, 25, 0.1);
@@ -583,7 +720,7 @@
     fMotion.add(settings, "shellStrength", 0.1, 8, 0.01);
     fMotion.add(settings, "orbit", 0.0, 8, 0.01).name("Orbit Speed");
     fMotion.add(settings, "separation", 0.0, 4, 0.01);
-    fMotion.add(settings, "maxVelocity", 0.1, 5, 0.01).name("Max Speed");
+    fMotion.add(settings, "maxVelocity", 0.1, 25, 0.1).name("Max Speed");
     fMotion.add(settings, "friction", 0.90, 0.999, 0.001);
     fMotion.add(settings, "soften", 0.1, 6.0, 0.01);
     fMotion.add(settings, "collisionRestitution", 0, 1, 0.01).name("Bounciness");
@@ -591,7 +728,7 @@
     const fColor = gui.addFolder("Colors");
     fColor.addColor(settings, "colorA").onChange(settings.respawn);
     fColor.addColor(settings, "colorB").onChange(settings.respawn);
-    fColor.addColor(settings, "leaderColor").onChange(() => leader.material.color.set(settings.leaderColor));
+    fColor.addColor(settings, "leaderColor").onChange(() => leaderMaterial.color.set(settings.leaderColor));
     fColor.addColor(settings, "glowColor").onChange(() => {
       glow.material.color.set(settings.glowColor);
       glow.material.emissive.set(settings.glowColor);
@@ -609,9 +746,24 @@
     fBloom.add(settings, "bloomRadius", 0, 1.0, 0.01).onChange(() => bloomPass.radius = settings.bloomRadius);
     fBloom.add(settings, "bloomThreshold", 0, 1.0, 0.01).onChange(() => bloomPass.threshold = settings.bloomThreshold);
 
+    const fDOF = gui.addFolder("Depth of Field");
+    fDOF.add(settings, "dofEnabled").name("Enable DOF").onChange(() => bokehPass.enabled = settings.dofEnabled);
+    fDOF.add(settings, "dofFocus", 1, 50, 0.5).name("Focus Distance").onChange(() => bokehPass.uniforms.focus.value = settings.dofFocus);
+    fDOF.add(settings, "dofAperture", 0, 0.1, 0.001).name("Aperture (blur)").onChange(() => bokehPass.uniforms.aperture.value = settings.dofAperture);
+    fDOF.add(settings, "dofMaxBlur", 0, 0.05, 0.001).name("Max Blur").onChange(() => bokehPass.uniforms.maxblur.value = settings.dofMaxBlur);
+
     fLeader.open();
     fMotion.open();
     fBloom.open();
+
+    // Hide GUI by default (press H to toggle)
+    gui.hide();
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'h' || e.key === 'H') {
+        gui._hidden ? gui.show() : gui.hide();
+      }
+    });
   </script>
 </body>
 

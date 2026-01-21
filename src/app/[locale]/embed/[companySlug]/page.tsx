@@ -24,7 +24,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
       <header className="bg-white border-b shadow-sm">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center">
               <span className="text-white font-bold text-lg">E</span>
             </div>
             <span className="font-semibold text-slate-800">Example Website</span>

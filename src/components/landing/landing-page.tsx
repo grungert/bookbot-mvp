@@ -16,7 +16,7 @@ const SphereBackground = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="fixed inset-0 bg-gradient-to-br from-blue-500/10 via-blue-400/5 to-transparent" />
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-500/10 via-violet-400/5 to-transparent" />
     ),
   }
 );
@@ -24,7 +24,7 @@ const SphereBackground = dynamic(
 // Scrolling grid background
 function ScrollingGrid() {
   return (
-    <div className="absolute inset-0 z-0 pointer-events-none">
+    <div className="fixed inset-0 -z-20 pointer-events-none">
       {/* White/Gray Grid - base layer */}
       <div
         className="absolute inset-0 opacity-[0.03]"

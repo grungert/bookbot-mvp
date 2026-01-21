@@ -60,7 +60,7 @@ export function HeroSection() {
               <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>
             </Link>
             <Link href="/register">
-              <Button className="cursor-pointer">{t("getStarted")}</Button>
+              <Button variant="gradient" className="cursor-pointer">{t("getStarted")}</Button>
             </Link>
           </div>
         </div>
@@ -103,7 +103,7 @@ export function HeroSection() {
               variants={itemVariants}
             >
               <Link href="/register">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 cursor-pointer">
+                <Button variant="gradient" size="lg" className="w-full sm:w-auto text-lg px-8 py-6 cursor-pointer">
                   {t("startFreeTrial")}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

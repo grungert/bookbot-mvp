@@ -88,3 +88,45 @@ export async function sendAppointmentReminderEmail(data: Omit<AppointmentEmailDa
     return { success: false, error };
   }
 }
+
+interface AppointmentUpdateEmailData {
+  customerEmail: string;
+  customerName: string;
+  serviceName: string;
+  startTime: Date;
+  companyName: string;
+  previousStartTime?: Date;
+}
+
+export async function sendAppointmentUpdateEmail(data: AppointmentUpdateEmailData) {
+  const { customerEmail, customerName, serviceName, startTime, companyName, previousStartTime } = data;
+
+  try {
+    const resend = getResend();
+    const newDate = format(startTime, "EEEE, MMMM d, yyyy");
+    const newTime = format(startTime, "h:mm a");
+
+    let body = `Hello ${customerName},\n\nYour appointment at ${companyName} has been updated.\n\n`;
+    body += `Service: ${serviceName}\n`;
+    body += `New Date: ${newDate}\n`;
+    body += `New Time: ${newTime}\n`;
+
+    if (previousStartTime) {
+      body += `\nPrevious Date: ${format(previousStartTime, "EEEE, MMMM d, yyyy")}\n`;
+      body += `Previous Time: ${format(previousStartTime, "h:mm a")}\n`;
+    }
+
+    body += `\nIf you have any questions, please contact us.\n\nBest regards,\n${companyName}`;
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: customerEmail,
+      subject: `Appointment Updated - ${companyName}`,
+      text: body,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to send appointment update email:", error);
+    return { success: false, error };
+  }
+}

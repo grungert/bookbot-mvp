@@ -146,7 +146,7 @@ export function PricingCard({
                 "w-full transition-all duration-200 cursor-pointer",
                 !isPopular && "bg-white/50 hover:bg-white/80 text-foreground border border-white/20"
               )}
-              variant={isPopular ? "default" : "outline"}
+              variant={isPopular ? "gradient" : "outline"}
               size="lg"
             >
               {ctaText}

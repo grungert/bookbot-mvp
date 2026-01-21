@@ -249,7 +249,7 @@ export default function InvoicesPage() {
       const response = await fetch(`/api/c/${companySlug}/services`);
       if (response.ok) {
         const data = await response.json();
-        setServices(data);
+        setServices(data.services || []);
       }
     } catch (error) {
       console.error("Error loading services:", error);

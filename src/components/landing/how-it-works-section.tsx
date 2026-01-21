@@ -48,12 +48,22 @@ function Step({ number, icon: Icon, title, description, delay = 0, index = 0 }: 
         ease: "easeOut",
       }}
       className={cn(
-        "flex flex-col items-center text-center p-6 rounded-2xl",
+        "group flex flex-col items-center text-center p-6 rounded-2xl",
         "bg-white/70 dark:bg-gray-900/70",
         "backdrop-blur-md",
         "border border-white/30 dark:border-white/10",
-        "shadow-lg"
+        "hover:-translate-y-2 hover:bg-white/90 dark:hover:bg-gray-900/90",
+        "transition-all duration-300"
       )}
+      style={{
+        boxShadow: "0 10px 15px -3px rgba(59, 130, 246, 0.08), 0 4px 6px -4px rgba(168, 85, 247, 0.08)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 25px 50px -12px rgba(59, 130, 246, 0.25), 0 20px 40px -15px rgba(168, 85, 247, 0.2)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "0 10px 15px -3px rgba(59, 130, 246, 0.08), 0 4px 6px -4px rgba(168, 85, 247, 0.08)";
+      }}
     >
       {/* Step Number Circle */}
       <div

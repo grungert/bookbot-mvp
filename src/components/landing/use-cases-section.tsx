@@ -48,10 +48,18 @@ function UseCaseItem({ icon: Icon, label, delay = 0, index = 0 }: UseCaseItemPro
         "group flex items-center gap-3 px-5 py-3 rounded-full",
         "bg-white/70 dark:bg-gray-900/70",
         "border border-white/30 dark:border-white/10",
-        "shadow-sm hover:shadow-md",
-        "hover:bg-white/90 dark:hover:bg-gray-900/90",
+        "hover:-translate-y-1 hover:bg-white/95 dark:hover:bg-gray-900/95",
         "transition-all duration-200"
       )}
+      style={{
+        boxShadow: "0 4px 6px -1px rgba(59, 130, 246, 0.06), 0 2px 4px -2px rgba(168, 85, 247, 0.06)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 10px 25px -5px rgba(59, 130, 246, 0.18), 0 8px 20px -6px rgba(168, 85, 247, 0.15)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(59, 130, 246, 0.06), 0 2px 4px -2px rgba(168, 85, 247, 0.06)";
+      }}
     >
       <div
         className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-all group-hover:scale-110"
