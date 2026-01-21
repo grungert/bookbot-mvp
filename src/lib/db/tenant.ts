@@ -1135,6 +1135,7 @@ export async function getRecentBookings(
 export interface RecentConversation {
   id: string;
   customerName: string;
+  customerImage: string | null;
   lastMessage: string;
   messageCount: number;
   isRead: boolean;
@@ -1151,7 +1152,7 @@ export async function getRecentConversations(
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
-      user: { select: { name: true, email: true } },
+      user: { select: { name: true, email: true, image: true } },
       messages: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -1166,6 +1167,7 @@ export async function getRecentConversations(
   return sessions.map((session) => ({
     id: session.id,
     customerName: session.user?.name || session.user?.email || "Guest",
+    customerImage: session.user?.image || null,
     lastMessage: session.messages[0]?.content?.slice(0, 50) || "",
     messageCount: session._count.messages,
     isRead: session.isRead,

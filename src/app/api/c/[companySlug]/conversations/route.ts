@@ -111,6 +111,7 @@ export async function GET(request: Request, { params }: RouteParams) {
             id: true,
             email: true,
             name: true,
+            image: true,
           },
         },
         _count: {

@@ -37,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import {
@@ -97,6 +98,7 @@ interface Invoice {
     id: string;
     name: string | null;
     email: string;
+    image?: string | null;
   };
   lineItems: LineItem[];
 }
@@ -1176,7 +1178,20 @@ export default function InvoicesPage() {
                       {invoice.invoiceNumber}
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm">{invoice.user.name || invoice.user.email}</span>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-7 w-7 shrink-0">
+                          {invoice.user.image ? (
+                            <AvatarImage src={invoice.user.image} alt={invoice.user.name || invoice.user.email} />
+                          ) : null}
+                          <AvatarFallback
+                            className="text-xs font-semibold text-white"
+                            style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: "#3B82F6" }}
+                          >
+                            {(invoice.user.name || invoice.user.email || "?").charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{invoice.user.name || invoice.user.email}</span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">{format(parseISO(invoice.issueDate), "MMM d, yyyy")}</span>
@@ -1401,8 +1416,23 @@ export default function InvoicesPage() {
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     {t("customer")}
                   </h4>
-                  <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
-                  <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 shrink-0">
+                      {viewingInvoice.user.image ? (
+                        <AvatarImage src={viewingInvoice.user.image} alt={viewingInvoice.user.name || viewingInvoice.user.email} />
+                      ) : null}
+                      <AvatarFallback
+                        className="text-sm font-semibold text-white"
+                        style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: "#3B82F6" }}
+                      >
+                        {(viewingInvoice.user.name || viewingInvoice.user.email || "?").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{viewingInvoice.user.name || "—"}</p>
+                      <p className="text-sm text-muted-foreground">{viewingInvoice.user.email}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="text-right">
                   <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">

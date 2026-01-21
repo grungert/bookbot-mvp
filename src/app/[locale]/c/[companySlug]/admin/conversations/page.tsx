@@ -62,6 +62,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AdminMessageRenderer } from "@/components/chat/admin-message-renderer";
 import { StatsCard } from "@/components/admin/dashboard/stats-card";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
@@ -70,6 +71,7 @@ interface ChatUser {
   id: string;
   email: string;
   name: string | null;
+  image?: string | null;
 }
 
 interface ChatSession {
@@ -761,24 +763,48 @@ export default function ConversationsPage() {
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {group.unreadCount > 0 && (
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: primaryColor || "#3B82F6" }}
-                          />
-                        )}
-                        <div>
-                          <p className={cn("font-medium", group.unreadCount > 0 && "font-semibold")}>
-                            {group.user ? group.user.name || group.user.email : t("guestSessions")}
-                          </p>
-                          {group.user && (
-                            <p className="text-xs text-muted-foreground">{group.user.email}</p>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          {group.user?.image ? (
+                            <AvatarImage src={group.user.image} alt={group.user.name || group.user.email} />
+                          ) : null}
+                          <AvatarFallback
+                            className={cn(
+                              "text-xs font-medium",
+                              group.unreadCount === 0
+                                ? "bg-muted text-muted-foreground"
+                                : "text-white"
+                            )}
+                            style={
+                              group.unreadCount > 0 && primaryColor
+                                ? { backgroundColor: primaryColor }
+                                : group.unreadCount > 0
+                                ? { backgroundColor: "#3B82F6" }
+                                : undefined
+                            }
+                          >
+                            {(group.user?.name || group.user?.email || "G").charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex items-center gap-2">
+                          {group.unreadCount > 0 && (
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: primaryColor || "#3B82F6" }}
+                            />
+                          )}
+                          <div>
+                            <p className={cn("font-medium", group.unreadCount > 0 && "font-semibold")}>
+                              {group.user ? group.user.name || group.user.email : t("guestSessions")}
+                            </p>
+                            {group.user && (
+                              <p className="text-xs text-muted-foreground">{group.user.email}</p>
+                            )}
+                          </div>
+                          {!group.user && (
+                            <Badge variant="secondary" className="ml-2">{t("guest")}</Badge>
                           )}
                         </div>
-                        {!group.user && (
-                          <Badge variant="secondary" className="ml-2">{t("guest")}</Badge>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -944,31 +970,55 @@ export default function ConversationsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        {!session.isRead && (
-                          <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: primaryColor || "#3B82F6" }}
-                          />
-                        )}
-                        {session.isImportant && (
-                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                        )}
-                        <div>
-                          <p className={cn("font-medium", !session.isRead && "font-semibold")}>
-                            {getUserDisplay(session)}
-                          </p>
-                          {session.user && (
-                            <p className="text-xs text-muted-foreground">
-                              {session.user.email}
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          {session.user?.image ? (
+                            <AvatarImage src={session.user.image} alt={session.user.name || session.user.email} />
+                          ) : null}
+                          <AvatarFallback
+                            className={cn(
+                              "text-xs font-medium",
+                              session.isRead
+                                ? "bg-muted text-muted-foreground"
+                                : "text-white"
+                            )}
+                            style={
+                              !session.isRead && primaryColor
+                                ? { backgroundColor: primaryColor }
+                                : !session.isRead
+                                ? { backgroundColor: "#3B82F6" }
+                                : undefined
+                            }
+                          >
+                            {(session.user?.name || session.user?.email || "G").charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex items-center gap-2">
+                          {!session.isRead && (
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: primaryColor || "#3B82F6" }}
+                            />
+                          )}
+                          {session.isImportant && (
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          )}
+                          <div>
+                            <p className={cn("font-medium", !session.isRead && "font-semibold")}>
+                              {getUserDisplay(session)}
                             </p>
+                            {session.user && (
+                              <p className="text-xs text-muted-foreground">
+                                {session.user.email}
+                              </p>
+                            )}
+                          </div>
+                          {!session.user && (
+                            <Badge variant="secondary" className="ml-2">
+                              {t("guest")}
+                            </Badge>
                           )}
                         </div>
-                        {!session.user && (
-                          <Badge variant="secondary" className="ml-2">
-                            {t("guest")}
-                          </Badge>
-                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -1148,24 +1198,37 @@ export default function ConversationsPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {viewingSession && (
-                <>
-                  <h2 className="text-lg font-semibold truncate">
-                    {t("conversationWith")}{" "}
-                    {viewingSession.user
-                      ? viewingSession.user.name || viewingSession.user.email
-                      : t("guest")}
-                  </h2>
-                  <div className="flex items-center gap-4 mt-1">
-                    <p className="text-sm text-muted-foreground">
-                      {format(parseISO(viewingSession.createdAt), "MMM d, yyyy 'at' HH:mm")}
-                    </p>
-                    {totalMessageCount > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {t("showingMessages", { shown: dialogMessages.length, total: totalMessageCount })}
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10 shrink-0">
+                    {viewingSession.user?.image ? (
+                      <AvatarImage src={viewingSession.user.image} alt={viewingSession.user.name || viewingSession.user.email} />
+                    ) : null}
+                    <AvatarFallback
+                      className="text-sm font-medium text-white"
+                      style={primaryColor ? { backgroundColor: primaryColor } : { backgroundColor: "#3B82F6" }}
+                    >
+                      {(viewingSession.user?.name || viewingSession.user?.email || "G").charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-lg font-semibold truncate">
+                      {t("conversationWith")}{" "}
+                      {viewingSession.user
+                        ? viewingSession.user.name || viewingSession.user.email
+                        : t("guest")}
+                    </h2>
+                    <div className="flex items-center gap-4 mt-1">
+                      <p className="text-sm text-muted-foreground">
+                        {format(parseISO(viewingSession.createdAt), "MMM d, yyyy 'at' HH:mm")}
                       </p>
-                    )}
+                      {totalMessageCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {t("showingMessages", { shown: dialogMessages.length, total: totalMessageCount })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </>
+                </div>
               )}
             </div>
             <Button

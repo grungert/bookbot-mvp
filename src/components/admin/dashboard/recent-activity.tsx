@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export interface RecentBooking {
   id: string;
@@ -33,6 +34,7 @@ export interface RecentBooking {
 export interface RecentConversation {
   id: string;
   customerName: string;
+  customerImage: string | null;
   lastMessage: string;
   messageCount: number;
   isRead: boolean;
@@ -412,23 +414,28 @@ export function RecentActivity({
                               href={`/${locale}/c/${companySlug}/admin/conversations?id=${conversation.id}`}
                               className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group"
                             >
-                              <div
-                                className={cn(
-                                  "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium",
-                                  conversation.isRead
-                                    ? "bg-muted text-muted-foreground"
-                                    : "text-white"
-                                )}
-                                style={
-                                  !conversation.isRead && primaryColor
-                                    ? { backgroundColor: primaryColor }
-                                    : !conversation.isRead
-                                    ? { backgroundColor: "#3B82F6" }
-                                    : undefined
-                                }
-                              >
-                                {conversation.customerName.charAt(0).toUpperCase()}
-                              </div>
+                              <Avatar className="h-8 w-8 shrink-0">
+                                {conversation.customerImage ? (
+                                  <AvatarImage src={conversation.customerImage} alt={conversation.customerName} />
+                                ) : null}
+                                <AvatarFallback
+                                  className={cn(
+                                    "text-xs font-medium",
+                                    conversation.isRead
+                                      ? "bg-muted text-muted-foreground"
+                                      : "text-white"
+                                  )}
+                                  style={
+                                    !conversation.isRead && primaryColor
+                                      ? { backgroundColor: primaryColor }
+                                      : !conversation.isRead
+                                      ? { backgroundColor: "#3B82F6" }
+                                      : undefined
+                                  }
+                                >
+                                  {conversation.customerName.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span

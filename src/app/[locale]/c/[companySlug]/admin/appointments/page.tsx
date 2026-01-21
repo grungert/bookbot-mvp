@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -740,12 +741,25 @@ export default function AppointmentsPage() {
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell">
-                            <div>
-                              <div className="font-medium">
-                                {apt.user.name || t("noName")}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {apt.user.email}
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8 shrink-0">
+                                {apt.user.image ? (
+                                  <AvatarImage src={apt.user.image} alt={apt.user.name || apt.user.email} />
+                                ) : null}
+                                <AvatarFallback
+                                  className="text-xs font-semibold text-white"
+                                  style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                                >
+                                  {(apt.user.name || apt.user.email || "?").charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">
+                                  {apt.user.name || t("noName")}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {apt.user.email}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
