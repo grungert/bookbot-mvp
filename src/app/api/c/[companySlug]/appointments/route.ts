@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
-import { isSlotAvailable } from "@/lib/utils/slots";
 import { sendBookingConfirmationEmail } from "@/lib/email/send";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
@@ -171,42 +170,97 @@ export async function POST(request: Request, { params }: RouteParams) {
     const appointmentStart = new Date(startTime);
     const appointmentEnd = addMinutes(appointmentStart, service.duration);
 
-    // Check if slot is available
-    const available = await isSlotAvailable(
-      company.id,
-      appointmentStart,
-      service.duration
-    );
+    // Use atomic transaction to prevent race conditions
+    // Check availability and create appointment in a single transaction
+    let appointment;
+    try {
+      appointment = await prisma.$transaction(
+        async (tx) => {
+          // Check for conflicting appointments within the transaction
+          const conflicting = await tx.appointment.findFirst({
+            where: {
+              companyId: company.id,
+              status: { in: ["PENDING", "CONFIRMED"] },
+              OR: [
+                {
+                  startTime: { gte: appointmentStart, lt: appointmentEnd },
+                },
+                {
+                  endTime: { gt: appointmentStart, lte: appointmentEnd },
+                },
+                {
+                  AND: [
+                    { startTime: { lte: appointmentStart } },
+                    { endTime: { gte: appointmentEnd } },
+                  ],
+                },
+              ],
+            },
+          });
 
-    if (!available) {
-      return NextResponse.json(
-        { error: "Time slot is not available" },
-        { status: 409 }
-      );
-    }
+          if (conflicting) {
+            throw new Error("SLOT_TAKEN");
+          }
 
-    // Create the appointment
-    const appointment = await prisma.appointment.create({
-      data: {
-        companyId: company.id,
-        userId: user.id,
-        serviceId: service.id,
-        startTime: appointmentStart,
-        endTime: appointmentEnd,
-        status: "PENDING",
-        notes,
-      },
-      include: {
-        service: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+          // Also verify working hours within transaction
+          const dayOfWeek = appointmentStart.getDay();
+          const workingHours = await tx.workingHours.findUnique({
+            where: {
+              companyId_dayOfWeek: {
+                companyId: company.id,
+                dayOfWeek,
+              },
+            },
+          });
+
+          if (!workingHours || !workingHours.isOpen) {
+            throw new Error("OUTSIDE_WORKING_HOURS");
+          }
+
+          // Create the appointment
+          return tx.appointment.create({
+            data: {
+              companyId: company.id,
+              userId: user.id,
+              serviceId: service.id,
+              startTime: appointmentStart,
+              endTime: appointmentEnd,
+              status: "PENDING",
+              notes,
+            },
+            include: {
+              service: true,
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          });
         },
-      },
-    });
+        {
+          isolationLevel: "Serializable",
+        }
+      );
+    } catch (txError) {
+      if (txError instanceof Error) {
+        if (txError.message === "SLOT_TAKEN") {
+          return NextResponse.json(
+            { error: "Time slot is no longer available. Please select another time." },
+            { status: 409 }
+          );
+        }
+        if (txError.message === "OUTSIDE_WORKING_HOURS") {
+          return NextResponse.json(
+            { error: "Selected time is outside working hours" },
+            { status: 400 }
+          );
+        }
+      }
+      throw txError;
+    }
 
     // Send confirmation email
     if (user.email) {

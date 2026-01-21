@@ -9,6 +9,7 @@ export interface Service {
   id: string;
   name: string;
   color?: string | null;
+  duration?: number;
 }
 
 export interface FilterState {

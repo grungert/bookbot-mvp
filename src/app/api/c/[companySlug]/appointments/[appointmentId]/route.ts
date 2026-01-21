@@ -2,16 +2,22 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
-import { sendCancellationEmail } from "@/lib/email/send";
+import { sendCancellationEmail, sendAppointmentUpdateEmail } from "@/lib/email/send";
 import { createInvoiceForAppointment } from "@/lib/invoices";
 import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
 import { updateCustomerMetrics } from "@/lib/db/customer-metrics";
+import { isValidTransition, getInvalidTransitionError, getValidNextStatuses } from "@/lib/utils/appointment-status";
 import { z } from "zod";
+import { AppointmentStatus } from "@prisma/client";
+import { addMinutes } from "date-fns";
 
 const updateAppointmentSchema = z.object({
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED", "COMPLETED"]).optional(),
-  notes: z.string().optional(),
+  notes: z.string().nullable().optional(),
   cancellationReason: z.string().optional(),
+  startTime: z.string().datetime().optional(),
+  serviceId: z.string().optional(),
+  sendNotification: z.boolean().optional(),
 });
 
 interface RouteParams {
@@ -140,12 +146,58 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Validate status transition
+    if (parsed.data.status) {
+      const currentStatus = appointment.status as AppointmentStatus;
+      const newStatus = parsed.data.status as AppointmentStatus;
+
+      if (!isValidTransition(currentStatus, newStatus)) {
+        const errorMessage = getInvalidTransitionError(currentStatus, newStatus);
+        const validOptions = getValidNextStatuses(currentStatus);
+
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            currentStatus,
+            requestedStatus: newStatus,
+            validOptions,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Build update data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
       ...(parsed.data.status && { status: parsed.data.status }),
-      ...(parsed.data.notes && { notes: parsed.data.notes }),
+      ...(parsed.data.notes !== undefined && { notes: parsed.data.notes }),
     };
+
+    // Handle service change
+    let newService = null;
+    if (parsed.data.serviceId && parsed.data.serviceId !== appointment.serviceId) {
+      newService = await prisma.service.findFirst({
+        where: { id: parsed.data.serviceId, companyId: company.id },
+      });
+      if (!newService) {
+        return NextResponse.json({ error: "Service not found" }, { status: 404 });
+      }
+      updateData.serviceId = parsed.data.serviceId;
+    }
+
+    // Handle time change
+    const hasTimeChange = parsed.data.startTime && new Date(parsed.data.startTime).getTime() !== appointment.startTime.getTime();
+    const hasServiceChange = newService !== null;
+
+    if (hasTimeChange || hasServiceChange) {
+      const newStartTime = parsed.data.startTime ? new Date(parsed.data.startTime) : appointment.startTime;
+      const serviceDuration = newService?.duration || (await prisma.service.findUnique({ where: { id: appointment.serviceId } }))?.duration || 60;
+      const newEndTime = addMinutes(newStartTime, serviceDuration);
+
+      updateData.startTime = newStartTime;
+      updateData.endTime = newEndTime;
+    }
 
     // Add cancellation tracking if status is being changed to CANCELLED
     if (parsed.data.status === "CANCELLED") {
@@ -190,6 +242,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         startTime: updated.startTime,
         companyName: company.name,
       });
+    }
+
+    // Send update notification email if appointment details changed (not status)
+    if (parsed.data.sendNotification && (hasTimeChange || hasServiceChange) && updated.user?.email) {
+      try {
+        await sendAppointmentUpdateEmail({
+          customerEmail: updated.user.email,
+          customerName: updated.user.name || "Customer",
+          serviceName: updated.service.name,
+          startTime: updated.startTime,
+          companyName: company.name,
+          previousStartTime: hasTimeChange ? appointment.startTime : undefined,
+        });
+      } catch (emailError) {
+        console.error("Error sending appointment update email:", emailError);
+        // Don't fail the update if email fails
+      }
     }
 
     // Auto-generate invoice when appointment is confirmed

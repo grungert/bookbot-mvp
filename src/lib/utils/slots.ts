@@ -9,7 +9,11 @@ import {
   startOfDay,
   endOfDay,
 } from "date-fns";
+import { toZonedTime, fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { prisma } from "@/lib/prisma";
+
+// Default timezone if company hasn't set one
+const DEFAULT_TIMEZONE = "Europe/Belgrade";
 
 export interface TimeSlot {
   start: Date;
@@ -36,14 +40,56 @@ function setTime(date: Date, timeStr: string): Date {
   return setMinutes(setHours(date, hours), minutes);
 }
 
+/**
+ * Get the company timezone, falling back to default if not set
+ */
+export async function getCompanyTimezone(companyId: string): Promise<string> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { timezone: true },
+  });
+  return company?.timezone || DEFAULT_TIMEZONE;
+}
+
+/**
+ * Convert a UTC date to company's local timezone
+ */
+export function toCompanyTime(date: Date, timezone: string): Date {
+  return toZonedTime(date, timezone);
+}
+
+/**
+ * Convert a date from company's local timezone to UTC
+ */
+export function fromCompanyTime(date: Date, timezone: string): Date {
+  return fromZonedTime(date, timezone);
+}
+
+/**
+ * Format a date in the company's timezone
+ */
+export function formatInCompanyTimezone(
+  date: Date,
+  formatStr: string,
+  timezone: string
+): string {
+  return formatInTimeZone(date, timezone, formatStr);
+}
+
 // Generate time slots for a given date and service
 export async function generateTimeSlots(
   companyId: string,
   date: Date,
   serviceDuration: number,
-  slotInterval: number = 30 // Default 30 min intervals
+  slotInterval: number = 30, // Default 30 min intervals
+  timezone?: string // Optional timezone, fetched from company if not provided
 ): Promise<TimeSlot[]> {
-  const dayOfWeek = date.getDay();
+  // Fetch company timezone if not provided
+  const tz = timezone || (await getCompanyTimezone(companyId));
+
+  // Convert the input date to the company's timezone
+  const localDate = toCompanyTime(date, tz);
+  const dayOfWeek = localDate.getDay();
 
   // Get working hours for this day
   const workingHours = await prisma.workingHours.findUnique({
@@ -61,12 +107,18 @@ export async function generateTimeSlots(
   }
 
   // Get existing appointments for this date
+  // Use the local date's start/end in company timezone, converted to UTC for DB query
+  const localDayStart = startOfDay(localDate);
+  const localDayEnd = endOfDay(localDate);
+  const utcDayStart = fromCompanyTime(localDayStart, tz);
+  const utcDayEnd = fromCompanyTime(localDayEnd, tz);
+
   const existingAppointments = await prisma.appointment.findMany({
     where: {
       companyId,
       startTime: {
-        gte: startOfDay(date),
-        lte: endOfDay(date),
+        gte: utcDayStart,
+        lte: utcDayEnd,
       },
       status: {
         in: ["PENDING", "CONFIRMED"],
@@ -76,10 +128,14 @@ export async function generateTimeSlots(
   });
 
   const slots: TimeSlot[] = [];
-  const dayStart = setTime(date, workingHours.startTime);
-  const dayEnd = setTime(date, workingHours.endTime);
+  // Working hours are in local time, set on the local date
+  const dayStart = setTime(localDate, workingHours.startTime);
+  const dayEnd = setTime(localDate, workingHours.endTime);
 
   let currentSlotStart = dayStart;
+
+  // Current time in company's timezone for past slot checking
+  const nowInTz = toCompanyTime(new Date(), tz);
 
   while (isBefore(currentSlotStart, dayEnd)) {
     const slotEnd = addMinutes(currentSlotStart, serviceDuration);
@@ -89,26 +145,31 @@ export async function generateTimeSlots(
       break;
     }
 
-    // Check if slot conflicts with existing appointments
+    // Convert slot times to UTC for comparison with stored appointments
+    const slotStartUtc = fromCompanyTime(currentSlotStart, tz);
+    const slotEndUtc = fromCompanyTime(slotEnd, tz);
+
+    // Check if slot conflicts with existing appointments (all in UTC)
     const isAvailable = !existingAppointments.some((apt) => {
       // Slot conflicts if it overlaps with an appointment
       const aptStart = new Date(apt.startTime);
       const aptEnd = new Date(apt.endTime);
 
       return (
-        (isAfter(currentSlotStart, aptStart) && isBefore(currentSlotStart, aptEnd)) ||
-        (isAfter(slotEnd, aptStart) && isBefore(slotEnd, aptEnd)) ||
-        (isBefore(currentSlotStart, aptStart) && isAfter(slotEnd, aptEnd)) ||
-        currentSlotStart.getTime() === aptStart.getTime()
+        (isAfter(slotStartUtc, aptStart) && isBefore(slotStartUtc, aptEnd)) ||
+        (isAfter(slotEndUtc, aptStart) && isBefore(slotEndUtc, aptEnd)) ||
+        (isBefore(slotStartUtc, aptStart) && isAfter(slotEndUtc, aptEnd)) ||
+        slotStartUtc.getTime() === aptStart.getTime()
       );
     });
 
-    // Don't show past slots
-    const isPast = isBefore(currentSlotStart, new Date());
+    // Don't show past slots (compare in local timezone)
+    const isPast = isBefore(currentSlotStart, nowInTz);
 
+    // Return slots in UTC for storage, but times are calculated from company's working hours
     slots.push({
-      start: currentSlotStart,
-      end: slotEnd,
+      start: slotStartUtc,
+      end: slotEndUtc,
       available: isAvailable && !isPast,
     });
 
@@ -132,10 +193,17 @@ export async function getAvailableSlots(
 export async function isSlotAvailable(
   companyId: string,
   startTime: Date,
-  duration: number
+  duration: number,
+  timezone?: string // Optional timezone, fetched from company if not provided
 ): Promise<boolean> {
+  // Fetch company timezone if not provided
+  const tz = timezone || (await getCompanyTimezone(companyId));
+
+  // startTime is in UTC, convert to company's local time for working hours check
+  const localStartTime = toCompanyTime(startTime, tz);
   const endTime = addMinutes(startTime, duration);
-  const dayOfWeek = startTime.getDay();
+  const localEndTime = toCompanyTime(endTime, tz);
+  const dayOfWeek = localStartTime.getDay();
 
   // Check working hours
   const workingHours = await prisma.workingHours.findUnique({
@@ -151,11 +219,12 @@ export async function isSlotAvailable(
     return false;
   }
 
-  const dayStart = setTime(startTime, workingHours.startTime);
-  const dayEnd = setTime(startTime, workingHours.endTime);
+  // Working hours are in local time
+  const dayStart = setTime(localStartTime, workingHours.startTime);
+  const dayEnd = setTime(localStartTime, workingHours.endTime);
 
-  // Check if within working hours
-  if (isBefore(startTime, dayStart) || isAfter(endTime, dayEnd)) {
+  // Check if within working hours (compare in local timezone)
+  if (isBefore(localStartTime, dayStart) || isAfter(localEndTime, dayEnd)) {
     return false;
   }
 
