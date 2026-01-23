@@ -1,13 +1,17 @@
 "use client";
 
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowRight, Play, LayoutDashboard } from "lucide-react";
 import dynamic from "next/dynamic";
 import { VideoPlaceholder } from "./video-player";
 import { Logo } from "@/components/ui/logo";
+import { UserMenu } from "@/components/navigation/user-menu";
 
 // Lazy load video player
 const VideoPlayer = dynamic(
@@ -19,8 +23,18 @@ const VideoPlayer = dynamic(
 );
 
 export function HeroSection() {
+  const { data: session, status } = useSession();
   const t = useTranslations("landing");
+  const tNav = useTranslations("nav");
   const prefersReducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isLoggedIn = mounted && status === "authenticated" && session?.user;
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -56,12 +70,33 @@ export function HeroSection() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Logo size="lg" showText />
           <div className="flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>
-            </Link>
-            <Link href="/register">
-              <Button variant="gradient" className="cursor-pointer">{t("getStarted")}</Button>
-            </Link>
+            {isLoggedIn ? (
+              <>
+                {/* Show Dashboard button for logged in users */}
+                <Link href={
+                  session.user.role === "SUPER_ADMIN"
+                    ? "/super-admin"
+                    : session.user.role === "COMPANY_ADMIN" && session.user.memberships?.[0]?.companySlug
+                      ? `/c/${session.user.memberships[0].companySlug}/admin`
+                      : "/account"
+                }>
+                  <Button variant="ghost" className="cursor-pointer">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    {tNav("dashboard")}
+                  </Button>
+                </Link>
+                <UserMenu showDashboardLink={false} />
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>
+                </Link>
+                <Link href="/register">
+                  <Button variant="gradient" className="cursor-pointer">{t("getStarted")}</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
+import { checkDocumentLimit, getCompanyOwnerId, checkSubscriptionActive } from "@/lib/subscription";
 import { z } from "zod";
 
 const MAX_CONTENT_SIZE = 100 * 1024; // 100KB
@@ -74,6 +75,45 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json(
         { error: error || "Company not found" },
         { status: error === "Unauthorized" ? 401 : 403 }
+      );
+    }
+
+    // Check if company owner's subscription is active
+    const ownerId = await getCompanyOwnerId(company.id);
+    if (!ownerId) {
+      return NextResponse.json(
+        { error: "Company owner not found" },
+        { status: 500 }
+      );
+    }
+
+    const subscriptionStatus = await checkSubscriptionActive(ownerId);
+    if (!subscriptionStatus.active) {
+      return NextResponse.json(
+        {
+          error: subscriptionStatus.reason || "Subscription not active",
+          code:
+            subscriptionStatus.status === "TRIAL_EXPIRED"
+              ? "TRIAL_EXPIRED"
+              : "SUBSCRIPTION_INACTIVE",
+          upgradeUrl: "/pricing",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check document limit for this company
+    const documentLimit = await checkDocumentLimit(company.id);
+    if (!documentLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Document limit reached for this company",
+          code: "DOCUMENT_LIMIT",
+          currentUsage: documentLimit.currentCount,
+          limit: documentLimit.limit,
+          upgradeUrl: "/pricing",
+        },
+        { status: 429 }
       );
     }
 

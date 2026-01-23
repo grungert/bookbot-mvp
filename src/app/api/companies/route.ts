@@ -34,11 +34,15 @@ export async function POST(request: Request) {
     if (!canCreate.allowed) {
       return NextResponse.json(
         {
-          error: canCreate.reason,
-          currentCount: canCreate.currentCount,
-          maxCount: canCreate.maxCount,
+          error: canCreate.reason || "Company limit reached",
+          code: "COMPANY_LIMIT",
+          currentUsage: canCreate.currentCount,
+          limit: canCreate.maxCount,
+          canAddSlots: canCreate.canAddSlots,
+          extraSlotPrice: canCreate.extraSlotPrice,
+          upgradeUrl: "/pricing",
         },
-        { status: 403 }
+        { status: 429 }
       );
     }
 

@@ -5,7 +5,11 @@ import { getCompanyBySlug, validateCompanyMembershipAccess } from "@/lib/db/tena
 import { AdminSidebar, AdminMobileNav, SidebarProvider, AdminMainContent } from "@/components/admin/admin-sidebar";
 import { UserMenu } from "@/components/navigation/user-menu";
 import { LanguageSwitcher } from "@/components/navigation/language-switcher";
+import { TrialBannerWrapper } from "@/components/admin/trial-banner";
+import { ExpiredOverlay } from "@/components/subscription/expired-overlay";
 import { prisma } from "@/lib/prisma";
+import { getTrialStatus } from "@/lib/subscription/trial";
+import { SubscriptionStatus } from "@prisma/client";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -37,7 +41,16 @@ export default async function AdminLayout({
     redirect(`/${locale}`);
   }
 
-  const [pendingAppointmentsCount, actionableInvoicesCount] = await Promise.all([
+  // Get the company owner for subscription checks
+  const ownerMembership = await prisma.companyMembership.findFirst({
+    where: {
+      companyId: company.id,
+      role: "OWNER",
+    },
+    select: { userId: true },
+  });
+
+  const [pendingAppointmentsCount, actionableInvoicesCount, trialStatus] = await Promise.all([
     prisma.appointment.count({
       where: {
         companyId: company.id,
@@ -56,7 +69,41 @@ export default async function AdminLayout({
         ],
       },
     }),
+    ownerMembership ? getTrialStatus(ownerMembership.userId) : Promise.resolve(null),
   ]);
+
+  // Prepare subscription data for the trial banner
+  const subscriptionData = trialStatus ? {
+    status: trialStatus.status,
+    daysRemaining: trialStatus.daysRemaining,
+    trialEndsAt: trialStatus.trialEndsAt?.toISOString() ?? null,
+    planName: trialStatus.planTier,
+  } : null;
+
+  // Check if subscription is blocked (expired or cancelled)
+  const blockedStatuses: SubscriptionStatus[] = ["TRIAL_EXPIRED", "PAST_DUE", "CANCELLED"];
+  const isBlocked = trialStatus?.status && blockedStatuses.includes(trialStatus.status as SubscriptionStatus);
+
+  // If blocked, show the expired overlay
+  if (isBlocked) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen bg-muted/30 relative">
+          {/* Mobile header */}
+          <header className="lg:hidden sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-14 items-center px-4">
+              <span className="font-semibold">{company.name}</span>
+              <div className="ml-auto flex items-center gap-1">
+                <LanguageSwitcher />
+                <UserMenu showDashboardLink={false} />
+              </div>
+            </div>
+          </header>
+          <ExpiredOverlay status={trialStatus.status as "TRIAL_EXPIRED" | "PAST_DUE" | "CANCELLED"} />
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -78,6 +125,8 @@ export default async function AdminLayout({
             </div>
           </div>
         </header>
+        {/* Trial/Subscription status banner */}
+        <TrialBannerWrapper subscription={subscriptionData} />
         <div className="flex">
           <AdminSidebar
             companySlug={companySlug}

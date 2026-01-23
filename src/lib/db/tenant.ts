@@ -2,9 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { cache } from "react";
 import type { MembershipRole } from "@prisma/client";
-
-// Maximum companies per user (before paid tiers)
-const MAX_COMPANIES_PER_USER = 3;
+import { canCreateCompany as subscriptionCanCreateCompany } from "@/lib/subscription";
 
 // Get company by slug (cached per request)
 export const getCompanyBySlug = cache(async (slug: string) => {
@@ -273,31 +271,26 @@ export async function checkCanCreateCompany(userId: string) {
     const ownerCount = await prisma.companyMembership.count({
       where: { userId, role: "OWNER" },
     });
-    return { allowed: true, reason: null, currentCount: ownerCount, maxCount: null };
-  }
-
-  // Count existing memberships with OWNER role
-  const ownerCount = await prisma.companyMembership.count({
-    where: {
-      userId,
-      role: "OWNER",
-    },
-  });
-
-  if (ownerCount >= MAX_COMPANIES_PER_USER) {
     return {
-      allowed: false,
-      reason: "Company limit reached",
+      allowed: true,
+      reason: null,
       currentCount: ownerCount,
-      maxCount: MAX_COMPANIES_PER_USER,
+      maxCount: null,
+      canAddSlots: false,
+      extraSlotPrice: null,
     };
   }
 
+  // Use subscription system for limit checking
+  const result = await subscriptionCanCreateCompany(userId);
+
   return {
-    allowed: true,
-    reason: null,
-    currentCount: ownerCount,
-    maxCount: MAX_COMPANIES_PER_USER,
+    allowed: result.allowed,
+    reason: result.reason,
+    currentCount: result.currentCompanies,
+    maxCount: result.maxCompanies === -1 ? null : result.maxCompanies,
+    canAddSlots: result.canAddSlots,
+    extraSlotPrice: result.extraSlotPrice,
   };
 }
 

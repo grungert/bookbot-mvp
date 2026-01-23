@@ -3,7 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Building2, Users, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, CreditCard } from "lucide-react";
 
 interface SuperAdminLayoutProps {
   children: React.ReactNode;
@@ -26,6 +26,7 @@ export default async function SuperAdminLayout({
   const navItems = [
     { href: "/super-admin", label: "Dashboard", icon: LayoutDashboard },
     { href: "/super-admin/companies", label: "Companies", icon: Building2 },
+    { href: "/super-admin/subscriptions", label: "Subscriptions", icon: CreditCard },
   ];
 
   return (

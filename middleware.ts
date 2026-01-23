@@ -53,7 +53,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/_vercel") ||
     pathname.includes(".") ||
     pathname.includes("/login") ||
-    pathname.includes("/register")
+    pathname.includes("/register") ||
+    pathname.includes("/forgot-password") ||
+    pathname.includes("/reset-password") ||
+    pathname.includes("/verify-email")
   ) {
     return handleI18nRouting(request);
   }

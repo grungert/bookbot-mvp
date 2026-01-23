@@ -99,6 +99,7 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  badgeTooltip?: string;
 }
 
 function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number) {
@@ -119,12 +120,14 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       label: t("bookings"),
       icon: Calendar,
       badge: pendingAppointmentsCount,
+      badgeTooltip: tAdmin("pendingAppointments"),
     },
     {
       href: `${basePath}/invoices`,
       label: t("invoices"),
       icon: FileText,
       badge: actionableInvoicesCount,
+      badgeTooltip: tAdmin("actionableInvoices"),
     },
     {
       href: `${basePath}/conversations`,
@@ -213,12 +216,28 @@ function NavContent({
             </span>
           )}
           {!isCollapsed && item.badge !== undefined && item.badge > 0 && (
-            <Badge className="ml-auto h-5 min-w-5 px-1.5">
-              {item.badge}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  className="ml-auto h-5 min-w-5 px-1.5 cursor-help"
+                  style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+                >
+                  {item.badge}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+              >
+                {item.badgeTooltip || item.badge}
+              </TooltipContent>
+            </Tooltip>
           )}
           {isCollapsed && item.badge !== undefined && item.badge > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground px-1">
+            <span
+              className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full text-[10px] px-1"
+              style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : { backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
+            >
               {item.badge > 9 ? "9+" : item.badge}
             </span>
           )}
@@ -230,10 +249,25 @@ function NavContent({
       return (
         <Tooltip key={item.href}>
           <TooltipTrigger asChild>{navLink}</TooltipTrigger>
-          <TooltipContent side="right" className="flex items-center gap-2">
-            {item.label}
-            {item.badge !== undefined && item.badge > 0 && (
-              <Badge className="h-5 min-w-5 px-1.5">{item.badge}</Badge>
+          <TooltipContent side="right" className="flex flex-col gap-1">
+            <span className="flex items-center gap-2">
+              {item.label}
+              {item.badge !== undefined && item.badge > 0 && (
+                <Badge
+                  className="h-5 min-w-5 px-1.5"
+                  style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+                >
+                  {item.badge}
+                </Badge>
+              )}
+            </span>
+            {item.badge !== undefined && item.badge > 0 && item.badgeTooltip && (
+              <span
+                className="text-xs px-2 py-0.5 rounded"
+                style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+              >
+                {item.badgeTooltip}
+              </span>
             )}
           </TooltipContent>
         </Tooltip>

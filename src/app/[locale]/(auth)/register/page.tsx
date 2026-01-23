@@ -3,7 +3,7 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ function RegisterForm() {
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
   const router = useRouter();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const callbackUrl = getSafeCallbackUrl(searchParams.get("callbackUrl"), "/");
 
@@ -34,17 +35,27 @@ function RegisterForm() {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, locale }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || tCommon("error"));
+        if (response.status === 429) {
+          toast.error(t("rateLimitExceeded"));
+        } else {
+          toast.error(data.error || tCommon("error"));
+        }
         return;
       }
 
-      // Auto sign in after registration
+      // Redirect to verify email page instead of auto-login
+      if (data.requiresVerification) {
+        router.push(`/${locale}/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
+      // Fallback: Auto sign in after registration (for cases where verification is disabled)
       const result = await signIn("credentials", {
         email,
         password,

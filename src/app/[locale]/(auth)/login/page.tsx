@@ -3,31 +3,60 @@
 import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { getSafeCallbackUrl } from "@/lib/url-utils";
+import { AUTH_ERROR_CODES } from "@/lib/auth-errors";
 
 function LoginForm() {
   const t = useTranslations("auth");
   const tCommon = useTranslations("common");
   const router = useRouter();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const callbackUrl = getSafeCallbackUrl(searchParams.get("callbackUrl"), "/");
 
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorType, setErrorType] = useState<string | null>(null);
+  const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
+
+  function parseAuthError(error: string): { type: string; lockedUntil?: Date } {
+    if (error.startsWith(AUTH_ERROR_CODES.ACCOUNT_LOCKED)) {
+      const parts = error.split(":");
+      const dateStr = parts.slice(1).join(":");
+      return {
+        type: AUTH_ERROR_CODES.ACCOUNT_LOCKED,
+        lockedUntil: dateStr ? new Date(dateStr) : undefined,
+      };
+    }
+    if (error === AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED) {
+      return { type: AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED };
+    }
+    return { type: "INVALID_CREDENTIALS" };
+  }
+
+  function getLockoutMinutes(): number {
+    if (!lockoutUntil) return 0;
+    const now = new Date();
+    const diff = lockoutUntil.getTime() - now.getTime();
+    return Math.max(1, Math.ceil(diff / 60000));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
+    setErrorType(null);
+    setLockoutUntil(null);
 
     try {
       const result = await signIn("credentials", {
@@ -38,10 +67,40 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        toast.error(t("invalidCredentials"));
+        const parsed = parseAuthError(result.error);
+        setErrorType(parsed.type);
+
+        if (parsed.type === AUTH_ERROR_CODES.ACCOUNT_LOCKED && parsed.lockedUntil) {
+          setLockoutUntil(parsed.lockedUntil);
+        } else if (parsed.type === AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED) {
+          // Don't show toast, show inline message instead
+        } else {
+          toast.error(t("invalidCredentials"));
+        }
       } else if (result?.ok) {
         router.push(callbackUrl);
         router.refresh();
+      }
+    } catch {
+      toast.error(tCommon("error"));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setIsLoading(true);
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, locale }),
+      });
+
+      if (response.ok) {
+        toast.success(t("verificationResent"));
+      } else {
+        toast.error(tCommon("error"));
       }
     } catch {
       toast.error(tCommon("error"));
@@ -64,6 +123,32 @@ function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {errorType === AUTH_ERROR_CODES.ACCOUNT_LOCKED && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {t("accountLocked", { minutes: getLockoutMinutes() })}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {errorType === AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED && (
+          <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+              {t("emailNotVerified")}
+              <Button
+                variant="link"
+                className="h-auto p-0 ml-1 text-yellow-800 dark:text-yellow-200 underline"
+                onClick={handleResendVerification}
+                disabled={isLoading}
+              >
+                {t("resendVerification")}
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">{tCommon("email")}</Label>
@@ -78,7 +163,15 @@ function LoginForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">{tCommon("password")}</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">{tCommon("password")}</Label>
+              <Link
+                href="/forgot-password"
+                className="text-sm text-primary hover:underline"
+              >
+                {t("forgotPassword")}
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"

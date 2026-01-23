@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Sparkles, Clock, AlertTriangle, ExternalLink } from "lucide-react";
+import { Link } from "@/i18n/routing";
+import { UsageMeter } from "@/components/subscription/usage-meter";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -59,7 +62,7 @@ interface CompanySettings {
   taxRate: number;
 }
 
-type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed";
+type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "subscription";
 
 const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
   { id: "general", labelKey: "tabGeneral", icon: Building2 },
@@ -68,7 +71,36 @@ const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[]
   { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
   { id: "business", labelKey: "tabBusinessDetails", icon: FileText },
   { id: "embed", labelKey: "tabEmbed", icon: Code },
+  { id: "subscription", labelKey: "tabSubscription", icon: CreditCard },
 ];
+
+interface SubscriptionData {
+  status: string;
+  planTier: string;
+  planName: string;
+  trialEndsAt: string | null;
+  daysRemaining: number;
+  chatUsage: {
+    used: number;
+    limit: number;
+    unlimited: boolean;
+    resetsAt: string;
+  };
+  documentUsage: {
+    current: number;
+    limit: number;
+    unlimited: boolean;
+  };
+  companySlots: {
+    used: number;
+    total: number;
+    unlimited: boolean;
+  };
+  features: {
+    customBranding: boolean;
+    prioritySupport: boolean;
+  };
+}
 
 export default function SettingsPage() {
   const params = useParams();
@@ -77,8 +109,11 @@ export default function SettingsPage() {
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const tSub = useTranslations("subscription");
 
   const [isLoading, setIsLoading] = useState(true);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
@@ -183,6 +218,28 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, [companySlug]);
+
+  // Load subscription data when tab changes to subscription
+  useEffect(() => {
+    if (activeTab === "subscription" && !subscriptionData && !isLoadingSubscription) {
+      loadSubscriptionData();
+    }
+  }, [activeTab]);
+
+  async function loadSubscriptionData() {
+    setIsLoadingSubscription(true);
+    try {
+      const response = await fetch(`/api/c/${companySlug}/settings/subscription`);
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionData(data);
+      }
+    } catch (error) {
+      console.error("Error loading subscription data:", error);
+    } finally {
+      setIsLoadingSubscription(false);
+    }
+  }
 
   async function loadSettings() {
     try {
@@ -356,6 +413,68 @@ export default function SettingsPage() {
 
   const BrandingSection = () => {
     const displayLogo = logoPreview || logoUrl;
+    const canUseBranding = subscriptionData?.features.customBranding ?? false;
+
+    // Load subscription data if not loaded yet
+    useEffect(() => {
+      if (!subscriptionData && !isLoadingSubscription) {
+        loadSubscriptionData();
+      }
+    }, []);
+
+    if (isLoadingSubscription) {
+      return (
+        <div className="rounded-xl border bg-card p-8 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    // Show upgrade prompt if custom branding is not available
+    if (!canUseBranding) {
+      return (
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            {t("branding")}
+          </h3>
+          <div className="relative">
+            {/* Blurred preview of branding section */}
+            <div className="blur-sm pointer-events-none opacity-50 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("companyLogo")}</Label>
+                <div className="flex items-center gap-6">
+                  <div className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/50">
+                    <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">{t("primaryColor")}</Label>
+                <div className="flex gap-3 items-center">
+                  <div className="w-12 h-10 bg-primary rounded" />
+                </div>
+              </div>
+            </div>
+            {/* Upgrade overlay */}
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
+              <div className="text-center p-6">
+                <Palette className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <h4 className="font-semibold mb-2">{tSub("customBrandingLocked")}</h4>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {tSub("upgradeToCustomize")}
+                </p>
+                <Link href="/pricing">
+                  <Button size="sm">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {tSub("upgradeToPro")}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
     <div className="rounded-xl border bg-card p-4">
@@ -812,6 +931,153 @@ export default function SettingsPage() {
     );
   };
 
+  const SubscriptionSection = () => {
+    if (isLoadingSubscription) {
+      return (
+        <div className="rounded-xl border bg-card p-8 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
+
+    if (!subscriptionData) {
+      return (
+        <div className="rounded-xl border bg-card p-8 text-center">
+          <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="font-semibold mb-2">{tSub("noSubscription")}</h3>
+          <p className="text-sm text-muted-foreground mb-4">{tSub("noSubscriptionDescription")}</p>
+          <Link href="/pricing">
+            <Button>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {tSub("viewPricing")}
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    const statusColors: Record<string, { text: string; bg: string }> = {
+      ACTIVE: { text: "text-green-600", bg: "bg-green-100" },
+      TRIALING: { text: "text-blue-600", bg: "bg-blue-100" },
+      TRIAL_EXPIRED: { text: "text-destructive", bg: "bg-red-100" },
+      PAST_DUE: { text: "text-amber-600", bg: "bg-amber-100" },
+      CANCELLED: { text: "text-muted-foreground", bg: "bg-muted" },
+    };
+
+    const colors = statusColors[subscriptionData.status] || statusColors.CANCELLED;
+
+    return (
+      <div className="space-y-4">
+        {/* Current Plan */}
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            {tSub("currentPlan")}
+          </h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", colors.bg)}>
+                <CreditCard className={cn("h-5 w-5", colors.text)} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{subscriptionData.planName}</span>
+                  <Badge variant="outline" className={colors.text}>
+                    {subscriptionData.status === "TRIALING" && <Clock className="h-3 w-3 mr-1" />}
+                    {subscriptionData.status === "ACTIVE" && <Check className="h-3 w-3 mr-1" />}
+                    {(subscriptionData.status === "TRIAL_EXPIRED" || subscriptionData.status === "PAST_DUE") && <AlertTriangle className="h-3 w-3 mr-1" />}
+                    {tSub(`status_${subscriptionData.status}`)}
+                  </Badge>
+                </div>
+                {subscriptionData.status === "TRIALING" && subscriptionData.daysRemaining > 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    {tSub("trialDaysRemaining", { days: subscriptionData.daysRemaining })}
+                  </p>
+                )}
+              </div>
+            </div>
+            {subscriptionData.planTier !== "BUSINESS" && (
+              <Link href="/pricing">
+                <Button size="sm">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {tSub("upgradePlan")}
+                </Button>
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* Usage Stats */}
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            {tSub("usage")}
+          </h3>
+          <div className="space-y-4">
+            {/* Chat Messages */}
+            <UsageMeter
+              label={tSub("chatMessages")}
+              used={subscriptionData.chatUsage.used}
+              limit={subscriptionData.chatUsage.limit}
+              unlimited={subscriptionData.chatUsage.unlimited}
+            />
+
+            {/* Documents */}
+            <UsageMeter
+              label={tSub("documentsThisCompany")}
+              used={subscriptionData.documentUsage.current}
+              limit={subscriptionData.documentUsage.limit}
+              unlimited={subscriptionData.documentUsage.unlimited}
+            />
+
+            {/* Company Slots */}
+            <UsageMeter
+              label={tSub("companySlots")}
+              used={subscriptionData.companySlots.used}
+              limit={subscriptionData.companySlots.total}
+              unlimited={subscriptionData.companySlots.unlimited}
+            />
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="rounded-xl border bg-card p-4">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+            {tSub("planFeatures")}
+          </h3>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div className="flex items-center gap-2 text-sm">
+              {subscriptionData.features.customBranding ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className={cn(!subscriptionData.features.customBranding && "text-muted-foreground")}>
+                {tSub("customBranding")}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              {subscriptionData.features.prioritySupport ? (
+                <Check className="h-4 w-4 text-green-500" />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className={cn(!subscriptionData.features.prioritySupport && "text-muted-foreground")}>
+                {tSub("prioritySupport")}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Manage Link */}
+        <div className="text-center">
+          <Link href="/account/subscription" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
+            {tSub("manageSubscription")}
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -880,6 +1146,7 @@ export default function SettingsPage() {
           {activeTab === "bot" && <BotPersonalitySection />}
           {activeTab === "business" && <BusinessDetailsSection />}
           {activeTab === "embed" && <EmbedSection />}
+          {activeTab === "subscription" && <SubscriptionSection />}
         </div>
       </div>
     </div>

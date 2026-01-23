@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { MessageSquare, X, Send, Loader2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatMessageRenderer } from "./chat-message-renderer";
+import { LimitModal, useLimitModal, type LimitType } from "@/components/subscription/limit-modal";
 import type { ChatMessage, ChatService, ChatTimeSlot, ChatUICallbacks } from "./types";
 
 interface ChatWidgetProps {
@@ -22,6 +23,7 @@ const STORAGE_KEY_PREFIX = "chat-session-";
 export function ChatWidget({ companySlug, primaryColor, embedded = false }: ChatWidgetProps) {
   const t = useTranslations("chat");
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(embedded);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -30,6 +32,9 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Limit modal state
+  const { modalState, showLimitModal, setModalOpen } = useLimitModal();
 
   const storageKey = `${STORAGE_KEY_PREFIX}${companySlug}`;
 
@@ -135,7 +140,22 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       });
 
       if (!response.ok) {
-        throw new Error("Failed to send message");
+        const errorData = await response.json().catch(() => ({}));
+
+        // Handle chat limit exceeded (429)
+        if (response.status === 429 && errorData.code === "CHAT_LIMIT_EXCEEDED") {
+          showLimitModal(
+            "CHAT_LIMIT",
+            errorData.currentUsage,
+            errorData.limit,
+            errorData.resetsAt ? new Date(errorData.resetsAt) : null
+          );
+          // Remove the user message we just added since it wasn't processed
+          setMessages((prev) => prev.slice(0, -1));
+          return;
+        }
+
+        throw new Error(errorData.error || "Failed to send message");
       }
 
       const data = await response.json();
@@ -365,6 +385,17 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
           </form>
         </div>
       )}
+
+      {/* Limit Modal */}
+      <LimitModal
+        open={modalState.open}
+        onOpenChange={setModalOpen}
+        limitType={modalState.limitType}
+        currentUsage={modalState.currentUsage}
+        limit={modalState.limit}
+        resetsAt={modalState.resetsAt}
+        onUpgrade={() => router.push("/pricing")}
+      />
     </>
   );
 }

@@ -10,6 +10,12 @@ import {
   type CompanyContext,
   type UserContext,
 } from "@/lib/ai/chat";
+import {
+  getCompanyOwnerId,
+  checkChatLimit,
+  incrementChatUsage,
+  checkSubscriptionActive,
+} from "@/lib/subscription";
 import { z } from "zod";
 
 const chatRequestSchema = z.object({
@@ -39,6 +45,47 @@ export async function POST(request: Request, { params }: RouteParams) {
       return NextResponse.json(
         { error: "AI not configured for this company" },
         { status: 400 }
+      );
+    }
+
+    // Get company owner for subscription checks
+    const ownerId = await getCompanyOwnerId(company.id);
+    if (!ownerId) {
+      return NextResponse.json(
+        { error: "Company owner not found" },
+        { status: 500 }
+      );
+    }
+
+    // Check owner's subscription is active
+    const subscriptionStatus = await checkSubscriptionActive(ownerId);
+    if (!subscriptionStatus.active) {
+      return NextResponse.json(
+        {
+          error: subscriptionStatus.reason || "Subscription not active",
+          code:
+            subscriptionStatus.status === "TRIAL_EXPIRED"
+              ? "TRIAL_EXPIRED"
+              : "SUBSCRIPTION_INACTIVE",
+          upgradeUrl: "/pricing",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check chat limit (at user level, shared across all companies)
+    const chatLimitResult = await checkChatLimit(ownerId);
+    if (!chatLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: "Monthly chat limit reached across all companies",
+          code: "CHAT_LIMIT_EXCEEDED",
+          currentUsage: chatLimitResult.currentUsage,
+          limit: chatLimitResult.limit,
+          resetsAt: chatLimitResult.resetsAt.toISOString(),
+          upgradeUrl: "/pricing",
+        },
+        { status: 429 }
       );
     }
 
@@ -117,6 +164,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Save assistant response
     await saveChatMessage(session.id, "assistant", response);
+
+    // Increment chat usage at user level (owner pays for all company usage)
+    await incrementChatUsage(ownerId, 1);
 
     return NextResponse.json({
       sessionId: session.id,

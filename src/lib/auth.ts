@@ -6,6 +6,17 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { UserRole, MembershipRole } from "@prisma/client";
 import { z } from "zod";
+import { defaultLocale } from "@/i18n/config";
+import {
+  checkAccountLockout,
+  recordFailedLogin,
+  resetFailedLogins,
+} from "@/lib/account-lockout";
+import { AUTH_ERROR_CODES } from "@/lib/auth-errors";
+
+// Re-export for backward compatibility
+export { AUTH_ERROR_CODES } from "@/lib/auth-errors";
+export type { AuthErrorCode } from "@/lib/auth-errors";
 
 // Membership info for session
 export interface SessionMembership {
@@ -48,18 +59,27 @@ const credentialsSchema = z.object({
 });
 
 export const authOptions: NextAuthOptions = {
+  debug: process.env.NODE_ENV === "development",
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
   session: {
     strategy: "jwt",
   },
   pages: {
-    signIn: "/login",
-    error: "/login",
+    signIn: `/${defaultLocale}/login`,
+    error: `/${defaultLocale}/login`,
   },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      allowDangerousEmailAccountLinking: true,
+      authorization: {
+        params: {
+          prompt: "consent",
+          access_type: "offline",
+          response_type: "code"
+        }
+      }
     }),
     CredentialsProvider({
       name: "credentials",
@@ -83,10 +103,37 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // Check if account is locked
+        const lockoutStatus = await checkAccountLockout(user.id);
+        if (lockoutStatus.isLocked) {
+          // Throw an error that includes the lockout info
+          // The error message format allows the client to parse and display appropriately
+          throw new Error(
+            `${AUTH_ERROR_CODES.ACCOUNT_LOCKED}:${lockoutStatus.lockedUntil?.toISOString()}`
+          );
+        }
+
         const passwordMatch = await bcrypt.compare(password, user.password);
         if (!passwordMatch) {
+          // Record failed login attempt
+          const newLockoutStatus = await recordFailedLogin(user.id);
+
+          if (newLockoutStatus.isLocked) {
+            throw new Error(
+              `${AUTH_ERROR_CODES.ACCOUNT_LOCKED}:${newLockoutStatus.lockedUntil?.toISOString()}`
+            );
+          }
+
           return null;
         }
+
+        // Check if email is verified (strict mode - block login)
+        if (!user.emailVerified) {
+          throw new Error(AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED);
+        }
+
+        // Reset failed login attempts on successful login
+        await resetFailedLogins(user.id);
 
         return {
           id: user.id,
@@ -103,11 +150,38 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, trigger }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
-        token.companyId = user.companyId;
+
+        // Remove any base64 images from the token to prevent oversized cookies
+        // The user's profile picture should be fetched via API instead
+        delete token.picture;
+        if (typeof token.image === 'string' && token.image.startsWith('data:')) {
+          delete token.image;
+        }
+
+        // For OAuth users, fetch role and companyId from database
+        let userRole = user.role;
+        let userCompanyId = user.companyId;
+
+        if (!userRole) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { role: true, companyId: true },
+          });
+          if (dbUser) {
+            userRole = dbUser.role;
+            userCompanyId = dbUser.companyId;
+          } else {
+            // Fallback for new OAuth users
+            userRole = UserRole.END_USER;
+            userCompanyId = null;
+          }
+        }
+
+        token.role = userRole ?? UserRole.END_USER;
+        token.companyId = userCompanyId ?? null;
 
         // Fetch memberships for COMPANY_ADMIN users
-        if (user.role === "COMPANY_ADMIN") {
+        if (userRole === UserRole.COMPANY_ADMIN) {
           const memberships = await prisma.companyMembership.findMany({
             where: { userId: user.id },
             include: {
@@ -138,7 +212,7 @@ export const authOptions: NextAuthOptions = {
       }
 
       // Refresh memberships on session update
-      if (trigger === "update" && token.role === "COMPANY_ADMIN") {
+      if (trigger === "update" && token.role === UserRole.COMPANY_ADMIN) {
         const memberships = await prisma.companyMembership.findMany({
           where: { userId: token.id },
           include: {
@@ -177,24 +251,16 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user, account }) {
-      // For OAuth, we need to handle the user creation/linking
-      if (account?.provider === "google") {
-        const existingUser = await prisma.user.findUnique({
-          where: { email: user.email! },
+      // For Google OAuth, ensure user.id is set correctly for JWT callback
+      // The adapter handles account linking via allowDangerousEmailAccountLinking
+      if (account?.provider === "google" && user.email) {
+        const normalizedEmail = user.email.toLowerCase();
+        const dbUser = await prisma.user.findUnique({
+          where: { email: normalizedEmail },
         });
-
-        if (!existingUser) {
-          // Create a new user with END_USER role
-          // They'll need to be assigned to a company later
-          await prisma.user.create({
-            data: {
-              email: user.email!,
-              name: user.name,
-              image: user.image,
-              role: "END_USER",
-              emailVerified: new Date(),
-            },
-          });
+        if (dbUser) {
+          // Ensure JWT callback gets the correct user ID
+          user.id = dbUser.id;
         }
       }
       return true;

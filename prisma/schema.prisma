@@ -13,6 +13,20 @@ enum UserRole {
   END_USER
 }
 
+enum PlanTier {
+  TRIAL      // 14-day free trial
+  PRO        // Paid, base + per-company pricing
+  BUSINESS   // Paid flat rate, unlimited companies
+}
+
+enum SubscriptionStatus {
+  TRIALING       // In 14-day trial period
+  ACTIVE         // Paid and active
+  TRIAL_EXPIRED  // Trial ended, needs upgrade
+  PAST_DUE       // Payment overdue
+  CANCELLED
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
@@ -126,6 +140,13 @@ model User {
   invoices      Invoice[]
   chatSessions  ChatSession[]
   auditLogs     AuditLog[]
+  subscription  UserSubscription?
+  chatUsage     ChatUsage[]
+
+  // Security relations
+  accountLockout          AccountLockout?
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 }
 
 // NextAuth.js Account model
@@ -398,4 +419,138 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// Subscription Plan
+model Plan {
+  id                      String    @id @default(cuid())
+  name                    String
+  tier                    PlanTier  @unique
+  description             String?
+
+  // Limits (-1 = unlimited)
+  baseCompanies           Int       // Companies included in base price
+  maxCompanies            Int       // Max companies allowed (-1 = unlimited)
+  extraCompanyPrice       Decimal?  @db.Decimal(10, 2) // Price per extra company
+  maxChatMessagesPerMonth Int       // SHARED across all companies
+  maxDocumentsPerCompany  Int?      // Per-company doc limit (-1 = unlimited)
+
+  // Trial settings
+  trialDays               Int?      // 14 for TRIAL tier
+
+  // Features
+  customBranding          Boolean   @default(false)
+  prioritySupport         Boolean   @default(false)
+
+  // Pricing
+  priceMonthly            Decimal   @db.Decimal(10, 2)
+  priceCurrency           String    @default("USD")
+
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  subscriptions           UserSubscription[]
+}
+
+// Subscription at USER level (not company)
+model UserSubscription {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id])
+
+  status             SubscriptionStatus @default(TRIALING)
+
+  // Company slots
+  extraCompanySlots  Int                @default(0) // Additional companies purchased
+
+  // Trial tracking
+  trialEndsAt        DateTime?
+
+  // Billing period
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime
+
+  notes              String?            // Admin notes for manual billing
+
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+}
+
+// Chat usage tracked at USER level (shared across companies)
+model ChatUsage {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  periodStart   DateTime // First day of month
+  periodEnd     DateTime // Last day of month
+  messageCount  Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, periodStart])
+  @@index([userId])
+}
+
+// Security: Login attempt tracking for rate limiting
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  ipAddress String
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([ipAddress])
+  @@index([createdAt])
+}
+
+// Security: Account lockout after failed login attempts
+model AccountLockout {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  lastFailedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([lockedUntil])
+}
+
+// Security: Password reset tokens
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// Security: Email verification tokens
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([expiresAt])
 }

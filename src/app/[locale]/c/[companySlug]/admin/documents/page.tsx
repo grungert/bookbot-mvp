@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useTheme } from "next-themes";
 import { format, parseISO } from "date-fns";
@@ -31,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Loader2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Search, Copy, ChevronLeft, ChevronRight, AlertTriangle, Eye, RefreshCw, RotateCcw, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { LimitModal, useLimitModal } from "@/components/subscription/limit-modal";
 import { cn } from "@/lib/utils";
 import MDEditor from "@uiw/react-md-editor";
 
@@ -54,10 +55,14 @@ const CONTENT_WARNING_THRESHOLD = 80 * 1024; // 80KB - show warning at 80%
 
 export default function DocumentsPage() {
   const params = useParams();
+  const router = useRouter();
   const companySlug = params.companySlug as string;
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
   const { resolvedTheme } = useTheme();
+
+  // Limit modal state
+  const { modalState, showLimitModal, setModalOpen } = useLimitModal();
 
   const [documents, setDocuments] = useState<Document[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
@@ -287,6 +292,17 @@ export default function DocumentsPage() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
+
+        // Handle document limit exceeded (429)
+        if (response.status === 429 && data.code === "DOCUMENT_LIMIT") {
+          showLimitModal(
+            "DOCUMENT_LIMIT",
+            data.currentUsage,
+            data.limit,
+            null
+          );
+          return;
+        }
 
         if (response.status === 400) {
           // Handle validation errors from API
@@ -1031,6 +1047,17 @@ export default function DocumentsPage() {
           </div>
         </form>
       </div>
+
+      {/* Limit Modal */}
+      <LimitModal
+        open={modalState.open}
+        onOpenChange={setModalOpen}
+        limitType={modalState.limitType}
+        currentUsage={modalState.currentUsage}
+        limit={modalState.limit}
+        resetsAt={modalState.resetsAt}
+        onUpgrade={() => router.push("/pricing")}
+      />
     </div>
   );
 }
