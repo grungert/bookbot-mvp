@@ -36,7 +36,9 @@ interface UpgradeModalProps {
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
   currentTier?: string | null;
+  hasChatbot?: boolean; // Does user already have chatbot addon?
   primaryColor?: string | null;
+  currentCompanyCount?: number; // Number of companies user currently has
 }
 
 interface Pricing {
@@ -48,19 +50,32 @@ interface Pricing {
 
 type PlanTier = "PRO" | "BUSINESS";
 
+// Type for what PRO users can upgrade to
+type ProUpgradeChoice = "chatbot" | "companies" | "business";
+
 export function UpgradeModal({
   open,
   onOpenChange,
   onSuccess,
   currentTier,
+  hasChatbot = false,
   primaryColor,
+  currentCompanyCount,
 }: UpgradeModalProps) {
   const t = useTranslations("pricing");
   const tUpgrade = useTranslations("upgrade");
   const tCommon = useTranslations("common");
 
+  // Check if user already has PRO plan (addon-only mode)
+  const isProAddonMode = currentTier === "PRO";
+  // PRO users who have chatbot already can only add companies or upgrade to business
+  const canAddChatbot = isProAddonMode && !hasChatbot;
+  const proHasChatbotAlready = isProAddonMode && hasChatbot;
+
   const [step, setStep] = useState(1);
   const [selectedPlan, setSelectedPlan] = useState<PlanTier>("PRO");
+  // For PRO users: what upgrade path they chose
+  const [proUpgradeChoice, setProUpgradeChoice] = useState<ProUpgradeChoice | null>(null);
   const [includeChatbot, setIncludeChatbot] = useState(false);
   const [extraCompanyCount, setExtraCompanyCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,24 +106,32 @@ export function UpgradeModal({
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
+      // PRO users start at step 1 to choose their upgrade path
+      // Non-PRO users also start at step 1 to choose PRO vs Business
       setStep(1);
       setSelectedPlan("PRO");
+      setProUpgradeChoice(null);
       setIncludeChatbot(false);
-      setExtraCompanyCount(0);
+      // Pre-fill extra companies based on current usage (for trial users)
+      // Pro includes 1 company, so extra = max(0, currentCount - 1)
+      const requiredExtra = Math.max(0, (currentCompanyCount ?? 1) - 1);
+      setExtraCompanyCount(requiredExtra);
       setIsSubmitting(false);
       setSubmitted(false);
       setPaymentReference("");
     }
-  }, [open]);
+  }, [open, currentCompanyCount]);
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
   // Calculate total price based on selected plan
   const calculateTotalPrice = () => {
-    if (selectedPlan === "BUSINESS") {
+    // For Business plan (or PRO users upgrading to Business)
+    if (selectedPlan === "BUSINESS" || proUpgradeChoice === "business") {
       return pricing.BUSINESS_BASE;
     }
-    const basePrice = pricing.PRO_BASE;
+    // If user already has PRO, don't charge base price again
+    const basePrice = isProAddonMode ? 0 : pricing.PRO_BASE;
     const chatbotPrice = includeChatbot ? pricing.CHATBOT_ADDON : 0;
     const extraCompaniesPrice = extraCompanyCount * pricing.EXTRA_COMPANY;
     return basePrice + chatbotPrice + extraCompaniesPrice;
@@ -124,13 +147,18 @@ export function UpgradeModal({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // Determine actual plan tier (Business upgrade from PRO user)
+      const actualPlanTier = proUpgradeChoice === "business" ? "BUSINESS" : selectedPlan;
+      const isBusiness = actualPlanTier === "BUSINESS";
+
       const response = await fetch("/api/subscription/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          planTier: selectedPlan,
-          includeChatbot: selectedPlan === "BUSINESS" ? true : includeChatbot,
-          extraCompanyCount: selectedPlan === "BUSINESS" ? 0 : extraCompanyCount,
+          planTier: actualPlanTier,
+          includeChatbot: isBusiness ? true : includeChatbot,
+          extraCompanyCount: isBusiness ? 0 : extraCompanyCount,
+          isAddonOnly: isProAddonMode, // User already has PRO, just adding addons
         }),
       });
 
@@ -166,17 +194,61 @@ export function UpgradeModal({
     toast.success(tUpgrade("referenceCopied"));
   };
 
-  // Get total steps based on plan (Business skips company and chatbot steps)
-  const totalSteps = selectedPlan === "BUSINESS" ? 3 : 5;
+  // Get total steps based on plan and mode
+  const getTotalSteps = () => {
+    // Business from trial/new user: Plan -> Summary -> Confirm = 3 steps
+    if (selectedPlan === "BUSINESS" && !isProAddonMode) return 3;
+
+    // PRO user choosing Business: Choose -> Summary -> Confirm = 3 steps
+    if (isProAddonMode && proUpgradeChoice === "business") return 3;
+
+    // PRO user with chatbot choosing companies: Choose -> Companies -> Summary -> Confirm = 4 steps
+    if (proHasChatbotAlready && proUpgradeChoice === "companies") return 4;
+
+    // PRO user without chatbot choosing chatbot: Choose -> Chatbot (pre-selected) -> Companies -> Summary -> Confirm = 4 steps
+    // (Chatbot is pre-selected, so effectively: Choose -> Companies -> Summary -> Confirm = 4 steps)
+    if (isProAddonMode && proUpgradeChoice === "chatbot") return 4;
+
+    // Non-PRO PRO plan: Plan -> Companies -> Chatbot -> Summary -> Confirm = 5 steps
+    return 5;
+  };
+  const totalSteps = getTotalSteps();
 
   // Get actual step for progress bar
   const getProgressStep = () => {
-    if (selectedPlan === "BUSINESS") {
-      // Business: Step 1 (Plan) -> Step 4 (Summary) -> Step 5 (Confirm)
+    // Business from trial/new user
+    if (selectedPlan === "BUSINESS" && !isProAddonMode) {
       if (step === 1) return 1;
       if (step === 4) return 2;
       if (step === 5) return 3;
     }
+
+    // PRO user flows
+    if (isProAddonMode) {
+      // Business upgrade
+      if (proUpgradeChoice === "business") {
+        if (step === 1) return 1;
+        if (step === 4) return 2;
+        if (step === 5) return 3;
+      }
+      // Companies only (PRO with chatbot)
+      if (proHasChatbotAlready && proUpgradeChoice === "companies") {
+        if (step === 1) return 1;
+        if (step === 2) return 2;
+        if (step === 4) return 3;
+        if (step === 5) return 4;
+      }
+      // Chatbot + optional companies (PRO without chatbot)
+      if (proUpgradeChoice === "chatbot") {
+        if (step === 1) return 1;
+        if (step === 2) return 2; // Companies step (chatbot pre-selected)
+        if (step === 4) return 3;
+        if (step === 5) return 4;
+      }
+      // Still at choose step
+      return 1;
+    }
+
     return step;
   };
 
@@ -200,7 +272,173 @@ export function UpgradeModal({
     </div>
   );
 
-  // Step 1: Plan selection (Pro vs Business)
+  // Step 1 for PRO users: Choose upgrade path (Chatbot vs Business, or Companies vs Business)
+  const renderProAddonStep1 = () => {
+    // PRO user with chatbot already: can add companies or upgrade to business
+    // PRO user without chatbot: can add chatbot (+companies) or upgrade to business
+    const showChatbotOption = canAddChatbot;
+    const showCompaniesOption = proHasChatbotAlready;
+
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <div
+            className="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3"
+            style={primaryBgLight || { backgroundColor: 'hsl(var(--primary) / 0.1)' }}
+          >
+            <Crown className="h-6 w-6" style={primaryText || { color: 'hsl(var(--primary))' }} />
+          </div>
+          <h3 className="font-semibold text-lg mb-1">{tUpgrade("chooseUpgradeType")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {tUpgrade("chooseUpgradeTypeDescription")}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {/* Add Chatbot Option (for PRO users without chatbot) */}
+          {showChatbotOption && (
+            <div
+              onClick={() => {
+                setProUpgradeChoice("chatbot");
+                setIncludeChatbot(true); // Pre-select chatbot
+              }}
+              className={cn(
+                "relative p-4 rounded-xl border bg-card cursor-pointer transition-all",
+                proUpgradeChoice === "chatbot" ? "ring-2" : "hover:border-muted-foreground/50"
+              )}
+              style={proUpgradeChoice === "chatbot" ? { borderColor: primaryColor || 'hsl(var(--primary))', boxShadow: primaryColor ? `0 0 0 1px ${primaryColor}` : undefined } : undefined}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0"
+                  style={proUpgradeChoice === "chatbot" ? { borderColor: primaryColor || 'hsl(var(--primary))' } : { borderColor: 'hsl(var(--muted-foreground))' }}
+                >
+                  {proUpgradeChoice === "chatbot" && (
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={primaryBg || { backgroundColor: 'hsl(var(--primary))' }}
+                    />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                      <span className="font-semibold">{tUpgrade("addChatbotAddon")}</span>
+                    </div>
+                    <span className="font-bold" style={primaryText || { color: 'hsl(var(--primary))' }}>
+                      +{formatPrice(pricing.CHATBOT_ADDON)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{tUpgrade("addChatbotDescription")}</p>
+                  <div className="mt-3 space-y-1.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                      <span>{tUpgrade("chatbotFeature1")}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                      <span>{tUpgrade("chatbotFeature2")}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Companies Option (for PRO users with chatbot) */}
+          {showCompaniesOption && (
+            <div
+              onClick={() => setProUpgradeChoice("companies")}
+              className={cn(
+                "relative p-4 rounded-xl border bg-card cursor-pointer transition-all",
+                proUpgradeChoice === "companies" ? "ring-2" : "hover:border-muted-foreground/50"
+              )}
+              style={proUpgradeChoice === "companies" ? { borderColor: primaryColor || 'hsl(var(--primary))', boxShadow: primaryColor ? `0 0 0 1px ${primaryColor}` : undefined } : undefined}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0"
+                  style={proUpgradeChoice === "companies" ? { borderColor: primaryColor || 'hsl(var(--primary))' } : { borderColor: 'hsl(var(--muted-foreground))' }}
+                >
+                  {proUpgradeChoice === "companies" && (
+                    <div
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={primaryBg || { backgroundColor: 'hsl(var(--primary))' }}
+                    />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                      <span className="font-semibold">{tUpgrade("addCompanies")}</span>
+                    </div>
+                    <span className="font-bold" style={primaryText || { color: 'hsl(var(--primary))' }}>
+                      {formatPrice(pricing.EXTRA_COMPANY)}<span className="text-sm font-normal text-muted-foreground">/ea</span>
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{tUpgrade("addCompaniesDescription")}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade to Business Option (always shown for PRO users) */}
+          <div
+            onClick={() => setProUpgradeChoice("business")}
+            className={cn(
+              "relative p-4 rounded-xl border bg-card cursor-pointer transition-all",
+              proUpgradeChoice === "business" ? "ring-2" : "hover:border-muted-foreground/50"
+            )}
+            style={proUpgradeChoice === "business" ? { borderColor: primaryColor || 'hsl(var(--primary))', boxShadow: primaryColor ? `0 0 0 1px ${primaryColor}` : undefined } : undefined}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0"
+                style={proUpgradeChoice === "business" ? { borderColor: primaryColor || 'hsl(var(--primary))' } : { borderColor: 'hsl(var(--muted-foreground))' }}
+              >
+                {proUpgradeChoice === "business" && (
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={primaryBg || { backgroundColor: 'hsl(var(--primary))' }}
+                  />
+                )}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{tUpgrade("upgradeToBusiness")}</span>
+                    <Sparkles className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  <span className="font-bold" style={primaryText || { color: 'hsl(var(--primary))' }}>
+                    {formatPrice(pricing.BUSINESS_BASE)}<span className="text-sm font-normal text-muted-foreground">/mo</span>
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{tUpgrade("upgradeToBusinessDescription")}</p>
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Infinity className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                    <span>{tUpgrade("businessFeature1")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Infinity className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                    <span>{tUpgrade("businessFeature2")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Zap className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                    <span>{tUpgrade("businessFeature3")}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Step 1: Plan selection (Pro vs Business) - for new/trial users
   const renderStep1 = () => (
     <div className="space-y-4">
       <div className="text-center">
@@ -485,7 +723,13 @@ export function UpgradeModal({
   );
 
   // Step 4: Price summary
-  const renderStep4 = () => (
+  const renderStep4 = () => {
+    // Check if this is a Business upgrade (either direct selection or PRO user upgrading)
+    const isBusinessUpgrade = selectedPlan === "BUSINESS" || proUpgradeChoice === "business";
+    // PRO user adding addons (not upgrading to business)
+    const isProAddons = isProAddonMode && proUpgradeChoice !== "business";
+
+    return (
     <div className="space-y-4">
       <div className="text-center">
         <div
@@ -502,27 +746,85 @@ export function UpgradeModal({
 
       <div className="rounded-xl border bg-card p-4">
         <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          {selectedPlan === "BUSINESS" ? "Business" : "Pro"} {tUpgrade("plan")}
+          {isProAddons ? tUpgrade("addons") : isBusinessUpgrade ? `Business ${tUpgrade("plan")}` : `Pro ${tUpgrade("plan")}`}
         </h4>
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-8 w-8 items-center justify-center rounded-full"
-                style={primaryBgLight || { backgroundColor: 'hsl(var(--primary) / 0.1)' }}
-              >
-                <Crown className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+          {/* Show base price only if not in addon mode (new user getting PRO or Business) */}
+          {!isProAddonMode && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex h-8 w-8 items-center justify-center rounded-full"
+                  style={primaryBgLight || { backgroundColor: 'hsl(var(--primary) / 0.1)' }}
+                >
+                  <Crown className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                </div>
+                <span className="font-medium">
+                  {selectedPlan === "BUSINESS" ? "Business" : tUpgrade("proBase")}
+                </span>
               </div>
               <span className="font-medium">
-                {selectedPlan === "BUSINESS" ? "Business" : tUpgrade("proBase")}
+                {formatPrice(selectedPlan === "BUSINESS" ? pricing.BUSINESS_BASE : pricing.PRO_BASE)}/mo
               </span>
             </div>
-            <span className="font-medium">
-              {formatPrice(selectedPlan === "BUSINESS" ? pricing.BUSINESS_BASE : pricing.PRO_BASE)}/mo
-            </span>
-          </div>
+          )}
 
-          {selectedPlan === "PRO" && includeChatbot && (
+          {/* PRO user upgrading to Business */}
+          {isProAddonMode && proUpgradeChoice === "business" && (
+            <>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-dashed">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                    <Check className="h-4 w-4 text-green-600" />
+                  </div>
+                  <span className="font-medium text-muted-foreground">{tUpgrade("existingProPlan")}</span>
+                </div>
+                <span className="text-sm text-muted-foreground line-through">€9.99/mo</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex h-8 w-8 items-center justify-center rounded-full"
+                    style={primaryBgLight || { backgroundColor: 'hsl(var(--primary) / 0.1)' }}
+                  >
+                    <Sparkles className="h-4 w-4 text-yellow-500" />
+                  </div>
+                  <span className="font-medium">{tUpgrade("upgradeToBusiness")}</span>
+                </div>
+                <span className="font-medium">{formatPrice(pricing.BUSINESS_BASE)}/mo</span>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                  <span>{tUpgrade("businessFeature1")}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                  <span>{tUpgrade("businessFeature2")}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
+                  <span>{tUpgrade("businessFeature3")}</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Show existing Pro subscription note in addon mode (not business) */}
+          {isProAddons && (
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-dashed">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                  <Check className="h-4 w-4 text-green-600" />
+                </div>
+                <span className="font-medium text-muted-foreground">{tUpgrade("existingProPlan")}</span>
+              </div>
+              <span className="text-sm text-muted-foreground">{tUpgrade("alreadyActive")}</span>
+            </div>
+          )}
+
+          {/* Chatbot addon (PRO users adding chatbot, or new PRO users with chatbot) */}
+          {selectedPlan === "PRO" && includeChatbot && proUpgradeChoice !== "business" && (
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <div
@@ -537,7 +839,8 @@ export function UpgradeModal({
             </div>
           )}
 
-          {selectedPlan === "PRO" && extraCompanyCount > 0 && (
+          {/* Extra companies (PRO users adding companies, or new PRO users with extra companies) */}
+          {selectedPlan === "PRO" && extraCompanyCount > 0 && proUpgradeChoice !== "business" && (
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <div
@@ -552,7 +855,8 @@ export function UpgradeModal({
             </div>
           )}
 
-          {selectedPlan === "BUSINESS" && (
+          {/* New user selecting Business */}
+          {selectedPlan === "BUSINESS" && !isProAddonMode && (
             <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
               <div className="flex items-center gap-2 text-sm">
                 <Check className="h-4 w-4" style={primaryText || { color: 'hsl(var(--primary))' }} />
@@ -586,10 +890,15 @@ export function UpgradeModal({
         </p>
       </div>
     </div>
-  );
+    );
+  };
 
   // Step 5: Confirmation
-  const renderStep5 = () => (
+  const renderStep5 = () => {
+    // Check if this is a Business upgrade (either direct selection or PRO user upgrading)
+    const isBusinessUpgrade = selectedPlan === "BUSINESS" || proUpgradeChoice === "business";
+
+    return (
     <div className="space-y-4">
       <div className="text-center">
         <div
@@ -611,9 +920,9 @@ export function UpgradeModal({
         <div className="rounded-lg bg-muted/50 p-3 space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">{tUpgrade("plan")}</span>
-            <span className="font-medium">{selectedPlan === "BUSINESS" ? "Business" : "Pro"}</span>
+            <span className="font-medium">{isBusinessUpgrade ? "Business" : "Pro"}</span>
           </div>
-          {selectedPlan === "PRO" && (
+          {!isBusinessUpgrade && (
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{tUpgrade("totalCompanies")}</span>
@@ -625,7 +934,7 @@ export function UpgradeModal({
               </div>
             </>
           )}
-          {selectedPlan === "BUSINESS" && (
+          {isBusinessUpgrade && (
             <>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{tUpgrade("totalCompanies")}</span>
@@ -650,7 +959,8 @@ export function UpgradeModal({
         {tUpgrade("confirmNote")}
       </p>
     </div>
-  );
+    );
+  };
 
   // Step 6: Success
   const renderStep6 = () => (
@@ -705,26 +1015,84 @@ export function UpgradeModal({
   );
 
   const handleNext = () => {
-    if (selectedPlan === "BUSINESS") {
-      // Business plan skips steps 2 and 3
+    // Non-PRO user selecting Business: Plan (1) -> Summary (4) -> Confirm (5)
+    if (selectedPlan === "BUSINESS" && !isProAddonMode) {
       if (step === 1) setStep(4);
       else if (step === 4) setStep(5);
-    } else {
-      setStep(step + 1);
+      return;
     }
+
+    // PRO user flows
+    if (isProAddonMode) {
+      // Business upgrade: Choose (1) -> Summary (4) -> Confirm (5)
+      if (proUpgradeChoice === "business") {
+        if (step === 1) setStep(4);
+        else if (step === 4) setStep(5);
+        return;
+      }
+      // Chatbot + companies: Choose (1) -> Companies (2) -> Summary (4) -> Confirm (5)
+      if (proUpgradeChoice === "chatbot") {
+        if (step === 1) setStep(2);
+        else if (step === 2) setStep(4);
+        else if (step === 4) setStep(5);
+        return;
+      }
+      // Companies only (has chatbot): Choose (1) -> Companies (2) -> Summary (4) -> Confirm (5)
+      if (proUpgradeChoice === "companies") {
+        if (step === 1) setStep(2);
+        else if (step === 2) setStep(4);
+        else if (step === 4) setStep(5);
+        return;
+      }
+    }
+
+    // Non-PRO user selecting PRO: Plan (1) -> Companies (2) -> Chatbot (3) -> Summary (4) -> Confirm (5)
+    setStep(step + 1);
   };
 
   const handleBack = () => {
-    if (selectedPlan === "BUSINESS") {
+    // Non-PRO user selecting Business
+    if (selectedPlan === "BUSINESS" && !isProAddonMode) {
       if (step === 4) setStep(1);
       else if (step === 5) setStep(4);
-    } else {
-      setStep(step - 1);
+      return;
     }
+
+    // PRO user flows
+    if (isProAddonMode) {
+      // Business upgrade
+      if (proUpgradeChoice === "business") {
+        if (step === 4) setStep(1);
+        else if (step === 5) setStep(4);
+        return;
+      }
+      // Chatbot + companies or companies only
+      if (proUpgradeChoice === "chatbot" || proUpgradeChoice === "companies") {
+        if (step === 2) setStep(1);
+        else if (step === 4) setStep(2);
+        else if (step === 5) setStep(4);
+        return;
+      }
+    }
+
+    // Non-PRO user selecting PRO
+    setStep(step - 1);
   };
 
   const isLastStep = () => {
     return step === 5;
+  };
+
+  const isFirstStep = () => {
+    return step === 1;
+  };
+
+  // Check if next button should be disabled (must select an option in PRO addon mode step 1)
+  const isNextDisabled = () => {
+    if (isProAddonMode && step === 1 && !proUpgradeChoice) {
+      return true;
+    }
+    return false;
   };
 
   const renderNavigation = () => {
@@ -738,7 +1106,7 @@ export function UpgradeModal({
 
     return (
       <div className="flex gap-3">
-        {step > 1 && (
+        {!isFirstStep() && (
           <Button variant="outline" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             {tCommon("back")}
@@ -747,6 +1115,7 @@ export function UpgradeModal({
         {!isLastStep() ? (
           <Button
             onClick={handleNext}
+            disabled={isNextDisabled()}
             className="flex-1"
             style={primaryBg}
           >
@@ -799,7 +1168,7 @@ export function UpgradeModal({
         </DialogHeader>
 
         <div className="py-2">
-          {step === 1 && renderStep1()}
+          {step === 1 && (isProAddonMode ? renderProAddonStep1() : renderStep1())}
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
           {step === 4 && renderStep4()}

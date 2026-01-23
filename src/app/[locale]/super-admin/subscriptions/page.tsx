@@ -29,11 +29,11 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Loader2,
   Search,
-  CreditCard,
   Users,
   MessageSquare,
   AlertTriangle,
@@ -41,6 +41,8 @@ import {
   Clock,
   Building2,
   Edit,
+  Bot,
+  BotOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -65,6 +67,7 @@ interface Subscription {
   };
   status: string;
   extraCompanySlots: number;
+  hasChatbot: boolean;
   trialEndsAt: string | null;
   currentPeriodStart: string;
   currentPeriodEnd: string;
@@ -106,6 +109,7 @@ export default function SubscriptionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
+  const [chatbotFilter, setChatbotFilter] = useState<string>("all");
 
   // Edit dialog state
   const [editingSubscription, setEditingSubscription] =
@@ -116,6 +120,7 @@ export default function SubscriptionsPage() {
     status: "",
     planTier: "",
     extraCompanySlots: 0,
+    hasChatbot: false,
     notes: "",
   });
 
@@ -153,6 +158,7 @@ export default function SubscriptionsPage() {
       status: subscription.status,
       planTier: subscription.plan.tier,
       extraCompanySlots: subscription.extraCompanySlots,
+      hasChatbot: subscription.hasChatbot,
       notes: subscription.notes || "",
     });
     setIsEditDialogOpen(true);
@@ -172,6 +178,7 @@ export default function SubscriptionsPage() {
             status: editForm.status,
             planTier: editForm.planTier,
             extraCompanySlots: editForm.extraCompanySlots,
+            hasChatbot: editForm.hasChatbot,
             notes: editForm.notes || null,
           }),
         }
@@ -207,8 +214,16 @@ export default function SubscriptionsPage() {
     const matchesTier =
       tierFilter === "all" || sub.plan.tier === tierFilter;
 
-    return matchesSearch && matchesStatus && matchesTier;
+    const matchesChatbot =
+      chatbotFilter === "all" ||
+      (chatbotFilter === "with" && sub.hasChatbot) ||
+      (chatbotFilter === "without" && !sub.hasChatbot);
+
+    return matchesSearch && matchesStatus && matchesTier && matchesChatbot;
   });
+
+  // Calculate chatbot stats
+  const usersWithChatbot = subscriptions.filter((sub) => sub.hasChatbot).length;
 
   if (isLoading) {
     return (
@@ -226,7 +241,7 @@ export default function SubscriptionsPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -310,6 +325,23 @@ export default function SubscriptionsPage() {
               </p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Users with Chatbot
+              </CardTitle>
+              <Bot className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{usersWithChatbot}</div>
+              <p className="text-xs text-muted-foreground">
+                {subscriptions.length > 0
+                  ? `${Math.round((usersWithChatbot / subscriptions.length) * 100)}% of users`
+                  : "0% of users"}
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -336,6 +368,13 @@ export default function SubscriptionsPage() {
                 <span className="font-medium">
                   {stats.byStatus.CANCELLED || 0}
                 </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+                  <Bot className="h-3 w-3 mr-1" />
+                  With Chatbot
+                </Badge>
+                <span className="font-medium">{usersWithChatbot}</span>
               </div>
             </div>
           </CardContent>
@@ -381,6 +420,16 @@ export default function SubscriptionsPage() {
                 <SelectItem value="BUSINESS">Business</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={chatbotFilter} onValueChange={setChatbotFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Chatbot" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Chatbot</SelectItem>
+                <SelectItem value="with">With Chatbot</SelectItem>
+                <SelectItem value="without">Without Chatbot</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -393,6 +442,7 @@ export default function SubscriptionsPage() {
               <TableHead>User</TableHead>
               <TableHead>Plan</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Chatbot</TableHead>
               <TableHead>Companies</TableHead>
               <TableHead>Chat Usage</TableHead>
               <TableHead>Trial/Period End</TableHead>
@@ -402,7 +452,7 @@ export default function SubscriptionsPage() {
           <TableBody>
             {filteredSubscriptions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8">
+                <TableCell colSpan={8} className="text-center py-8">
                   <p className="text-muted-foreground">No subscriptions found</p>
                 </TableCell>
               </TableRow>
@@ -448,6 +498,19 @@ export default function SubscriptionsPage() {
                       <Badge className={statusColors[sub.status] || ""}>
                         {sub.status.replace("_", " ")}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {sub.hasChatbot ? (
+                        <div className="flex items-center gap-1 text-emerald-600">
+                          <Bot className="h-4 w-4" />
+                          <span className="text-xs">Enabled</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <BotOff className="h-4 w-4" />
+                          <span className="text-xs">Disabled</span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -582,6 +645,19 @@ export default function SubscriptionsPage() {
                 <p className="text-xs text-muted-foreground">
                   Additional company slots beyond base plan
                 </p>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="hasChatbot"
+                  checked={editForm.hasChatbot}
+                  onCheckedChange={(checked) =>
+                    setEditForm({ ...editForm, hasChatbot: checked === true })
+                  }
+                />
+                <Label htmlFor="hasChatbot" className="cursor-pointer">
+                  AI Chatbot Enabled
+                </Label>
               </div>
 
               <div className="space-y-2">

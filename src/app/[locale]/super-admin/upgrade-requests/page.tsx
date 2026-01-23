@@ -32,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Clock,
   CheckCircle,
@@ -42,6 +43,7 @@ import {
   MessageSquare,
   Loader2,
   Euro,
+  Trash2,
 } from "lucide-react";
 
 interface User {
@@ -87,6 +89,8 @@ export default function UpgradeRequestsPage() {
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
@@ -125,7 +129,7 @@ export default function UpgradeRequestsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to process request");
+        throw new Error(error.details || error.error || "Failed to process request");
       }
 
       toast.success(
@@ -181,6 +185,54 @@ export default function UpgradeRequestsPage() {
     if (statusFilter === "all") return true;
     return req.status === statusFilter;
   });
+
+  // Selection handlers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredRequests.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch("/api/super-admin/upgrade-requests", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete requests");
+      }
+
+      const data = await response.json();
+      toast.success(`Deleted ${data.deletedCount} request(s)`);
+      setSelectedIds(new Set());
+      fetchRequests();
+    } catch (error) {
+      console.error("Error deleting requests:", error);
+      toast.error("Failed to delete requests");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -258,6 +310,21 @@ export default function UpgradeRequestsPage() {
             <SelectItem value="CANCELLED">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        {selectedIds.size > 0 && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeleteSelected}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Delete {selectedIds.size} selected
+          </Button>
+        )}
       </div>
 
       {/* Requests Table */}
@@ -277,6 +344,12 @@ export default function UpgradeRequestsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={filteredRequests.length > 0 && selectedIds.size === filteredRequests.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Plan Details</TableHead>
                   <TableHead>Monthly Price</TableHead>
@@ -288,6 +361,12 @@ export default function UpgradeRequestsPage() {
               <TableBody>
                 {filteredRequests.map((request) => (
                   <TableRow key={request.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(request.id)}
+                        onCheckedChange={() => toggleSelect(request.id)}
+                      />
+                    </TableCell>
                     <TableCell>
                       <div>
                         <p className="font-medium">{request.user.name || "No name"}</p>

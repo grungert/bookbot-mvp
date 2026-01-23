@@ -119,6 +119,7 @@ export async function GET(request: Request) {
       },
       status: sub.status,
       extraCompanySlots: sub.extraCompanySlots,
+      hasChatbot: sub.hasChatbot,
       trialEndsAt: sub.trialEndsAt,
       currentPeriodStart: sub.currentPeriodStart,
       currentPeriodEnd: sub.currentPeriodEnd,

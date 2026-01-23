@@ -1561,6 +1561,7 @@ export default function SettingsPage() {
           onSuccess={loadPendingUpgradeRequest}
           currentTier={subscriptionData.planTier}
           hasChatbot={subscriptionData.features.aiChatbot}
+          currentCompanyCount={subscriptionData.companySlots.used}
           primaryColor={primaryColor}
         />
 

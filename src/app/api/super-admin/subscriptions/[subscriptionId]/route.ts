@@ -8,6 +8,7 @@ const updateSubscriptionSchema = z.object({
   planTier: z.nativeEnum(PlanTier).optional(),
   status: z.nativeEnum(SubscriptionStatus).optional(),
   extraCompanySlots: z.number().min(0).optional(),
+  hasChatbot: z.boolean().optional(),
   notes: z.string().nullable().optional(),
   trialEndsAt: z.string().nullable().optional(),
 });
@@ -152,6 +153,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     // Handle extra company slots
     if (parsed.data.extraCompanySlots !== undefined) {
       updateData.extraCompanySlots = parsed.data.extraCompanySlots;
+    }
+
+    // Handle chatbot toggle
+    if (parsed.data.hasChatbot !== undefined) {
+      updateData.hasChatbot = parsed.data.hasChatbot;
     }
 
     // Handle notes
