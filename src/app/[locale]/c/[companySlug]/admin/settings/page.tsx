@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Sparkles, Clock, AlertTriangle, ExternalLink, Calendar, Plus } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
@@ -481,7 +481,7 @@ export default function SettingsPage() {
                 </p>
                 <Link href="/pricing">
                   <Button size="sm">
-                    <Sparkles className="h-4 w-4 mr-2" />
+                    <Crown className="h-4 w-4 mr-2" />
                     {tSub("upgradeToPro")}
                   </Button>
                 </Link>
@@ -972,7 +972,7 @@ export default function SettingsPage() {
           <p className="text-sm text-muted-foreground mb-4">{tSub("noSubscriptionDescription")}</p>
           <Link href="/pricing">
             <Button>
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Crown className="h-4 w-4 mr-2" />
               {tSub("viewPricing")}
             </Button>
           </Link>
@@ -1016,7 +1016,7 @@ export default function SettingsPage() {
             </div>
             {subscriptionData.planTier !== "BUSINESS" && (
               <Button size="sm" onClick={() => setShowUpgradeModal(true)}>
-                <Sparkles className="h-4 w-4 mr-2" />
+                <Crown className="h-4 w-4 mr-2" />
                 {tSub("upgradePlan")}
               </Button>
             )}

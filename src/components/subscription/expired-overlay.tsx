@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { AlertTriangle, Sparkles, HelpCircle } from "lucide-react";
+import { AlertTriangle, Crown, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ExpiredOverlayProps {
@@ -60,7 +60,7 @@ export function ExpiredOverlay({ status }: ExpiredOverlayProps) {
         <div className="flex flex-col gap-3 max-w-xs mx-auto">
           <Link href="/pricing">
             <Button size="lg" className="w-full">
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Crown className="h-4 w-4 mr-2" />
               {status === "CANCELLED" ? t("resubscribe") : t("viewPricing")}
             </Button>
           </Link>

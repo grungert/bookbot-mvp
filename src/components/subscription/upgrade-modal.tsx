@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Loader2, Sparkles, X } from "lucide-react";
+import { Check, Loader2, Crown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -162,7 +162,7 @@ export function UpgradeModal({
               {isUpgrading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : (
-                <Sparkles className="h-4 w-4 mr-2" />
+                <Crown className="h-4 w-4 mr-2" />
               )}
               {t("confirmUpgradeButton")}
             </Button>

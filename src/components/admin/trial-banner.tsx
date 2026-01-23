@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { Clock, AlertTriangle, Sparkles } from "lucide-react";
+import { Clock, AlertTriangle, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/admin/admin-sidebar";
@@ -59,7 +59,7 @@ export function TrialBanner({
           </div>
           <Link href="/pricing">
             <Button size="sm" variant="destructive">
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Crown className="h-4 w-4 mr-2" />
               {t("upgradePlan")}
             </Button>
           </Link>
@@ -119,7 +119,7 @@ export function TrialBanner({
           </div>
           <Link href="/pricing">
             <Button size="sm" variant="secondary">
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Crown className="h-4 w-4 mr-2" />
               {t("resubscribe")}
             </Button>
           </Link>
@@ -197,7 +197,7 @@ export function TrialBanner({
                   : "bg-primary hover:bg-primary/90 text-primary-foreground"
               )}
             >
-              <Sparkles className="h-4 w-4 mr-2" />
+              <Crown className="h-4 w-4 mr-2" />
               {t("upgradePlan")}
             </Button>
           </Link>

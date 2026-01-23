@@ -117,11 +117,7 @@ export function CompanySwitcher({
     return null;
   }
 
-  // Always show if user can create more companies OR has multiple companies
-  // Hide only if: has 0-1 companies AND cannot create more
-  if (companies.length <= 1 && !canCreateMore) {
-    return null;
-  }
+  // Always show the company switcher to display subscription info
 
   // Collapsed view - show icon only with dropdown
   if (isCollapsed) {
@@ -146,15 +142,17 @@ export function CompanySwitcher({
                   ? `${companies.length}/${maxCount} ${t("companiesUsed") || "companies"}`
                   : `${companies.length} ${t("companiesUsed") || "companies"}`}
               </span>
-              {maxCount !== null && (
-                <a
-                  href="#"
+              {maxCount !== null && !canCreateMore && (
+                <button
                   className="hover:opacity-80 text-[10px] font-medium"
                   style={{ color: checkColor }}
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push(`/${locale}/c/${currentCompanySlug}/admin/settings#subscription`);
+                  }}
                 >
-                  {t("buyMore") || "Buy more"}
-                </a>
+                  {t("upgradeForMore") || "Upgrade"}
+                </button>
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -178,11 +176,10 @@ export function CompanySwitcher({
               </DropdownMenuItem>
             ) : (
               <DropdownMenuItem
-                className="text-muted-foreground"
-                onClick={() => {/* TODO: Link to upgrade page */}}
+                onClick={() => router.push(`/${locale}/c/${currentCompanySlug}/admin/settings#subscription`)}
               >
-                <Crown className="h-4 w-4 mr-2" />
-                {t("upgradeForMore") || "Upgrade for more"}
+                <Crown className="h-4 w-4 mr-2" style={{ color: checkColor }} />
+                <span style={{ color: checkColor }}>{t("upgradeForMore") || "Upgrade for more"}</span>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -224,15 +221,17 @@ export function CompanySwitcher({
                 ? `${companies.length}/${maxCount} ${t("companiesUsed") || "companies"}`
                 : `${companies.length} ${t("companiesUsed") || "companies"}`}
             </span>
-            {maxCount !== null && (
-              <a
-                href="#"
+            {maxCount !== null && !canCreateMore && (
+              <button
                 className="hover:opacity-80 text-[10px] font-medium"
                 style={{ color: checkColor }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/${locale}/c/${currentCompanySlug}/admin/settings#subscription`);
+                }}
               >
-                {t("buyMore") || "Buy more"}
-              </a>
+                {t("upgradeForMore") || "Upgrade"}
+              </button>
             )}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -259,11 +258,10 @@ export function CompanySwitcher({
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
-              className="text-muted-foreground"
-              onClick={() => {/* TODO: Link to upgrade page */}}
+              onClick={() => router.push(`/${locale}/c/${currentCompanySlug}/admin/settings#subscription`)}
             >
-              <Crown className="h-4 w-4 mr-2" />
-              {t("upgradeForMore") || "Upgrade for more"}
+              <Crown className="h-4 w-4 mr-2" style={{ color: checkColor }} />
+              <span style={{ color: checkColor }}>{t("upgradeForMore") || "Upgrade for more"}</span>
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>

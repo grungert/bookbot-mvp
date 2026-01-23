@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import {
   Check,
   X,
-  Sparkles,
+  Crown,
   Building2,
   MessageSquare,
   FileText,
@@ -157,7 +157,7 @@ export function PricingPageClient({
     if (isLoggedIn) {
       return (
         <Button onClick={() => setShowUpgradeModal(true)} className="w-full">
-          <Sparkles className="h-4 w-4 mr-2" />
+          <Crown className="h-4 w-4 mr-2" />
           {t("upgrade")}
         </Button>
       );
@@ -486,7 +486,7 @@ export function PricingPageClient({
           </p>
           {isLoggedIn ? (
             <Button size="lg" onClick={() => setShowUpgradeModal(true)}>
-              <Sparkles className="h-5 w-5 mr-2" />
+              <Crown className="h-5 w-5 mr-2" />
               {t("upgrade")}
             </Button>
           ) : (

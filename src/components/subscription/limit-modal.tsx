@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { AlertTriangle, MessageSquare, FileText, Building2, Sparkles, HelpCircle } from "lucide-react";
+import { AlertTriangle, MessageSquare, FileText, Building2, Crown, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -119,7 +119,7 @@ export function LimitModal({
 
         <div className="flex flex-col gap-2">
           <Button onClick={onUpgrade} className="w-full">
-            <Sparkles className="h-4 w-4 mr-2" />
+            <Crown className="h-4 w-4 mr-2" />
             {t("upgradePlan")}
           </Button>
           <Link href="/contact" className="w-full">
