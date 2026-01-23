@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
+import { CreateCompanyModal } from "@/components/admin/create-company-modal";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -105,16 +106,18 @@ interface SubscriptionData {
   features: {
     customBranding: boolean;
     prioritySupport: boolean;
+    aiChatbot: boolean;
   };
   plan: {
     maxDocumentsPerCompany: number | null;
     extraCompanyPrice: number | null;
+    chatbotAddonPrice: number; // EUR cents
   };
   companies: Array<{
     id: string;
     name: string;
     slug: string;
-    documentCount: number;
+    serviceCount: number;
   }>;
 }
 
@@ -134,6 +137,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [pendingUpgradeRequest, setPendingUpgradeRequest] = useState<{
     id: string;
@@ -247,15 +251,22 @@ export default function SettingsPage() {
     loadSettings();
   }, [companySlug]);
 
-  // Load subscription data when tab changes to subscription
+  // Load subscription data on mount to check chatbot access for tabs
   useEffect(() => {
-    if (activeTab === "subscription" && !subscriptionData && !isLoadingSubscription) {
+    if (!subscriptionData && !isLoadingSubscription) {
       loadSubscriptionData();
     }
+  }, []);
+
+  // Load pending upgrade request when subscription tab is active
+  useEffect(() => {
     if (activeTab === "subscription") {
       loadPendingUpgradeRequest();
     }
   }, [activeTab]);
+
+  // Check if chatbot is available
+  const hasChatbotAccess = subscriptionData?.features?.aiChatbot ?? false;
 
   async function loadSubscriptionData() {
     setIsLoadingSubscription(true);
@@ -1185,8 +1196,8 @@ export default function SettingsPage() {
       );
     }
 
-    const statusColors: Record<string, { text: string; bg: string }> = {
-      ACTIVE: { text: "text-green-600", bg: "bg-green-100" },
+    const statusColors: Record<string, { text: string; bg: string; usePrimaryColor?: boolean }> = {
+      ACTIVE: { text: "", bg: "", usePrimaryColor: true },
       TRIALING: { text: "text-primary", bg: "bg-primary/10" },
       TRIAL_EXPIRED: { text: "text-destructive", bg: "bg-red-100" },
       PAST_DUE: { text: "text-amber-600", bg: "bg-amber-100" },
@@ -1194,6 +1205,7 @@ export default function SettingsPage() {
     };
 
     const colors = statusColors[subscriptionData.status] || statusColors.CANCELLED;
+    const usePrimaryColor = colors.usePrimaryColor;
 
     return (
       <div className="space-y-4">
@@ -1207,13 +1219,23 @@ export default function SettingsPage() {
           </h3>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", colors.bg)}>
-                <CreditCard className={cn("h-5 w-5", colors.text)} />
+              <div
+                className={cn("flex h-10 w-10 items-center justify-center rounded-full", !usePrimaryColor && colors.bg)}
+                style={usePrimaryColor ? { backgroundColor: `${primaryColor}15` } : undefined}
+              >
+                <CreditCard
+                  className={cn("h-5 w-5", !usePrimaryColor && colors.text)}
+                  style={usePrimaryColor ? { color: primaryColor } : undefined}
+                />
               </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold">{subscriptionData.planName}</span>
-                  <Badge variant="outline" className={colors.text}>
+                  <Badge
+                    variant="outline"
+                    className={!usePrimaryColor ? colors.text : undefined}
+                    style={usePrimaryColor ? { color: primaryColor, borderColor: `${primaryColor}40` } : undefined}
+                  >
                     {subscriptionData.status === "TRIALING" && <Clock className="h-3 w-3 mr-1" />}
                     {subscriptionData.status === "ACTIVE" && <Check className="h-3 w-3 mr-1" />}
                     {(subscriptionData.status === "TRIAL_EXPIRED" || subscriptionData.status === "PAST_DUE") && <AlertTriangle className="h-3 w-3 mr-1" />}
@@ -1261,46 +1283,85 @@ export default function SettingsPage() {
             {tSub("usage")}
           </h3>
           <div className="grid gap-6 md:grid-cols-3">
-            {/* Chat Messages */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <span className="font-medium">{tSub("chatMessages")}</span>
-              </div>
-              <UsageMeter
-                label=""
-                used={subscriptionData.chatUsage.used}
-                limit={subscriptionData.chatUsage.limit}
-                unlimited={subscriptionData.chatUsage.unlimited}
-                showPercentage={true}
-              />
-              <p className="text-xs text-muted-foreground">
-                {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}
-              </p>
-            </div>
+            {/* Chat Messages & Knowledge Base - Combined when no chatbot */}
+            {subscriptionData.features.aiChatbot ? (
+              <>
+                {/* Chat Messages */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" style={{ color: primaryColor }} />
+                    <span className="font-medium">{tSub("chatMessages")}</span>
+                  </div>
+                  <UsageMeter
+                    label=""
+                    used={subscriptionData.chatUsage.used}
+                    limit={subscriptionData.chatUsage.limit}
+                    unlimited={subscriptionData.chatUsage.unlimited}
+                    showPercentage={true}
+                    color={primaryColor}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}
+                  </p>
+                </div>
 
-            {/* Knowledge Base (Documents) */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                <span className="font-medium">{tSub("knowledgeBase")}</span>
+                {/* Knowledge Base (Documents) */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" style={{ color: primaryColor }} />
+                    <span className="font-medium">{tSub("knowledgeBase")}</span>
+                  </div>
+                  <UsageMeter
+                    label=""
+                    used={subscriptionData.documentUsage.current}
+                    limit={subscriptionData.documentUsage.limit}
+                    unlimited={subscriptionData.documentUsage.unlimited}
+                    showPercentage={true}
+                    color={primaryColor}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {tSub("documentsThisCompany")}
+                  </p>
+                </div>
+              </>
+            ) : (
+              /* Combined AI Chatbot features - not available */
+              <div
+                className="col-span-2 space-y-3 rounded-lg border border-dashed p-4"
+                style={{ borderColor: `${primaryColor}40` }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MessageSquare className="h-4 w-4" />
+                      <span className="font-medium">{tSub("chatMessages")}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      <span className="font-medium">{tSub("knowledgeBase")}</span>
+                    </div>
+                  </div>
+                  {!pendingUpgradeRequest && (
+                    <Button
+                      size="sm"
+                      onClick={() => setShowUpgradeModal(true)}
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      <Crown className="h-4 w-4 mr-2" />
+                      {tSub("upgradeFrom", { price: (subscriptionData.plan.chatbotAddonPrice / 100).toFixed(0) })}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {tSub("upgradeForChatbot")}
+                </p>
               </div>
-              <UsageMeter
-                label=""
-                used={subscriptionData.documentUsage.current}
-                limit={subscriptionData.documentUsage.limit}
-                unlimited={subscriptionData.documentUsage.unlimited}
-                showPercentage={true}
-              />
-              <p className="text-xs text-muted-foreground">
-                {tSub("documentsThisCompany")}
-              </p>
-            </div>
+            )}
 
             {/* Company Slots */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-primary" />
+                <Building2 className="h-4 w-4" style={{ color: primaryColor }} />
                 <span className="font-medium">{tSub("companySlots")}</span>
               </div>
               <UsageMeter
@@ -1309,10 +1370,11 @@ export default function SettingsPage() {
                 limit={subscriptionData.companySlots.total}
                 unlimited={subscriptionData.companySlots.unlimited}
                 showPercentage={true}
+                color={primaryColor}
               />
               {subscriptionData.plan.extraCompanyPrice && !subscriptionData.companySlots.unlimited && (
                 <p className="text-xs text-muted-foreground">
-                  {tSub("extraCompanySlot", { price: subscriptionData.plan.extraCompanyPrice })}
+                  {tSub("extraCompanySlot", { price: (subscriptionData.plan.extraCompanyPrice / 100).toFixed(2) })}
                 </p>
               )}
             </div>
@@ -1326,23 +1388,17 @@ export default function SettingsPage() {
               {tSub("yourCompanies")}
             </h3>
             {subscriptionData.companySlots.available !== 0 && (
-              <Link href="/user">
-                <Button variant="outline" size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {tSub("createCompany")}
-                </Button>
-              </Link>
+              <Button variant="outline" size="sm" onClick={() => setShowCreateCompanyModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                {tSub("createCompany")}
+              </Button>
             )}
           </div>
           {subscriptionData.companies.length === 0 ? (
             <p className="text-sm text-muted-foreground">{tSub("noCompanies")}</p>
           ) : (
             <div className="space-y-3">
-              {subscriptionData.companies.map((company) => {
-                const docLimit = subscriptionData.plan.maxDocumentsPerCompany;
-                const docUnlimited = docLimit === null || docLimit === -1;
-
-                return (
+              {subscriptionData.companies.map((company) => (
                   <div
                     key={company.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
@@ -1354,13 +1410,8 @@ export default function SettingsPage() {
                       <div>
                         <p className="font-medium">{company.name}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <FileText className="h-3 w-3" />
-                          {docUnlimited
-                            ? tSub("documentsUnlimited", { count: company.documentCount })
-                            : tSub("documentsUsed", {
-                                used: company.documentCount,
-                                limit: docLimit,
-                              })}
+                          <Briefcase className="h-3 w-3" />
+                          {tSub("servicesCount", { count: company.serviceCount })}
                         </div>
                       </div>
                     </div>
@@ -1370,8 +1421,7 @@ export default function SettingsPage() {
                       </Button>
                     </Link>
                   </div>
-                );
-              })}
+                ))}
             </div>
           )}
         </div>
@@ -1381,26 +1431,125 @@ export default function SettingsPage() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             {tSub("planFeatures")}
           </h3>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div className="flex items-center gap-2 text-sm">
-              {subscriptionData.features.customBranding ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <X className="h-4 w-4 text-muted-foreground" />
+          <div className="grid gap-3 md:grid-cols-3">
+            {/* AI Chatbot */}
+            <div
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                !subscriptionData.features.aiChatbot && "bg-muted/30 border-transparent"
               )}
-              <span className={cn(!subscriptionData.features.customBranding && "text-muted-foreground")}>
-                {tSub("customBranding")}
-              </span>
+              style={subscriptionData.features.aiChatbot ? {
+                backgroundColor: `${primaryColor}10`,
+                borderColor: `${primaryColor}30`,
+              } : undefined}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg",
+                  !subscriptionData.features.aiChatbot && "bg-muted"
+                )}
+                style={subscriptionData.features.aiChatbot ? {
+                  backgroundColor: `${primaryColor}20`,
+                } : undefined}
+              >
+                <Bot
+                  className="h-4 w-4"
+                  style={{ color: subscriptionData.features.aiChatbot ? primaryColor : undefined }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium",
+                  !subscriptionData.features.aiChatbot && "text-muted-foreground"
+                )}>
+                  {tSub("aiChatbot")}
+                </p>
+              </div>
+              {subscriptionData.features.aiChatbot ? (
+                <Check className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
             </div>
-            <div className="flex items-center gap-2 text-sm">
-              {subscriptionData.features.prioritySupport ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <X className="h-4 w-4 text-muted-foreground" />
+
+            {/* Custom Branding */}
+            <div
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                !subscriptionData.features.customBranding && "bg-muted/30 border-transparent"
               )}
-              <span className={cn(!subscriptionData.features.prioritySupport && "text-muted-foreground")}>
-                {tSub("prioritySupport")}
-              </span>
+              style={subscriptionData.features.customBranding ? {
+                backgroundColor: `${primaryColor}10`,
+                borderColor: `${primaryColor}30`,
+              } : undefined}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg",
+                  !subscriptionData.features.customBranding && "bg-muted"
+                )}
+                style={subscriptionData.features.customBranding ? {
+                  backgroundColor: `${primaryColor}20`,
+                } : undefined}
+              >
+                <Palette
+                  className="h-4 w-4"
+                  style={{ color: subscriptionData.features.customBranding ? primaryColor : undefined }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium",
+                  !subscriptionData.features.customBranding && "text-muted-foreground"
+                )}>
+                  {tSub("customBranding")}
+                </p>
+              </div>
+              {subscriptionData.features.customBranding ? (
+                <Check className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+            </div>
+
+            {/* Priority Support */}
+            <div
+              className={cn(
+                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
+                !subscriptionData.features.prioritySupport && "bg-muted/30 border-transparent"
+              )}
+              style={subscriptionData.features.prioritySupport ? {
+                backgroundColor: `${primaryColor}10`,
+                borderColor: `${primaryColor}30`,
+              } : undefined}
+            >
+              <div
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-lg",
+                  !subscriptionData.features.prioritySupport && "bg-muted"
+                )}
+                style={subscriptionData.features.prioritySupport ? {
+                  backgroundColor: `${primaryColor}20`,
+                } : undefined}
+              >
+                <Crown
+                  className="h-4 w-4"
+                  style={{ color: subscriptionData.features.prioritySupport ? primaryColor : undefined }}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-sm font-medium",
+                  !subscriptionData.features.prioritySupport && "text-muted-foreground"
+                )}>
+                  {tSub("prioritySupport")}
+                </p>
+              </div>
+              {subscriptionData.features.prioritySupport ? (
+                <Check className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              ) : (
+                <X className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
             </div>
           </div>
         </div>
@@ -1411,7 +1560,18 @@ export default function SettingsPage() {
           onOpenChange={setShowUpgradeModal}
           onSuccess={loadPendingUpgradeRequest}
           currentTier={subscriptionData.planTier}
+          hasChatbot={subscriptionData.features.aiChatbot}
           primaryColor={primaryColor}
+        />
+
+        {/* Create Company Modal */}
+        <CreateCompanyModal
+          open={showCreateCompanyModal}
+          onOpenChange={setShowCreateCompanyModal}
+          onSuccess={(newCompany) => {
+            // Navigate to the new company's admin dashboard
+            router.push(`/${locale}/c/${newCompany.slug}/admin`);
+          }}
         />
       </div>
     );
@@ -1439,42 +1599,56 @@ export default function SettingsPage() {
 
       {/* Mobile: Horizontal scrollable tabs */}
       <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-        {tabConfig.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
-              activeTab === tab.id
-                ? "bg-primary/10 text-primary font-medium"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-          >
-            <tab.icon className="h-3.5 w-3.5" />
-            {t(tab.labelKey)}
-          </button>
-        ))}
+        {tabConfig.map((tab) => {
+          const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed") && !hasChatbotAccess;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => !isDisabled && setActiveTab(tab.id)}
+              disabled={isDisabled}
+              title={isDisabled ? tSub("upgradeToPro") : undefined}
+              className={cn(
+                "shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
+                isDisabled
+                  ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                  : activeTab === tab.id
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              <tab.icon className="h-3.5 w-3.5" />
+              {t(tab.labelKey)}
+            </button>
+          );
+        })}
       </div>
 
       {/* Desktop: Vertical sidebar + Content area */}
       <div className="flex gap-6">
         {/* Desktop Sidebar Navigation */}
         <nav className="hidden md:block w-48 shrink-0 space-y-1 sticky top-4 self-start">
-          {tabConfig.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left",
-                activeTab === tab.id
-                  ? "bg-primary/10 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-muted"
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {t(tab.labelKey)}
-            </button>
-          ))}
+          {tabConfig.map((tab) => {
+            const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed") && !hasChatbotAccess;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => !isDisabled && setActiveTab(tab.id)}
+                disabled={isDisabled}
+                title={isDisabled ? tSub("upgradeToPro") : undefined}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left",
+                  isDisabled
+                    ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                    : activeTab === tab.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <tab.icon className="h-4 w-4" />
+                {t(tab.labelKey)}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Content Area */}

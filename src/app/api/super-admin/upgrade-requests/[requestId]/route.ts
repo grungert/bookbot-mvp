@@ -107,14 +107,21 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
 
     if (action === "approve") {
-      // Get the PRO plan
-      const proPlan = await prisma.plan.findUnique({
-        where: { tier: "PRO" },
+      // Get the requested plan (PRO or BUSINESS)
+      // Note: requestedPlanTier is a PlanTier enum, defaults to PRO in schema
+      const requestedTier = upgradeRequest.requestedPlanTier ?? "PRO";
+      console.log(`[UPGRADE] Processing approval for tier: ${requestedTier}`);
+
+      const plan = await prisma.plan.findUnique({
+        where: { tier: requestedTier as "TRIAL" | "PRO" | "BUSINESS" },
       });
 
-      if (!proPlan) {
+      console.log(`[UPGRADE] Found plan:`, plan ? plan.id : "null");
+
+      if (!plan) {
+        console.error(`[UPGRADE] Plan not found for tier: ${requestedTier}`);
         return NextResponse.json(
-          { error: "PRO plan not found" },
+          { error: `${requestedTier} plan not found in database. Please ensure all plans are seeded.` },
           { status: 500 }
         );
       }
@@ -130,31 +137,44 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         999
       );
 
+      // For Business plan, chatbot is always included and extra companies don't matter (unlimited)
+      const isBusiness = requestedTier === "BUSINESS";
+
+      // Preserve existing chatbot status OR add chatbot if the request includes it
+      const existingHasChatbot = upgradeRequest.user.subscription?.hasChatbot ?? false;
+      const hasChatbot = isBusiness ? true : (existingHasChatbot || upgradeRequest.includeChatbot);
+
+      // Add to existing extra company slots, not replace
+      const existingExtraSlots = upgradeRequest.user.subscription?.extraCompanySlots ?? 0;
+      const extraCompanySlots = isBusiness ? 0 : (existingExtraSlots + upgradeRequest.extraCompanyCount);
+
       // Update the user's subscription
       if (upgradeRequest.user.subscription) {
         await prisma.userSubscription.update({
           where: { id: upgradeRequest.user.subscription.id },
           data: {
-            planId: proPlan.id,
+            plan: { connect: { id: plan.id } },
             status: "ACTIVE",
             trialEndsAt: null,
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
-            extraCompanySlots: upgradeRequest.extraCompanyCount,
-            notes: `Upgraded via bank transfer. Chatbot: ${upgradeRequest.includeChatbot ? "Yes" : "No"}, Extra Companies: ${upgradeRequest.extraCompanyCount}`,
+            extraCompanySlots,
+            hasChatbot,
+            notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
           },
         });
       } else {
         // Create new subscription if it doesn't exist
         await prisma.userSubscription.create({
           data: {
-            userId: upgradeRequest.userId,
-            planId: proPlan.id,
+            user: { connect: { id: upgradeRequest.userId } },
+            plan: { connect: { id: plan.id } },
             status: "ACTIVE",
             currentPeriodStart: now,
             currentPeriodEnd: periodEnd,
-            extraCompanySlots: upgradeRequest.extraCompanyCount,
-            notes: `Upgraded via bank transfer. Chatbot: ${upgradeRequest.includeChatbot ? "Yes" : "No"}, Extra Companies: ${upgradeRequest.extraCompanyCount}`,
+            extraCompanySlots,
+            hasChatbot,
+            notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
           },
         });
       }
@@ -212,8 +232,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
   } catch (error) {
     console.error("Error processing upgrade request:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to process upgrade request" },
+      { error: "Failed to process upgrade request", details: errorMessage },
       { status: 500 }
     );
   }
