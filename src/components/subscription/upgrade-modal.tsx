@@ -112,15 +112,25 @@ export function UpgradeModal({
       setSelectedPlan("PRO");
       setProUpgradeChoice(null);
       setIncludeChatbot(false);
-      // Pre-fill extra companies based on current usage (for trial users)
-      // Pro includes 1 company, so extra = max(0, currentCount - 1)
-      const requiredExtra = Math.max(0, (currentCompanyCount ?? 1) - 1);
-      setExtraCompanyCount(requiredExtra);
+
+      // Pre-fill extra companies:
+      // - For PRO users: they already have their slots, start at 0 (only buy NEW extra slots)
+      // - For trial users: pre-fill based on current companies to keep all existing
+      if (currentTier === "PRO") {
+        // PRO users already have their slots, don't pre-fill
+        setExtraCompanyCount(0);
+      } else {
+        // Trial users: calculate how many extra slots they need
+        // Pro includes 1 company, so extra = max(0, currentCount - 1)
+        const requiredExtra = Math.max(0, (currentCompanyCount ?? 1) - 1);
+        setExtraCompanyCount(requiredExtra);
+      }
+
       setIsSubmitting(false);
       setSubmitted(false);
       setPaymentReference("");
     }
-  }, [open, currentCompanyCount]);
+  }, [open, currentCompanyCount, currentTier]);
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
