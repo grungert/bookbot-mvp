@@ -623,28 +623,28 @@ export function UpgradeModal({
           </div>
         </div>
 
-        <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{tUpgrade("includedCompany")}</span>
-            <span className="font-medium">1</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{tUpgrade("extraCompanies")}</span>
-            <span className="font-medium">{extraCompanyCount}</span>
-          </div>
-          {extraCompanyCount > 0 && (
+        {extraCompanyCount > 0 && (
+          <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{tUpgrade("includedCompany")}</span>
+              <span className="font-medium">1</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{tUpgrade("extraCompanies")}</span>
+              <span className="font-medium">{extraCompanyCount}</span>
+            </div>
             <div className="flex items-center justify-between text-sm pt-2 border-t">
               <span className="text-muted-foreground">{tUpgrade("extraCompaniesPrice")}</span>
               <span className="font-medium" style={primaryText || { color: 'hsl(var(--primary))' }}>
                 +{formatPrice(extraCompanyCount * pricing.EXTRA_COMPANY)}/mo
               </span>
             </div>
-          )}
-          <div className="flex items-center justify-between text-sm pt-2 border-t">
-            <span className="font-medium">{tUpgrade("totalCompanies")}</span>
-            <span className="font-bold">{1 + extraCompanyCount}</span>
+            <div className="flex items-center justify-between text-sm pt-2 border-t">
+              <span className="font-medium">{tUpgrade("totalCompanies")}</span>
+              <span className="font-bold">{1 + extraCompanyCount}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <p className="text-xs text-center text-muted-foreground">
