@@ -125,6 +125,7 @@ export default function SettingsPage() {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
   const tSub = useTranslations("subscription");
+  const tUpgrade = useTranslations("upgrade");
 
   const [isLoading, setIsLoading] = useState(true);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
@@ -133,6 +134,14 @@ export default function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [pendingUpgradeRequest, setPendingUpgradeRequest] = useState<{
+    id: string;
+    includeChatbot: boolean;
+    extraCompanyCount: number;
+    totalMonthlyPrice: number;
+    createdAt: string;
+  } | null>(null);
+  const [isCancellingRequest, setIsCancellingRequest] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -240,6 +249,9 @@ export default function SettingsPage() {
     if (activeTab === "subscription" && !subscriptionData && !isLoadingSubscription) {
       loadSubscriptionData();
     }
+    if (activeTab === "subscription") {
+      loadPendingUpgradeRequest();
+    }
   }, [activeTab]);
 
   async function loadSubscriptionData() {
@@ -254,6 +266,45 @@ export default function SettingsPage() {
       console.error("Error loading subscription data:", error);
     } finally {
       setIsLoadingSubscription(false);
+    }
+  }
+
+  async function loadPendingUpgradeRequest() {
+    try {
+      const response = await fetch("/api/subscription/upgrade");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasPendingRequest && data.request) {
+          setPendingUpgradeRequest(data.request);
+        } else {
+          setPendingUpgradeRequest(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading pending upgrade request:", error);
+    }
+  }
+
+  async function handleCancelUpgradeRequest() {
+    if (!pendingUpgradeRequest) return;
+
+    setIsCancellingRequest(true);
+    try {
+      const response = await fetch("/api/subscription/upgrade", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to cancel upgrade request");
+      }
+
+      setPendingUpgradeRequest(null);
+      toast.success(tUpgrade("requestCancelled"));
+    } catch (error) {
+      console.error("Error cancelling upgrade request:", error);
+      toast.error(tCommon("error"));
+    } finally {
+      setIsCancellingRequest(false);
     }
   }
 
@@ -956,6 +1007,8 @@ export default function SettingsPage() {
       });
     };
 
+    const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
+
     if (isLoadingSubscription) {
       return (
         <div className="rounded-xl border bg-card p-8 flex items-center justify-center">
@@ -963,6 +1016,71 @@ export default function SettingsPage() {
         </div>
       );
     }
+
+    // Pending Upgrade Request Banner
+    const PendingUpgradeBanner = () => {
+      if (!pendingUpgradeRequest) return null;
+
+      return (
+        <div className="rounded-xl border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+              <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                {tUpgrade("pendingPayment")}
+              </h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                {tUpgrade("pendingPaymentDescription")}
+              </p>
+              <div className="mt-3 text-sm space-y-1">
+                <div className="flex gap-4">
+                  <span className="text-yellow-600 dark:text-yellow-400">{tUpgrade("plan")}:</span>
+                  <span className="font-medium text-yellow-800 dark:text-yellow-200">Pro</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-yellow-600 dark:text-yellow-400">{tUpgrade("aiChatbot")}:</span>
+                  <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                    {pendingUpgradeRequest.includeChatbot ? tCommon("yes") : tCommon("no")}
+                  </span>
+                </div>
+                {pendingUpgradeRequest.extraCompanyCount > 0 && (
+                  <div className="flex gap-4">
+                    <span className="text-yellow-600 dark:text-yellow-400">{tUpgrade("extraCompanies")}:</span>
+                    <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                      {pendingUpgradeRequest.extraCompanyCount}
+                    </span>
+                  </div>
+                )}
+                <div className="flex gap-4">
+                  <span className="text-yellow-600 dark:text-yellow-400">{tUpgrade("totalMonthly")}:</span>
+                  <span className="font-bold text-yellow-800 dark:text-yellow-200">
+                    {formatPrice(pendingUpgradeRequest.totalMonthlyPrice)}
+                  </span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-yellow-600 dark:text-yellow-400">{tUpgrade("createdOn")}:</span>
+                  <span className="font-medium text-yellow-800 dark:text-yellow-200">
+                    {formatDate(pendingUpgradeRequest.createdAt)}
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 border-yellow-400 text-yellow-700 hover:bg-yellow-100 dark:text-yellow-300 dark:hover:bg-yellow-900/30"
+                onClick={handleCancelUpgradeRequest}
+                disabled={isCancellingRequest}
+              >
+                {isCancellingRequest && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {tUpgrade("cancelRequest")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    };
 
     if (!subscriptionData) {
       return (
@@ -992,6 +1110,9 @@ export default function SettingsPage() {
 
     return (
       <div className="space-y-4">
+        {/* Pending Upgrade Banner */}
+        <PendingUpgradeBanner />
+
         {/* Current Plan */}
         <div className="rounded-xl border bg-card p-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
@@ -1014,7 +1135,7 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-            {subscriptionData.planTier !== "BUSINESS" && (
+            {subscriptionData.planTier !== "BUSINESS" && !pendingUpgradeRequest && (
               <Button size="sm" onClick={() => setShowUpgradeModal(true)}>
                 <Crown className="h-4 w-4 mr-2" />
                 {tSub("upgradePlan")}
@@ -1202,6 +1323,7 @@ export default function SettingsPage() {
           open={showUpgradeModal}
           onOpenChange={setShowUpgradeModal}
           currentTier={subscriptionData.planTier}
+          primaryColor={primaryColor}
         />
       </div>
     );

@@ -2,6 +2,8 @@ import { getResend, FROM_EMAIL } from "./resend";
 import { BookingConfirmationEmail } from "./templates/booking-confirmation";
 import { CancellationNoticeEmail } from "./templates/cancellation-notice";
 import { AppointmentReminderEmail } from "./templates/appointment-reminder";
+import { UpgradeRequestUserEmail } from "./templates/upgrade-request-user";
+import { UpgradeRequestAdminEmail } from "./templates/upgrade-request-admin";
 import { format } from "date-fns";
 
 interface AppointmentEmailData {
@@ -127,6 +129,128 @@ export async function sendAppointmentUpdateEmail(data: AppointmentUpdateEmailDat
     return { success: true };
   } catch (error) {
     console.error("Failed to send appointment update email:", error);
+    return { success: false, error };
+  }
+}
+
+interface UpgradeRequestUserEmailData {
+  userEmail: string;
+  userName: string;
+  planName: string;
+  includeChatbot: boolean;
+  extraCompanyCount: number;
+  basePrice: number;
+  chatbotPrice: number;
+  extraCompaniesPrice: number;
+  totalMonthlyPrice: number;
+  paymentReference: string;
+}
+
+export async function sendUpgradeRequestUserEmail(data: UpgradeRequestUserEmailData) {
+  const {
+    userEmail,
+    userName,
+    planName,
+    includeChatbot,
+    extraCompanyCount,
+    basePrice,
+    chatbotPrice,
+    extraCompaniesPrice,
+    totalMonthlyPrice,
+    paymentReference,
+  } = data;
+
+  try {
+    const resend = getResend();
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: `Upgrade Request Received - BookBot`,
+      react: UpgradeRequestUserEmail({
+        userName,
+        planName,
+        includeChatbot,
+        extraCompanyCount,
+        basePrice,
+        chatbotPrice,
+        extraCompaniesPrice,
+        totalMonthlyPrice,
+        bankName: process.env.BANK_NAME || "Bank Name",
+        bankAccountName: process.env.BANK_ACCOUNT_NAME || "BookBot d.o.o.",
+        bankIban: process.env.BANK_IBAN || "RS00 0000 0000 0000 0000 00",
+        bankBic: process.env.BANK_BIC || "XXXXXXXX",
+        paymentReference,
+      }),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to send upgrade request user email:", error);
+    return { success: false, error };
+  }
+}
+
+interface UpgradeRequestAdminEmailData {
+  userName: string;
+  userEmail: string;
+  planName: string;
+  includeChatbot: boolean;
+  extraCompanyCount: number;
+  basePrice: number;
+  chatbotPrice: number;
+  extraCompaniesPrice: number;
+  totalMonthlyPrice: number;
+  paymentReference: string;
+  requestId: string;
+}
+
+export async function sendUpgradeRequestAdminEmail(data: UpgradeRequestAdminEmailData) {
+  const {
+    userName,
+    userEmail,
+    planName,
+    includeChatbot,
+    extraCompanyCount,
+    basePrice,
+    chatbotPrice,
+    extraCompaniesPrice,
+    totalMonthlyPrice,
+    paymentReference,
+    requestId,
+  } = data;
+
+  const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+  if (!adminEmail) {
+    console.warn("SUPER_ADMIN_EMAIL not set, skipping admin notification");
+    return { success: false, error: "Admin email not configured" };
+  }
+
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
+  const adminPanelUrl = `${baseUrl}/en/super-admin/upgrade-requests`;
+
+  try {
+    const resend = getResend();
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `New Upgrade Request - ${userName || userEmail}`,
+      react: UpgradeRequestAdminEmail({
+        userName,
+        userEmail,
+        planName,
+        includeChatbot,
+        extraCompanyCount,
+        basePrice,
+        chatbotPrice,
+        extraCompaniesPrice,
+        totalMonthlyPrice,
+        paymentReference,
+        adminPanelUrl,
+        requestId,
+      }),
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to send upgrade request admin email:", error);
     return { success: false, error };
   }
 }

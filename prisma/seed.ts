@@ -114,6 +114,38 @@ async function main() {
     }
   }
 
+  // Seed default pricing configuration
+  console.log("Seeding pricing configuration...");
+
+  const pricingConfigs = [
+    { key: "PRO_BASE", priceEurCents: 1000, description: "Pro plan base price (without chatbot)" },
+    { key: "CHATBOT_ADDON", priceEurCents: 1000, description: "AI Chatbot add-on" },
+    { key: "EXTRA_COMPANY", priceEurCents: 700, description: "Price per extra company" },
+    { key: "BUSINESS_BASE", priceEurCents: 9900, description: "Business plan base price (all features included)" },
+  ];
+
+  for (const config of pricingConfigs) {
+    const existing = await prisma.pricingConfig.findUnique({
+      where: { key: config.key },
+    });
+
+    if (existing) {
+      await prisma.pricingConfig.update({
+        where: { key: config.key },
+        data: {
+          priceEurCents: config.priceEurCents,
+          description: config.description,
+        },
+      });
+      console.log(`Updated pricing config: ${config.key}`);
+    } else {
+      await prisma.pricingConfig.create({
+        data: config,
+      });
+      console.log(`Created pricing config: ${config.key}`);
+    }
+  }
+
   console.log("Seeding complete!");
 }
 

@@ -53,6 +53,13 @@ enum MembershipRole {
   ADMIN    // Full admin access
 }
 
+enum UpgradeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 // Company (Tenant)
 model Company {
   id           String   @id @default(cuid())
@@ -147,6 +154,7 @@ model User {
   accountLockout          AccountLockout?
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  upgradeRequests         UpgradeRequest[]
 }
 
 // NextAuth.js Account model
@@ -553,4 +561,53 @@ model EmailVerificationToken {
 
   @@index([token])
   @@index([expiresAt])
+}
+
+// Pricing configuration (editable by super admin)
+model PricingConfig {
+  id                  String   @id @default(cuid())
+  key                 String   @unique  // e.g., "PRO_BASE", "CHATBOT_ADDON", "EXTRA_COMPANY"
+  priceEurCents       Int      // Price in EUR cents (1000 = €10)
+  description         String?  // Human-readable description
+  isActive            Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?  // Admin who last updated
+}
+
+// Upgrade Request for bank transfer payments
+model UpgradeRequest {
+  id                  String               @id @default(cuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  requestedPlanTier   PlanTier             @default(PRO)
+  includeChatbot      Boolean              @default(false)
+  extraCompanyCount   Int                  @default(0)
+
+  // Pricing snapshot in EUR cents (captured at request time)
+  basePrice           Int                  // 1000 = €10
+  chatbotPrice        Int                  // 1000 = €10 (0 if not included)
+  extraCompaniesPrice Int                  // 700 × count
+  totalMonthlyPrice   Int
+
+  status              UpgradeRequestStatus @default(PENDING)
+  handledBy           String?
+  handledAt           DateTime?
+  adminNotes          String?
+
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// System settings (bank details, etc.)
+model SystemSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
 }
