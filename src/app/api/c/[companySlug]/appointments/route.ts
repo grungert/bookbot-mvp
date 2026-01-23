@@ -43,6 +43,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     const status = searchParams.get("status");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const myOnly = searchParams.get("myOnly") === "true";
 
     // Build where clause
     const where: Prisma.AppointmentWhereInput = {
@@ -50,7 +51,8 @@ export async function GET(request: Request, { params }: RouteParams) {
     };
 
     // Non-admin users can only see their own appointments
-    if (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN") {
+    // OR if myOnly=true is passed (for "My Appointments" customer page)
+    if (myOnly || (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN")) {
       where.userId = user.id;
     }
 
@@ -286,21 +288,26 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (notificationEmails.length > 0) {
       const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
-      // Send to all notification emails
-      await Promise.all(
-        notificationEmails.map((adminEmail) =>
-          sendNewBookingAdminEmail({
-            adminEmail,
-            customerName: user.name || "Customer",
-            customerEmail: user.email || "",
-            serviceName: service.name,
-            startTime: appointmentStart,
-            duration: service.duration,
-            companyName: company.name,
-            appointmentUrl: `${baseUrl}/en/c/${companySlug}/admin/appointments?id=${appointment.id}`,
-          })
-        )
-      );
+      // Send to all notification emails - use try-catch to prevent booking failure if email fails
+      try {
+        await Promise.allSettled(
+          notificationEmails.map((adminEmail) =>
+            sendNewBookingAdminEmail({
+              adminEmail,
+              customerName: user.name || "Customer",
+              customerEmail: user.email || "",
+              serviceName: service.name,
+              startTime: appointmentStart,
+              duration: service.duration,
+              companyName: company.name,
+              appointmentUrl: `${baseUrl}/en/c/${companySlug}/admin/appointments?id=${appointment.id}`,
+            })
+          )
+        );
+      } catch (error) {
+        console.error("[EMAIL] Failed to send admin notifications:", error);
+        // Don't fail the booking, just log the error
+      }
     }
 
     return NextResponse.json(appointment, { status: 201 });

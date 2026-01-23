@@ -175,7 +175,7 @@ export default function MyAppointmentsPage() {
   const loadData = useCallback(async () => {
     try {
       const [appointmentsRes, workingHoursRes] = await Promise.all([
-        fetch(`/api/c/${companySlug}/appointments`),
+        fetch(`/api/c/${companySlug}/appointments?myOnly=true`),
         fetch(`/api/c/${companySlug}/working-hours`),
       ]);
 
