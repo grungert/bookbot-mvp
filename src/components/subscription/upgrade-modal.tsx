@@ -934,13 +934,29 @@ export function UpgradeModal({
           </div>
           {!isBusinessUpgrade && (
             <>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{tUpgrade("totalCompanies")}</span>
-                <span className="font-medium">{1 + extraCompanyCount}</span>
-              </div>
+              {isProAddonMode ? (
+                // PRO addon mode: show extra companies being purchased (not total)
+                extraCompanyCount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{tUpgrade("extraCompanies")}</span>
+                    <span className="font-medium">+{extraCompanyCount}</span>
+                  </div>
+                )
+              ) : (
+                // New PRO subscription: show total companies
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{tUpgrade("totalCompanies")}</span>
+                  <span className="font-medium">{1 + extraCompanyCount}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{tUpgrade("aiChatbot")}</span>
-                <span className="font-medium">{includeChatbot ? tCommon("yes") : tCommon("no")}</span>
+                <span className="font-medium">
+                  {isProAddonMode
+                    ? (includeChatbot || proUpgradeChoice === "chatbot" ? tCommon("yes") : tCommon("no"))
+                    : (includeChatbot ? tCommon("yes") : tCommon("no"))
+                  }
+                </span>
               </div>
             </>
           )}
