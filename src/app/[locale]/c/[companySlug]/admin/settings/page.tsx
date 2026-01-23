@@ -26,6 +26,39 @@ import { BOT_PERSONALITIES, type PersonalityKey } from "@/lib/ai/personalities";
 import { cn } from "@/lib/utils";
 import { generateThemePalette } from "@/lib/utils/colors";
 
+// Token display component for Custom Instructions (defined outside to prevent re-render issues)
+function CustomInstructionsTokenDisplay({
+  content,
+  maxTokens,
+  t,
+}: {
+  content: string;
+  maxTokens: number;
+  t: (key: string) => string;
+}) {
+  const tokenCount = Math.ceil(content.length / 4);
+  const tokenPercent = Math.round((tokenCount / maxTokens) * 100);
+  const isApproachingLimit = tokenPercent >= 80 && tokenPercent < 100;
+  const isOverLimit = tokenCount > maxTokens;
+
+  return (
+    <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <span>
+        {content.length.toLocaleString()} {t("characters") || "characters"} · {tokenCount.toLocaleString()} {t("tokens") || "tokens"}
+      </span>
+      <span className={cn(
+        isOverLimit && "text-destructive font-medium",
+        isApproachingLimit && "text-yellow-600 dark:text-yellow-500"
+      )}>
+        {(isApproachingLimit || isOverLimit) && (
+          <AlertTriangle className="inline h-3 w-3 mr-1" />
+        )}
+        {tokenCount.toLocaleString()} / {maxTokens.toLocaleString()} {t("Tokens") || "Tokens"} ({tokenPercent}%)
+      </span>
+    </div>
+  );
+}
+
 // Color presets for brand color
 const colorPresets = [
   { name: "Blue", value: "#3B82F6" },
@@ -829,28 +862,11 @@ export default function SettingsPage() {
             placeholder="Custom instructions for the AI assistant..."
             rows={4}
           />
-          {(() => {
-            const tokenCount = Math.ceil(aiSystemPrompt.length / 4);
-            const tokenPercent = Math.round((tokenCount / maxCustomInstructionsTokens) * 100);
-            const isApproachingLimit = tokenPercent >= 80 && tokenPercent < 100;
-            const isOverLimit = tokenCount > maxCustomInstructionsTokens;
-            return (
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  {aiSystemPrompt.length.toLocaleString()} {t("characters") || "characters"} · {tokenCount.toLocaleString()} {t("tokens") || "tokens"}
-                </span>
-                <span className={cn(
-                  isOverLimit && "text-destructive font-medium",
-                  isApproachingLimit && "text-yellow-600 dark:text-yellow-500"
-                )}>
-                  {(isApproachingLimit || isOverLimit) && (
-                    <AlertTriangle className="inline h-3 w-3 mr-1" />
-                  )}
-                  {tokenCount.toLocaleString()} / {maxCustomInstructionsTokens.toLocaleString()} {t("Tokens") || "Tokens"} ({tokenPercent}%)
-                </span>
-              </div>
-            );
-          })()}
+          <CustomInstructionsTokenDisplay
+            content={aiSystemPrompt}
+            maxTokens={maxCustomInstructionsTokens}
+            t={t}
+          />
         </div>
       </div>
     </div>
