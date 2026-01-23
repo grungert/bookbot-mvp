@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
 import { CreateCompanyModal } from "@/components/admin/create-company-modal";
+import { InvoicesSection } from "@/components/admin/settings/invoices-section";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -65,7 +66,7 @@ interface CompanySettings {
   taxRate: number;
 }
 
-type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "subscription";
+type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "subscription" | "invoices";
 
 const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
   { id: "general", labelKey: "tabGeneral", icon: Building2 },
@@ -75,6 +76,7 @@ const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[]
   { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
   { id: "embed", labelKey: "tabEmbed", icon: Code },
   { id: "subscription", labelKey: "tabSubscription", icon: CreditCard },
+  { id: "invoices", labelKey: "tabInvoices", icon: FileText },
 ];
 
 interface SubscriptionData {
@@ -165,6 +167,9 @@ export default function SettingsPage() {
   const [aiGreeting, setAiGreeting] = useState("");
   const [aiPersonality, setAiPersonality] = useState<string>("friendly");
 
+  // Token limits
+  const [maxCustomInstructionsTokens, setMaxCustomInstructionsTokens] = useState(500);
+
   // Business Details state
   const [businessAddress, setBusinessAddress] = useState("");
   const [taxId, setTaxId] = useState("");
@@ -250,6 +255,24 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, [companySlug]);
+
+  // Load token limits
+  useEffect(() => {
+    async function loadTokenLimits() {
+      try {
+        const response = await fetch("/api/settings/document-limit");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.maxCustomInstructionsTokens) {
+            setMaxCustomInstructionsTokens(data.maxCustomInstructionsTokens);
+          }
+        }
+      } catch {
+        // Ignore errors, use default
+      }
+    }
+    loadTokenLimits();
+  }, []);
 
   // Load subscription data on mount to check chatbot access for tabs
   useEffect(() => {
@@ -806,6 +829,28 @@ export default function SettingsPage() {
             placeholder="Custom instructions for the AI assistant..."
             rows={4}
           />
+          {(() => {
+            const tokenCount = Math.ceil(aiSystemPrompt.length / 4);
+            const tokenPercent = Math.round((tokenCount / maxCustomInstructionsTokens) * 100);
+            const isApproachingLimit = tokenPercent >= 80 && tokenPercent < 100;
+            const isOverLimit = tokenCount > maxCustomInstructionsTokens;
+            return (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>
+                  {aiSystemPrompt.length.toLocaleString()} {t("characters") || "characters"} · {tokenCount.toLocaleString()} {t("tokens") || "tokens"}
+                </span>
+                <span className={cn(
+                  isOverLimit && "text-destructive font-medium",
+                  isApproachingLimit && "text-yellow-600 dark:text-yellow-500"
+                )}>
+                  {(isApproachingLimit || isOverLimit) && (
+                    <AlertTriangle className="inline h-3 w-3 mr-1" />
+                  )}
+                  {tokenCount.toLocaleString()} / {maxCustomInstructionsTokens.toLocaleString()} {t("Tokens") || "Tokens"} ({tokenPercent}%)
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>
@@ -1661,6 +1706,12 @@ export default function SettingsPage() {
           {activeTab === "business" && <BusinessDetailsSection />}
           {activeTab === "embed" && <EmbedSection />}
           {activeTab === "subscription" && <SubscriptionSection />}
+          {activeTab === "invoices" && (
+            <InvoicesSection
+              companySlug={companySlug}
+              primaryColor={primaryColor}
+            />
+          )}
         </div>
       </div>
     </div>

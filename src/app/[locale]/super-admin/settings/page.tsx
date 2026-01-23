@@ -6,25 +6,32 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Save, Building, CreditCard, RotateCcw } from "lucide-react";
+import { Loader2, Save, Building, CreditCard, RotateCcw, FileText } from "lucide-react";
 
-interface BankSettings {
+interface SystemSettings {
   BANK_NAME: string;
   BANK_ACCOUNT_NAME: string;
   BANK_IBAN: string;
   BANK_BIC: string;
+  MAX_DOCUMENT_TOKENS: string;
+  MAX_CUSTOM_INSTRUCTIONS_TOKENS: string;
 }
 
-const DEFAULT_SETTINGS: BankSettings = {
+const DEFAULT_MAX_DOCUMENT_TOKENS = 1500;
+const DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS = 500;
+
+const DEFAULT_SETTINGS: SystemSettings = {
   BANK_NAME: "",
   BANK_ACCOUNT_NAME: "",
   BANK_IBAN: "",
   BANK_BIC: "",
+  MAX_DOCUMENT_TOKENS: String(DEFAULT_MAX_DOCUMENT_TOKENS),
+  MAX_CUSTOM_INSTRUCTIONS_TOKENS: String(DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS),
 };
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<BankSettings>(DEFAULT_SETTINGS);
-  const [originalSettings, setOriginalSettings] = useState<BankSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
+  const [originalSettings, setOriginalSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +55,7 @@ export default function SettingsPage() {
     fetchSettings();
   }, []);
 
-  const handleChange = (key: keyof BankSettings, value: string) => {
+  const handleChange = (key: keyof SystemSettings, value: string) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -224,6 +231,63 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Knowledge Base Limits */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50 dark:bg-purple-950/30">
+              <FileText className="h-5 w-5 text-purple-500" />
+            </div>
+            <div>
+              <CardTitle>Knowledge Base Limits</CardTitle>
+              <CardDescription>
+                Configure token limits for knowledge base documents
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="maxDocumentTokens">Max Tokens per Document</Label>
+              <Input
+                id="maxDocumentTokens"
+                type="number"
+                min="100"
+                max="100000"
+                placeholder="1500"
+                value={settings.MAX_DOCUMENT_TOKENS}
+                onChange={(e) => handleChange("MAX_DOCUMENT_TOKENS", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                ~{Math.round(parseInt(settings.MAX_DOCUMENT_TOKENS || "1500") * 4).toLocaleString()} characters
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Limit for each knowledge base document. Default: 1,500 tokens.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxCustomInstructionsTokens">Max Tokens for Custom Instructions</Label>
+              <Input
+                id="maxCustomInstructionsTokens"
+                type="number"
+                min="100"
+                max="10000"
+                placeholder="500"
+                value={settings.MAX_CUSTOM_INSTRUCTIONS_TOKENS}
+                onChange={(e) => handleChange("MAX_CUSTOM_INSTRUCTIONS_TOKENS", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                ~{Math.round(parseInt(settings.MAX_CUSTOM_INSTRUCTIONS_TOKENS || "500") * 4).toLocaleString()} characters
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Limit for bot custom instructions. Default: 500 tokens.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>

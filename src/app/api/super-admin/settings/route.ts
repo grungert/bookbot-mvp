@@ -10,6 +10,15 @@ const BANK_SETTINGS_KEYS = [
   "BANK_BIC",
 ];
 
+// System limit settings keys
+const SYSTEM_LIMIT_KEYS = [
+  "MAX_DOCUMENT_TOKENS",
+  "MAX_CUSTOM_INSTRUCTIONS_TOKENS",
+];
+
+// All allowed settings keys
+const ALL_SETTINGS_KEYS = [...BANK_SETTINGS_KEYS, ...SYSTEM_LIMIT_KEYS];
+
 // GET system settings
 export async function GET() {
   try {
@@ -26,7 +35,7 @@ export async function GET() {
     try {
       settings = await prisma.systemSettings.findMany({
         where: {
-          key: { in: BANK_SETTINGS_KEYS },
+          key: { in: ALL_SETTINGS_KEYS },
         },
         select: {
           key: true,
@@ -79,7 +88,7 @@ export async function PUT(request: Request) {
     // Update each setting
     const updates = [];
     for (const [key, value] of Object.entries(settings)) {
-      if (!BANK_SETTINGS_KEYS.includes(key)) continue;
+      if (!ALL_SETTINGS_KEYS.includes(key)) continue;
 
       updates.push(
         prisma.systemSettings.upsert({
@@ -102,7 +111,7 @@ export async function PUT(request: Request) {
     // Fetch updated settings
     const updatedSettings = await prisma.systemSettings.findMany({
       where: {
-        key: { in: BANK_SETTINGS_KEYS },
+        key: { in: ALL_SETTINGS_KEYS },
       },
     });
 

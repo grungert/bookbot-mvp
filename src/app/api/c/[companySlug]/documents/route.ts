@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
 import { checkDocumentLimit, getCompanyOwnerId, checkSubscriptionActive } from "@/lib/subscription";
+import { estimateTokens, DEFAULT_MAX_DOCUMENT_TOKENS } from "@/lib/document-tokens";
 import { z } from "zod";
 
 const MAX_CONTENT_SIZE = 100 * 1024; // 100KB
@@ -123,6 +124,27 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid input", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    // Check token limit
+    const tokenLimitSetting = await prisma.systemSettings.findUnique({
+      where: { key: "MAX_DOCUMENT_TOKENS" },
+    });
+    const maxTokens = tokenLimitSetting
+      ? parseInt(tokenLimitSetting.value, 10) || DEFAULT_MAX_DOCUMENT_TOKENS
+      : DEFAULT_MAX_DOCUMENT_TOKENS;
+
+    const documentTokens = estimateTokens(parsed.data.content);
+    if (documentTokens > maxTokens) {
+      return NextResponse.json(
+        {
+          error: `Document exceeds token limit. ${documentTokens.toLocaleString()} tokens used, maximum is ${maxTokens.toLocaleString()} tokens.`,
+          code: "TOKEN_LIMIT_EXCEEDED",
+          currentTokens: documentTokens,
+          maxTokens,
+        },
         { status: 400 }
       );
     }

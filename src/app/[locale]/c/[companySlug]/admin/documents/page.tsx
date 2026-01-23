@@ -51,7 +51,7 @@ interface Pagination {
 }
 
 const MAX_CONTENT_SIZE = 100 * 1024; // 100KB - must match API
-const CONTENT_WARNING_THRESHOLD = 80 * 1024; // 80KB - show warning at 80%
+const DEFAULT_MAX_TOKENS = 1500; // Default max tokens per document
 
 export default function DocumentsPage() {
   const params = useParams();
@@ -103,6 +103,9 @@ export default function DocumentsPage() {
   const [chatKey, setChatKey] = useState(0);
   const [primaryColor, setPrimaryColor] = useState<string>("#10b981");
 
+  // Token limit state
+  const [maxTokens, setMaxTokens] = useState(DEFAULT_MAX_TOKENS);
+
   const loadDocuments = useCallback(async (page = 1) => {
     try {
       const response = await fetch(`/api/c/${companySlug}/documents?page=${page}&limit=20`);
@@ -142,6 +145,24 @@ export default function DocumentsPage() {
     }
     loadSettings();
   }, [companySlug]);
+
+  // Load document token limit
+  useEffect(() => {
+    async function loadTokenLimit() {
+      try {
+        const response = await fetch("/api/settings/document-limit");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.maxTokens) {
+            setMaxTokens(data.maxTokens);
+          }
+        }
+      } catch {
+        // Ignore errors, use default
+      }
+    }
+    loadTokenLimit();
+  }, []);
 
   // Load system prompt preview
   const loadSystemPrompt = useCallback(async () => {
@@ -514,12 +535,13 @@ export default function DocumentsPage() {
     }
   }
 
-  // Character and word count
+  // Character, word, and token count
   const characterCount = content.length;
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
-  const contentSizePercent = Math.round((characterCount / MAX_CONTENT_SIZE) * 100);
-  const isApproachingLimit = characterCount > CONTENT_WARNING_THRESHOLD;
-  const isOverLimit = characterCount > MAX_CONTENT_SIZE;
+  const tokenCount = Math.ceil(characterCount / 4); // Simple token estimation: ~4 chars per token
+  const tokenPercent = Math.round((tokenCount / maxTokens) * 100);
+  const isApproachingLimit = tokenPercent >= 80 && tokenPercent < 100;
+  const isOverLimit = tokenCount > maxTokens;
 
   // Check if all filtered documents are selected
   const allFilteredSelected = filteredAndSortedDocuments.length > 0 &&
@@ -636,6 +658,7 @@ export default function DocumentsPage() {
                     </button>
                   </TableHead>
                   <TableHead className="text-xs font-medium">{t("preview")}</TableHead>
+                  <TableHead className="text-xs font-medium text-right">{t("Tokens") || "Tokens"}</TableHead>
                   <TableHead className="text-xs font-medium">
                     <button
                       type="button"
@@ -671,6 +694,20 @@ export default function DocumentsPage() {
                     <TableCell className="font-medium">{doc.title}</TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
                       {doc.content.substring(0, 100)}...
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {(() => {
+                        const docTokens = Math.ceil(doc.content.length / 4);
+                        const docPercent = Math.round((docTokens / maxTokens) * 100);
+                        return (
+                          <span className={cn(
+                            "text-sm tabular-nums",
+                            docTokens > maxTokens && "text-destructive font-medium"
+                          )}>
+                            {docTokens.toLocaleString()} ({docPercent}%)
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <span className="text-sm">{format(parseISO(doc.updatedAt), "MMM d, yyyy")}</span>
@@ -1003,18 +1040,23 @@ export default function DocumentsPage() {
               )}
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {wordCount} {t("words") || "words"} · {characterCount.toLocaleString()} {t("characters") || "characters"}
+                  {wordCount} {t("words") || "words"} · {characterCount.toLocaleString()} {t("characters") || "characters"} · {tokenCount.toLocaleString()} {t("tokens") || "tokens"}
                 </span>
                 <span className={cn(
-                  isOverLimit && "text-destructive",
-                  isApproachingLimit && !isOverLimit && "text-yellow-600 dark:text-yellow-500"
+                  isOverLimit && "text-destructive font-medium",
+                  isApproachingLimit && "text-yellow-600 dark:text-yellow-500"
                 )}>
-                  {isApproachingLimit && (
+                  {(isApproachingLimit || isOverLimit) && (
                     <AlertTriangle className="inline h-3 w-3 mr-1" />
                   )}
-                  {contentSizePercent}% {t("ofLimit") || "of limit"}
+                  {tokenCount.toLocaleString()} / {maxTokens.toLocaleString()} {t("tokens") || "tokens"} ({tokenPercent}%)
                 </span>
               </div>
+              {isOverLimit && (
+                <p className="text-xs text-destructive font-medium">
+                  {t("tokenLimitExceeded") || "Document exceeds token limit. Please reduce the content."}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {t("markdownSupport")}
               </p>

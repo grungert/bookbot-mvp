@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
+import { estimateTokens, DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS } from "@/lib/document-tokens";
 import { z } from "zod";
 
 const updateSettingsSchema = z.object({
@@ -116,6 +117,29 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const data = parsed.data;
 
+    // Check custom instructions token limit
+    if (data.aiSystemPrompt) {
+      const tokenLimitSetting = await prisma.systemSettings.findUnique({
+        where: { key: "MAX_CUSTOM_INSTRUCTIONS_TOKENS" },
+      });
+      const maxTokens = tokenLimitSetting
+        ? parseInt(tokenLimitSetting.value, 10) || DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS
+        : DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS;
+
+      const promptTokens = estimateTokens(data.aiSystemPrompt);
+      if (promptTokens > maxTokens) {
+        return NextResponse.json(
+          {
+            error: `Custom instructions exceed token limit. ${promptTokens.toLocaleString()} tokens used, maximum is ${maxTokens.toLocaleString()} tokens.`,
+            code: "TOKEN_LIMIT_EXCEEDED",
+            currentTokens: promptTokens,
+            maxTokens,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Build update object, only including fields that were provided
     const updateData: Record<string, unknown> = {};
 
@@ -141,7 +165,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.bankName !== undefined) updateData.bankName = data.bankName;
     if (data.businessPhone !== undefined) updateData.businessPhone = data.businessPhone;
     if (data.businessEmail !== undefined) updateData.businessEmail = data.businessEmail;
-    if (data.notificationEmails !== undefined) updateData.notificationEmails = data.notificationEmails;
+    if (data.notificationEmails !== undefined) {
+      // Normalize to lowercase and deduplicate
+      updateData.notificationEmails = [...new Set(
+        data.notificationEmails.map(email => email.toLowerCase().trim())
+      )];
+    }
     if (data.taxRate !== undefined) updateData.taxRate = data.taxRate;
 
     // Only update API key if a new one is provided (not masked value)
