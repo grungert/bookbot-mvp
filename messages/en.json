@@ -508,6 +508,10 @@
     "businessEmail": "Business Email",
     "taxRate": "Tax Rate (%)",
     "taxRateHint": "Default tax rate for invoices",
+    "notificationEmails": "Booking Notification Emails",
+    "notificationEmailsDescription": "Email addresses that will receive notifications when a new booking is made",
+    "invalidEmail": "Please enter a valid email address",
+    "emailAlreadyAdded": "This email has already been added",
     "currency": "Currency",
     "currencyHint": "Currency used for invoices and pricing",
     "documentsSubtitle": "Add documents to your knowledge base for the AI chatbot",
@@ -1035,7 +1039,9 @@
     "pendingPaymentDescription": "Your upgrade request is waiting for payment confirmation",
     "cancelRequest": "Cancel Request",
     "requestCancelled": "Upgrade request cancelled",
-    "createdOn": "Requested on"
+    "createdOn": "Requested on",
+    "approvedEmailSubject": "Subscription Activated",
+    "rejectedEmailSubject": "Upgrade Request Update"
   },
   "account": {
     "subscription": "Subscription",

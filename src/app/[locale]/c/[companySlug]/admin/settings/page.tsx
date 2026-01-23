@@ -60,6 +60,7 @@ interface CompanySettings {
   bankName: string | null;
   businessPhone: string | null;
   businessEmail: string | null;
+  notificationEmails: string[];
   taxRate: number;
 }
 
@@ -168,6 +169,8 @@ export default function SettingsPage() {
   const [bankName, setBankName] = useState("");
   const [businessPhone, setBusinessPhone] = useState("");
   const [businessEmail, setBusinessEmail] = useState("");
+  const [notificationEmails, setNotificationEmails] = useState<string[]>([]);
+  const [newNotificationEmail, setNewNotificationEmail] = useState("");
   const [taxRate, setTaxRate] = useState<number>(20);
 
   // Logo upload
@@ -341,6 +344,7 @@ export default function SettingsPage() {
       setBankName(settings.bankName || "");
       setBusinessPhone(settings.businessPhone || "");
       setBusinessEmail(settings.businessEmail || "");
+      setNotificationEmails(settings.notificationEmails || []);
       setTaxRate(settings.taxRate ?? 20);
     } catch (error) {
       console.error("Error loading settings:", error);
@@ -376,6 +380,7 @@ export default function SettingsPage() {
         bankName: bankName || null,
         businessPhone: businessPhone || null,
         businessEmail: businessEmail || null,
+        notificationEmails,
         taxRate,
       };
 
@@ -795,114 +800,196 @@ export default function SettingsPage() {
     </div>
   );
 
-  const BusinessDetailsSection = () => (
-    <div className="rounded-xl border bg-card p-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-        {t("businessDetails")}
-      </h3>
-      <p className="text-xs text-muted-foreground mb-4">
-        {t("businessDetailsDescription")}
-      </p>
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="businessAddress" className="text-sm font-medium">{t("businessAddress")}</Label>
-            <Textarea
-              id="businessAddress"
-              value={businessAddress}
-              onChange={(e) => setBusinessAddress(e.target.value)}
-              placeholder="123 Business St, City, Country"
-              rows={2}
-            />
-          </div>
-          <div className="space-y-4">
+  const BusinessDetailsSection = () => {
+    const handleAddNotificationEmail = () => {
+      const email = newNotificationEmail.trim().toLowerCase();
+      if (!email) return;
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        toast.error(t("invalidEmail"));
+        return;
+      }
+
+      // Check for duplicates
+      if (notificationEmails.includes(email)) {
+        toast.error(t("emailAlreadyAdded"));
+        return;
+      }
+
+      setNotificationEmails([...notificationEmails, email]);
+      setNewNotificationEmail("");
+    };
+
+    const handleRemoveNotificationEmail = (email: string) => {
+      setNotificationEmails(notificationEmails.filter((e) => e !== email));
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAddNotificationEmail();
+      }
+    };
+
+    return (
+      <div className="rounded-xl border bg-card p-4">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+          {t("businessDetails")}
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          {t("businessDetailsDescription")}
+        </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="taxId" className="text-sm font-medium">{t("taxId")}</Label>
+              <Label htmlFor="businessAddress" className="text-sm font-medium">{t("businessAddress")}</Label>
+              <Textarea
+                id="businessAddress"
+                value={businessAddress}
+                onChange={(e) => setBusinessAddress(e.target.value)}
+                placeholder="123 Business St, City, Country"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="taxId" className="text-sm font-medium">{t("taxId")}</Label>
+                <Input
+                  id="taxId"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  placeholder="123456789"
+                  className="h-10"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vatNumber" className="text-sm font-medium">{t("vatNumber")}</Label>
+                <Input
+                  id="vatNumber"
+                  value={vatNumber}
+                  onChange={(e) => setVatNumber(e.target.value)}
+                  placeholder="RS123456789"
+                  className="h-10"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="bankName" className="text-sm font-medium">{t("bankName")}</Label>
               <Input
-                id="taxId"
-                value={taxId}
-                onChange={(e) => setTaxId(e.target.value)}
-                placeholder="123456789"
+                id="bankName"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="Bank Name"
                 className="h-10"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="vatNumber" className="text-sm font-medium">{t("vatNumber")}</Label>
+              <Label htmlFor="bankAccount" className="text-sm font-medium">{t("bankAccount")}</Label>
               <Input
-                id="vatNumber"
-                value={vatNumber}
-                onChange={(e) => setVatNumber(e.target.value)}
-                placeholder="RS123456789"
+                id="bankAccount"
+                value={bankAccount}
+                onChange={(e) => setBankAccount(e.target.value)}
+                placeholder="123-4567890123456-78"
                 className="h-10"
               />
             </div>
           </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="bankName" className="text-sm font-medium">{t("bankName")}</Label>
-            <Input
-              id="bankName"
-              value={bankName}
-              onChange={(e) => setBankName(e.target.value)}
-              placeholder="Bank Name"
-              className="h-10"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="businessPhone" className="text-sm font-medium">{t("businessPhone")}</Label>
+              <Input
+                id="businessPhone"
+                value={businessPhone}
+                onChange={(e) => setBusinessPhone(e.target.value)}
+                placeholder="+381 11 123 4567"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="businessEmail" className="text-sm font-medium">{t("businessEmail")}</Label>
+              <Input
+                id="businessEmail"
+                type="email"
+                value={businessEmail}
+                onChange={(e) => setBusinessEmail(e.target.value)}
+                placeholder="billing@company.com"
+                className="h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="taxRate" className="text-sm font-medium">{t("taxRate")}</Label>
+              <Input
+                id="taxRate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={taxRate}
+                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                placeholder="20"
+                className="h-10"
+              />
+              <p className="text-xs text-muted-foreground">
+                {t("taxRateHint")}
+              </p>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="bankAccount" className="text-sm font-medium">{t("bankAccount")}</Label>
-            <Input
-              id="bankAccount"
-              value={bankAccount}
-              onChange={(e) => setBankAccount(e.target.value)}
-              placeholder="123-4567890123456-78"
-              className="h-10"
-            />
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="businessPhone" className="text-sm font-medium">{t("businessPhone")}</Label>
-            <Input
-              id="businessPhone"
-              value={businessPhone}
-              onChange={(e) => setBusinessPhone(e.target.value)}
-              placeholder="+381 11 123 4567"
-              className="h-10"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="businessEmail" className="text-sm font-medium">{t("businessEmail")}</Label>
-            <Input
-              id="businessEmail"
-              type="email"
-              value={businessEmail}
-              onChange={(e) => setBusinessEmail(e.target.value)}
-              placeholder="billing@company.com"
-              className="h-10"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="taxRate" className="text-sm font-medium">{t("taxRate")}</Label>
-            <Input
-              id="taxRate"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={taxRate}
-              onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
-              placeholder="20"
-              className="h-10"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("taxRateHint")}
-            </p>
+
+          {/* Notification Emails Section */}
+          <div className="pt-4 border-t">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("notificationEmails")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {t("notificationEmailsDescription")}
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  value={newNotificationEmail}
+                  onChange={(e) => setNewNotificationEmail(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="admin@company.com"
+                  className="h-10"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddNotificationEmail}
+                  className="h-10 px-3"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {notificationEmails.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {notificationEmails.map((email) => (
+                    <Badge
+                      key={email}
+                      variant="secondary"
+                      className="flex items-center gap-1 py-1 px-2"
+                    >
+                      {email}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveNotificationEmail(email)}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const EmbedSection = () => {
     const [copied, setCopied] = useState(false);
@@ -1322,6 +1409,7 @@ export default function SettingsPage() {
         <UpgradeModal
           open={showUpgradeModal}
           onOpenChange={setShowUpgradeModal}
+          onSuccess={loadPendingUpgradeRequest}
           currentTier={subscriptionData.planTier}
           primaryColor={primaryColor}
         />

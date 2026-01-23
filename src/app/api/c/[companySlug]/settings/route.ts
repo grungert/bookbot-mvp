@@ -26,6 +26,7 @@ const updateSettingsSchema = z.object({
   bankName: z.string().nullable().optional(),
   businessPhone: z.string().nullable().optional(),
   businessEmail: z.string().email().nullable().optional(),
+  notificationEmails: z.array(z.string().email()).optional(),
   taxRate: z.number().min(0).max(100).nullable().optional(),
 });
 
@@ -76,6 +77,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       bankName: company.bankName,
       businessPhone: company.businessPhone,
       businessEmail: company.businessEmail,
+      notificationEmails: company.notificationEmails || [],
       taxRate: company.taxRate ? Number(company.taxRate) : 20,
     };
 
@@ -139,6 +141,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.bankName !== undefined) updateData.bankName = data.bankName;
     if (data.businessPhone !== undefined) updateData.businessPhone = data.businessPhone;
     if (data.businessEmail !== undefined) updateData.businessEmail = data.businessEmail;
+    if (data.notificationEmails !== undefined) updateData.notificationEmails = data.notificationEmails;
     if (data.taxRate !== undefined) updateData.taxRate = data.taxRate;
 
     // Only update API key if a new one is provided (not masked value)
@@ -180,6 +183,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       bankName: updatedCompany.bankName,
       businessPhone: updatedCompany.businessPhone,
       businessEmail: updatedCompany.businessEmail,
+      notificationEmails: updatedCompany.notificationEmails || [],
       taxRate: updatedCompany.taxRate ? Number(updatedCompany.taxRate) : 20,
     };
 

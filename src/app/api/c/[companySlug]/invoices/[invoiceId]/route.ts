@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug, validateCompanyAdminAccess } from "@/lib/db/tenant";
 import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
+import { sendInvoiceSentEmail, sendInvoicePaidEmail } from "@/lib/email/send";
 import { z } from "zod";
+import { addDays } from "date-fns";
 
 const updateInvoiceSchema = z.object({
   status: z.enum(["DRAFT", "SENT", "PAID", "CANCELLED"]).optional(),
@@ -210,6 +212,40 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           changes,
           ipAddress: getClientIp(request),
           userAgent: getUserAgent(request),
+        });
+      }
+    }
+
+    // Send email notifications on status changes
+    if (updated.user.email) {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
+
+      // Send invoice email when status changes to SENT
+      if (parsed.data.status === "SENT" && invoice.status !== "SENT") {
+        const dueDate = updated.dueDate || addDays(updated.issueDate, 30);
+        await sendInvoiceSentEmail({
+          customerEmail: updated.user.email,
+          customerName: updated.user.name || "Customer",
+          invoiceNumber: updated.invoiceNumber,
+          issueDate: updated.issueDate,
+          dueDate,
+          total: Number(updated.total),
+          currency: updated.currency,
+          companyName: company.name,
+          invoiceUrl: `${baseUrl}/en/c/${companySlug}/invoices/${invoiceId}`,
+        });
+      }
+
+      // Send payment confirmation when status changes to PAID
+      if (parsed.data.status === "PAID" && invoice.status !== "PAID") {
+        await sendInvoicePaidEmail({
+          customerEmail: updated.user.email,
+          customerName: updated.user.name || "Customer",
+          invoiceNumber: updated.invoiceNumber,
+          paidDate: updated.paidAt || new Date(),
+          total: Number(updated.total),
+          currency: updated.currency,
+          companyName: company.name,
         });
       }
     }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
-import { sendBookingConfirmationEmail } from "@/lib/email/send";
+import { sendBookingConfirmationEmail, sendNewBookingAdminEmail } from "@/lib/email/send";
 import { addMinutes } from "date-fns";
 import { z } from "zod";
 import { AppointmentStatus, Prisma } from "@prisma/client";
@@ -264,7 +264,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       throw txError;
     }
 
-    // Send confirmation email
+    // Send confirmation email to customer
     if (user.email) {
       await sendBookingConfirmationEmail({
         customerEmail: user.email,
@@ -275,6 +275,32 @@ export async function POST(request: Request, { params }: RouteParams) {
         companyName: company.name,
         notes: notes || undefined,
       });
+    }
+
+    // Send notification email to company admins
+    const notificationEmails = company.notificationEmails || [];
+    // Also include businessEmail if set (for backwards compatibility)
+    if (company.businessEmail && !notificationEmails.includes(company.businessEmail)) {
+      notificationEmails.push(company.businessEmail);
+    }
+
+    if (notificationEmails.length > 0) {
+      const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
+      // Send to all notification emails
+      await Promise.all(
+        notificationEmails.map((adminEmail) =>
+          sendNewBookingAdminEmail({
+            adminEmail,
+            customerName: user.name || "Customer",
+            customerEmail: user.email || "",
+            serviceName: service.name,
+            startTime: appointmentStart,
+            duration: service.duration,
+            companyName: company.name,
+            appointmentUrl: `${baseUrl}/en/c/${companySlug}/admin/appointments?id=${appointment.id}`,
+          })
+        )
+      );
     }
 
     return NextResponse.json(appointment, { status: 201 });

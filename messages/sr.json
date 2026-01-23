@@ -508,6 +508,10 @@
     "businessEmail": "Poslovni email",
     "taxRate": "Stopa poreza (%)",
     "taxRateHint": "Podrazumevana stopa poreza za fakture",
+    "notificationEmails": "Email adrese za obaveštenja o rezervacijama",
+    "notificationEmailsDescription": "Email adrese koje će primati obaveštenja kada se napravi nova rezervacija",
+    "invalidEmail": "Unesite validnu email adresu",
+    "emailAlreadyAdded": "Ova email adresa je već dodata",
     "currency": "Valuta",
     "currencyHint": "Valuta za fakture i cene",
     "documentsSubtitle": "Dodajte dokumente u bazu znanja za AI chatbot",
@@ -1035,7 +1039,9 @@
     "pendingPaymentDescription": "Vas zahtev za nadogradnju ceka potvrdu uplate",
     "cancelRequest": "Otkazi zahtev",
     "requestCancelled": "Zahtev za nadogradnju otkazan",
-    "createdOn": "Zatrazeno"
+    "createdOn": "Zatrazeno",
+    "approvedEmailSubject": "Pretplata aktivirana",
+    "rejectedEmailSubject": "Azuriranje zahteva za nadogradnju"
   },
   "account": {
     "subscription": "Pretplata",

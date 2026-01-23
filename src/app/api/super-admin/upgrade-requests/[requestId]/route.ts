@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { sendUpgradeApprovedEmail, sendUpgradeRejectedEmail } from "@/lib/email/send";
 
 interface RouteParams {
   params: Promise<{ requestId: string }>;
@@ -169,6 +170,16 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       });
 
+      // Send approval email to user
+      const planName = upgradeRequest.requestedPlanTier === "PRO" ? "Pro" : "Business";
+      await sendUpgradeApprovedEmail({
+        userEmail: upgradeRequest.user.email || "",
+        userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
+        planName,
+        includeChatbot: upgradeRequest.includeChatbot,
+        extraCompanyCount: upgradeRequest.extraCompanyCount,
+      });
+
       return NextResponse.json({
         success: true,
         message: "Upgrade request approved and subscription activated",
@@ -183,6 +194,15 @@ export async function PATCH(request: Request, { params }: RouteParams) {
           handledAt: new Date(),
           adminNotes: adminNotes || null,
         },
+      });
+
+      // Send rejection email to user
+      const rejectedPlanName = upgradeRequest.requestedPlanTier === "PRO" ? "Pro" : "Business";
+      await sendUpgradeRejectedEmail({
+        userEmail: upgradeRequest.user.email || "",
+        userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
+        planName: rejectedPlanName,
+        adminNotes: adminNotes || undefined,
       });
 
       return NextResponse.json({

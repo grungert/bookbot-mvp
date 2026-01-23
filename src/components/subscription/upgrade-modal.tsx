@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
   currentTier?: string | null;
   primaryColor?: string | null;
 }
@@ -50,6 +51,7 @@ type PlanTier = "PRO" | "BUSINESS";
 export function UpgradeModal({
   open,
   onOpenChange,
+  onSuccess,
   currentTier,
   primaryColor,
 }: UpgradeModalProps) {
@@ -145,8 +147,11 @@ export function UpgradeModal({
 
       setPaymentReference(data.paymentReference);
       setSubmitted(true);
-      setStep(6);
       toast.success(tUpgrade("requestSubmitted"));
+      // Notify parent component of successful submission
+      onSuccess?.();
+      // Close modal after successful submission
+      onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : tCommon("error"));
     } finally {
