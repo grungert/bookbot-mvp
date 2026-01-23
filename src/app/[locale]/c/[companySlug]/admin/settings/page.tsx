@@ -798,80 +798,6 @@ export default function SettingsPage() {
     </div>
   );
 
-  const BotPersonalitySection = () => (
-    <div className="rounded-xl border bg-card p-4">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-        {t("botPersonality")}
-      </h3>
-      <p className="text-xs text-muted-foreground mb-4">
-        {t("botPersonalityDescription")}
-      </p>
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="aiBotName" className="text-sm font-medium">{t("aiBotName")}</Label>
-            <Input
-              id="aiBotName"
-              value={aiBotName}
-              onChange={(e) => setAiBotName(e.target.value)}
-              placeholder="Assistant"
-              className="h-10"
-            />
-            <p className="text-xs text-muted-foreground">
-              {t("aiBotNameDescription")}
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="aiPersonality" className="text-sm font-medium">{t("aiPersonalityLabel")}</Label>
-            <Select value={aiPersonality} onValueChange={setAiPersonality}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Select a personality" />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(BOT_PERSONALITIES) as PersonalityKey[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    {BOT_PERSONALITIES[key].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {BOT_PERSONALITIES[aiPersonality as PersonalityKey]?.description || BOT_PERSONALITIES.friendly.description}
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
-          <Input
-            id="aiGreeting"
-            value={aiGreeting}
-            onChange={(e) => setAiGreeting(e.target.value)}
-            placeholder="Hello! How can I help you today?"
-            className="h-10"
-          />
-          <p className="text-xs text-muted-foreground">
-            {t("aiGreetingDescription")}
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>
-          <Textarea
-            id="aiSystemPrompt"
-            value={aiSystemPrompt}
-            onChange={(e) => setAiSystemPrompt(e.target.value)}
-            placeholder="Custom instructions for the AI assistant..."
-            rows={4}
-          />
-          <CustomInstructionsTokenDisplay
-            content={aiSystemPrompt}
-            maxTokens={maxCustomInstructionsTokens}
-            t={t}
-          />
-        </div>
-      </div>
-    </div>
-  );
-
   const BusinessDetailsSection = () => {
     const handleAddNotificationEmail = () => {
       const email = newNotificationEmail.trim().toLowerCase();
@@ -1718,7 +1644,79 @@ export default function SettingsPage() {
           {activeTab === "general" && <GeneralSection />}
           {activeTab === "branding" && <BrandingSection />}
           {activeTab === "ai" && <AiChatbotSection />}
-          {activeTab === "bot" && <BotPersonalitySection />}
+          {activeTab === "bot" && (
+            <div className="rounded-xl border bg-card p-4">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                {t("botPersonality")}
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {t("botPersonalityDescription")}
+              </p>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="aiBotName" className="text-sm font-medium">{t("aiBotName")}</Label>
+                    <Input
+                      id="aiBotName"
+                      value={aiBotName}
+                      onChange={(e) => setAiBotName(e.target.value)}
+                      placeholder="Assistant"
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiBotNameDescription")}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="aiPersonality" className="text-sm font-medium">{t("aiPersonalityLabel")}</Label>
+                    <Select value={aiPersonality} onValueChange={setAiPersonality}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Select a personality" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(BOT_PERSONALITIES) as PersonalityKey[]).map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {BOT_PERSONALITIES[key].label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {BOT_PERSONALITIES[aiPersonality as PersonalityKey]?.description || BOT_PERSONALITIES.friendly.description}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
+                  <Input
+                    id="aiGreeting"
+                    value={aiGreeting}
+                    onChange={(e) => setAiGreeting(e.target.value)}
+                    placeholder="Hello! How can I help you today?"
+                    className="h-10"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t("aiGreetingDescription")}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>
+                  <Textarea
+                    id="aiSystemPrompt"
+                    value={aiSystemPrompt}
+                    onChange={(e) => setAiSystemPrompt(e.target.value)}
+                    placeholder="Custom instructions for the AI assistant..."
+                    rows={4}
+                  />
+                  <CustomInstructionsTokenDisplay
+                    content={aiSystemPrompt}
+                    maxTokens={maxCustomInstructionsTokens}
+                    t={t}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           {activeTab === "business" && <BusinessDetailsSection />}
           {activeTab === "embed" && <EmbedSection />}
           {activeTab === "subscription" && <SubscriptionSection />}
