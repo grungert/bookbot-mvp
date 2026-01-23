@@ -927,15 +927,17 @@ export function UpgradeModal({
                   <span className="font-medium">{1 + extraCompanyCount}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{tUpgrade("aiChatbot")}</span>
-                <span className="font-medium">
-                  {isProAddonMode
-                    ? (includeChatbot || proUpgradeChoice === "chatbot" ? tCommon("yes") : tCommon("no"))
-                    : (includeChatbot ? tCommon("yes") : tCommon("no"))
-                  }
-                </span>
-              </div>
+              {!hasChatbot && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">{tUpgrade("aiChatbot")}</span>
+                  <span className="font-medium">
+                    {isProAddonMode
+                      ? (includeChatbot || proUpgradeChoice === "chatbot" ? tCommon("yes") : tCommon("no"))
+                      : (includeChatbot ? tCommon("yes") : tCommon("no"))
+                    }
+                  </span>
+                </div>
+              )}
             </>
           )}
           {isBusinessUpgrade && (
