@@ -23,7 +23,17 @@ export default async function AdminLayout({
   const { locale, companySlug } = await params;
   setRequestLocale(locale);
 
-  const user = await getCurrentUser();
+  const sessionUser = await getCurrentUser();
+
+  if (!sessionUser) {
+    redirect(`/${locale}/login`);
+  }
+
+  // Fetch fresh user data from database (session might have stale role)
+  const user = await prisma.user.findUnique({
+    where: { id: sessionUser.id },
+    select: { id: true, role: true },
+  });
 
   if (!user) {
     redirect(`/${locale}/login`);

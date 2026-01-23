@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/auth";
 import { checkRegistrationRateLimit } from "@/lib/rate-limit";
 import { createEmailVerificationToken } from "@/lib/tokens";
 import { sendVerificationEmail } from "@/lib/email";
+import { createTrialSubscription } from "@/lib/subscription/trial";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
-        role: "END_USER",
+        role: "COMPANY_ADMIN", // New users can create companies
         // emailVerified is intentionally left null - requires verification
       },
       select: {
@@ -80,6 +81,13 @@ export async function POST(request: Request) {
         role: true,
       },
     });
+
+    // Create 14-day trial subscription for the new user
+    const trialResult = await createTrialSubscription(user.id);
+    if (!trialResult.success) {
+      console.error("Failed to create trial subscription:", trialResult.error);
+      // Don't fail registration, but log the error
+    }
 
     // Create verification token and send email
     const verificationToken = await createEmailVerificationToken(user.id);
