@@ -188,7 +188,7 @@ export function PricingPageClient({
           </Link>
           <div className="flex items-center gap-4">
             {isLoggedIn ? (
-              <Link href="/account">
+              <Link href="/user">
                 <Button variant="outline" size="sm">
                   {t("myAccount")}
                 </Button>

@@ -889,7 +889,20 @@
     "status_TRIALING": "Probni",
     "status_TRIAL_EXPIRED": "Istekao",
     "status_PAST_DUE": "Dospelo",
-    "status_CANCELLED": "Otkazan"
+    "status_CANCELLED": "Otkazan",
+    "billingPeriod": "Period naplate",
+    "trialPeriod": "Besplatan probni period",
+    "trialFreeDescription": "Uzivajte u punom pristupu svim funkcijama bez troskova",
+    "trialBannerTitle": "Besplatan probni period",
+    "trialBannerDescription": "Pun pristup do {date} - bez placanja",
+    "knowledgeBase": "Baza znanja",
+    "resetsOn": "Resetuje se {date}",
+    "yourCompanies": "Vase kompanije",
+    "createCompany": "Kreiraj kompaniju",
+    "noCompanies": "Nema kompanija",
+    "documentsUnlimited": "{count} dokumenata (neograniceno)",
+    "documentsUsed": "{used} / {limit} dokumenata",
+    "extraCompanySlot": "+${price}/mesecno po dodatnoj kompaniji"
   },
   "pricing": {
     "pageTitle": "Cene",

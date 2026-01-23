@@ -889,7 +889,20 @@
     "status_TRIALING": "Trial",
     "status_TRIAL_EXPIRED": "Expired",
     "status_PAST_DUE": "Past Due",
-    "status_CANCELLED": "Cancelled"
+    "status_CANCELLED": "Cancelled",
+    "billingPeriod": "Billing period",
+    "trialPeriod": "Free trial period",
+    "trialFreeDescription": "Enjoy full access to all features at no cost",
+    "trialBannerTitle": "Free Trial",
+    "trialBannerDescription": "Full access until {date} - no payment required",
+    "knowledgeBase": "Knowledge Base",
+    "resetsOn": "Resets on {date}",
+    "yourCompanies": "Your Companies",
+    "createCompany": "Create Company",
+    "noCompanies": "No companies yet",
+    "documentsUnlimited": "{count} documents (unlimited)",
+    "documentsUsed": "{used} / {limit} documents",
+    "extraCompanySlot": "+${price}/month per extra company"
   },
   "pricing": {
     "pageTitle": "Pricing",

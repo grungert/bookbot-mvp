@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Sparkles, Clock, AlertTriangle, ExternalLink } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Sparkles, Clock, AlertTriangle, ExternalLink, Calendar, Plus } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
+import { UpgradeModal } from "@/components/subscription/upgrade-modal";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -66,10 +67,10 @@ type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" 
 
 const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
   { id: "general", labelKey: "tabGeneral", icon: Building2 },
+  { id: "business", labelKey: "tabBusinessDetails", icon: FileText },
   { id: "branding", labelKey: "tabBranding", icon: Palette },
   { id: "ai", labelKey: "tabAiChatbot", icon: Bot },
   { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
-  { id: "business", labelKey: "tabBusinessDetails", icon: FileText },
   { id: "embed", labelKey: "tabEmbed", icon: Code },
   { id: "subscription", labelKey: "tabSubscription", icon: CreditCard },
 ];
@@ -79,6 +80,9 @@ interface SubscriptionData {
   planTier: string;
   planName: string;
   trialEndsAt: string | null;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  extraCompanySlots: number;
   daysRemaining: number;
   chatUsage: {
     used: number;
@@ -95,11 +99,22 @@ interface SubscriptionData {
     used: number;
     total: number;
     unlimited: boolean;
+    available: number;
   };
   features: {
     customBranding: boolean;
     prioritySupport: boolean;
   };
+  plan: {
+    maxDocumentsPerCompany: number | null;
+    extraCompanyPrice: number | null;
+  };
+  companies: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    documentCount: number;
+  }>;
 }
 
 export default function SettingsPage() {
@@ -116,6 +131,7 @@ export default function SettingsPage() {
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
   // Form state
@@ -932,6 +948,14 @@ export default function SettingsPage() {
   };
 
   const SubscriptionSection = () => {
+    const formatDate = (dateStr: string) => {
+      return new Date(dateStr).toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    };
+
     if (isLoadingSubscription) {
       return (
         <div className="rounded-xl border bg-card p-8 flex items-center justify-center">
@@ -958,7 +982,7 @@ export default function SettingsPage() {
 
     const statusColors: Record<string, { text: string; bg: string }> = {
       ACTIVE: { text: "text-green-600", bg: "bg-green-100" },
-      TRIALING: { text: "text-blue-600", bg: "bg-blue-100" },
+      TRIALING: { text: "text-primary", bg: "bg-primary/10" },
       TRIAL_EXPIRED: { text: "text-destructive", bg: "bg-red-100" },
       PAST_DUE: { text: "text-amber-600", bg: "bg-amber-100" },
       CANCELLED: { text: "text-muted-foreground", bg: "bg-muted" },
@@ -988,22 +1012,39 @@ export default function SettingsPage() {
                     {tSub(`status_${subscriptionData.status}`)}
                   </Badge>
                 </div>
-                {subscriptionData.status === "TRIALING" && subscriptionData.daysRemaining > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {tSub("trialDaysRemaining", { days: subscriptionData.daysRemaining })}
-                  </p>
-                )}
               </div>
             </div>
             {subscriptionData.planTier !== "BUSINESS" && (
-              <Link href="/pricing">
-                <Button size="sm">
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {tSub("upgradePlan")}
-                </Button>
-              </Link>
+              <Button size="sm" onClick={() => setShowUpgradeModal(true)}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                {tSub("upgradePlan")}
+              </Button>
             )}
           </div>
+          {/* Trial Period Info */}
+          {subscriptionData.status === "TRIALING" && subscriptionData.trialEndsAt && (
+            <div className="mt-4 pt-4 border-t space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-muted-foreground">{tSub("trialPeriod")}:</span>
+                <span className="font-medium">
+                  {formatDate(subscriptionData.currentPeriodStart)} - {formatDate(subscriptionData.trialEndsAt)}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {tSub("trialDaysRemaining", { days: subscriptionData.daysRemaining })} - {tSub("trialFreeDescription")}
+              </p>
+            </div>
+          )}
+          {/* Billing Period - only show for paid subscriptions */}
+          {subscriptionData.status !== "TRIALING" && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-4 pt-4 border-t">
+              <Calendar className="h-4 w-4" />
+              <span>
+                {tSub("billingPeriod")}: {formatDate(subscriptionData.currentPeriodStart)} - {formatDate(subscriptionData.currentPeriodEnd)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Usage Stats */}
@@ -1011,31 +1052,120 @@ export default function SettingsPage() {
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             {tSub("usage")}
           </h3>
-          <div className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-3">
             {/* Chat Messages */}
-            <UsageMeter
-              label={tSub("chatMessages")}
-              used={subscriptionData.chatUsage.used}
-              limit={subscriptionData.chatUsage.limit}
-              unlimited={subscriptionData.chatUsage.unlimited}
-            />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                <span className="font-medium">{tSub("chatMessages")}</span>
+              </div>
+              <UsageMeter
+                label=""
+                used={subscriptionData.chatUsage.used}
+                limit={subscriptionData.chatUsage.limit}
+                unlimited={subscriptionData.chatUsage.unlimited}
+                showPercentage={true}
+              />
+              <p className="text-xs text-muted-foreground">
+                {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}
+              </p>
+            </div>
 
-            {/* Documents */}
-            <UsageMeter
-              label={tSub("documentsThisCompany")}
-              used={subscriptionData.documentUsage.current}
-              limit={subscriptionData.documentUsage.limit}
-              unlimited={subscriptionData.documentUsage.unlimited}
-            />
+            {/* Knowledge Base (Documents) */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="font-medium">{tSub("knowledgeBase")}</span>
+              </div>
+              <UsageMeter
+                label=""
+                used={subscriptionData.documentUsage.current}
+                limit={subscriptionData.documentUsage.limit}
+                unlimited={subscriptionData.documentUsage.unlimited}
+                showPercentage={true}
+              />
+              <p className="text-xs text-muted-foreground">
+                {tSub("documentsThisCompany")}
+              </p>
+            </div>
 
             {/* Company Slots */}
-            <UsageMeter
-              label={tSub("companySlots")}
-              used={subscriptionData.companySlots.used}
-              limit={subscriptionData.companySlots.total}
-              unlimited={subscriptionData.companySlots.unlimited}
-            />
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <span className="font-medium">{tSub("companySlots")}</span>
+              </div>
+              <UsageMeter
+                label=""
+                used={subscriptionData.companySlots.used}
+                limit={subscriptionData.companySlots.total}
+                unlimited={subscriptionData.companySlots.unlimited}
+                showPercentage={true}
+              />
+              {subscriptionData.plan.extraCompanyPrice && !subscriptionData.companySlots.unlimited && (
+                <p className="text-xs text-muted-foreground">
+                  {tSub("extraCompanySlot", { price: subscriptionData.plan.extraCompanyPrice })}
+                </p>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Companies List */}
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {tSub("yourCompanies")}
+            </h3>
+            {subscriptionData.companySlots.available !== 0 && (
+              <Link href="/user">
+                <Button variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  {tSub("createCompany")}
+                </Button>
+              </Link>
+            )}
+          </div>
+          {subscriptionData.companies.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{tSub("noCompanies")}</p>
+          ) : (
+            <div className="space-y-3">
+              {subscriptionData.companies.map((company) => {
+                const docLimit = subscriptionData.plan.maxDocumentsPerCompany;
+                const docUnlimited = docLimit === null || docLimit === -1;
+
+                return (
+                  <div
+                    key={company.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <Building2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{company.name}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <FileText className="h-3 w-3" />
+                          {docUnlimited
+                            ? tSub("documentsUnlimited", { count: company.documentCount })
+                            : tSub("documentsUsed", {
+                                used: company.documentCount,
+                                limit: docLimit,
+                              })}
+                        </div>
+                      </div>
+                    </div>
+                    <Link href={`/c/${company.slug}/admin`}>
+                      <Button variant="ghost" size="sm">
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Features */}
@@ -1067,13 +1197,12 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Manage Link */}
-        <div className="text-center">
-          <Link href="/account/subscription" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
-            {tSub("manageSubscription")}
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-        </div>
+        {/* Upgrade Modal */}
+        <UpgradeModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          currentTier={subscriptionData.planTier}
+        />
       </div>
     );
   };

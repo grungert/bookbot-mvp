@@ -58,11 +58,38 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json(null);
     }
 
+    // Get all companies owned by this user with document counts
+    const companiesWithDocs = await prisma.companyMembership.findMany({
+      where: {
+        userId: ownerId,
+        role: "OWNER",
+      },
+      include: {
+        company: {
+          include: {
+            _count: {
+              select: { documents: true },
+            },
+          },
+        },
+      },
+    });
+
+    const companies = companiesWithDocs.map((membership) => ({
+      id: membership.company.id,
+      name: membership.company.name,
+      slug: membership.company.slug,
+      documentCount: membership.company._count.documents,
+    }));
+
     return NextResponse.json({
       status: subscription.status,
       planTier: subscription.plan.tier,
       planName: subscription.plan.name,
       trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+      currentPeriodStart: subscription.currentPeriodStart.toISOString(),
+      currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
+      extraCompanySlots: subscription.extraCompanySlots,
       daysRemaining: trialStatus.daysRemaining,
       chatUsage: {
         used: chatUsage.currentPeriod.used,
@@ -79,11 +106,17 @@ export async function GET(request: Request, context: RouteContext) {
         used: companySlots.usedSlots,
         total: companySlots.totalSlots,
         unlimited: companySlots.unlimited,
+        available: companySlots.availableSlots,
       },
       features: {
         customBranding: subscription.plan.customBranding,
         prioritySupport: subscription.plan.prioritySupport,
       },
+      plan: {
+        maxDocumentsPerCompany: subscription.plan.maxDocumentsPerCompany,
+        extraCompanyPrice: subscription.plan.extraCompanyPrice,
+      },
+      companies,
     });
   } catch (error) {
     console.error("Error fetching subscription data:", error);

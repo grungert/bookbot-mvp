@@ -6,6 +6,7 @@ import { Link } from "@/i18n/routing";
 import { Clock, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/admin/admin-sidebar";
 
 export interface TrialBannerProps {
   status: "TRIALING" | "TRIAL_EXPIRED" | "ACTIVE" | "PAST_DUE" | "CANCELLED" | null;
@@ -22,6 +23,7 @@ export function TrialBanner({
 }: TrialBannerProps) {
   const t = useTranslations("subscription");
   const [mounted, setMounted] = useState(false);
+  const { isCollapsed } = useSidebar();
 
   useEffect(() => {
     setMounted(true);
@@ -32,11 +34,16 @@ export function TrialBanner({
     return null;
   }
 
+  const bannerContentClass = cn(
+    "flex items-center justify-between gap-4",
+    isCollapsed ? "lg:ml-16" : "lg:ml-64"
+  );
+
   // Trial expired - show urgent banner
   if (status === "TRIAL_EXPIRED") {
     return (
       <div className="bg-destructive/15 border-b border-destructive/20 px-4 py-3">
-        <div className="flex items-center justify-between gap-4 max-w-screen-2xl mx-auto">
+        <div className={bannerContentClass}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-destructive/20">
               <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -65,7 +72,7 @@ export function TrialBanner({
   if (status === "PAST_DUE") {
     return (
       <div className="bg-amber-500/15 border-b border-amber-500/20 px-4 py-3">
-        <div className="flex items-center justify-between gap-4 max-w-screen-2xl mx-auto">
+        <div className={bannerContentClass}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-amber-500/20">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -96,7 +103,7 @@ export function TrialBanner({
   if (status === "CANCELLED") {
     return (
       <div className="bg-muted border-b px-4 py-3">
-        <div className="flex items-center justify-between gap-4 max-w-screen-2xl mx-auto">
+        <div className={bannerContentClass}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-muted-foreground/20">
               <AlertTriangle className="h-4 w-4 text-muted-foreground" />
@@ -124,10 +131,11 @@ export function TrialBanner({
   // Active trial - show countdown
   if (status === "TRIALING") {
     const isUrgent = daysRemaining <= 3;
-    const formattedDate = trialEndsAt
+    const formattedEndDate = trialEndsAt
       ? new Date(trialEndsAt).toLocaleDateString(undefined, {
-          month: "short",
+          month: "long",
           day: "numeric",
+          year: "numeric",
         })
       : null;
 
@@ -140,7 +148,7 @@ export function TrialBanner({
             : "bg-primary/5 border-primary/10"
         )}
       >
-        <div className="flex items-center justify-between gap-4 max-w-screen-2xl mx-auto">
+        <div className={bannerContentClass}>
           <div className="flex items-center gap-3">
             <div
               className={cn(
@@ -164,7 +172,7 @@ export function TrialBanner({
                     : "text-primary"
                 )}
               >
-                {t("trialDaysRemaining", { days: daysRemaining })}
+                {t("trialBannerTitle")} - {t("trialDaysRemaining", { days: daysRemaining })}
               </p>
               <p
                 className={cn(
@@ -174,18 +182,19 @@ export function TrialBanner({
                     : "text-primary/70"
                 )}
               >
-                {formattedDate
-                  ? t("trialEndsOn", { date: formattedDate })
-                  : t("trialDescription")}
+                {formattedEndDate
+                  ? t("trialBannerDescription", { date: formattedEndDate })
+                  : t("trialFreeDescription")}
               </p>
             </div>
           </div>
           <Link href="/pricing">
             <Button
               size="sm"
-              variant={isUrgent ? "default" : "outline"}
               className={cn(
-                isUrgent && "bg-amber-600 hover:bg-amber-700 text-white"
+                isUrgent
+                  ? "bg-amber-600 hover:bg-amber-700 text-white"
+                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
               )}
             >
               <Sparkles className="h-4 w-4 mr-2" />

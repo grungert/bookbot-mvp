@@ -83,7 +83,7 @@ export function UpgradeModal({
 
     setIsUpgrading(true);
     try {
-      const response = await fetch("/api/account/upgrade", {
+      const response = await fetch("/api/subscription/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planTier: selectedPlan }),

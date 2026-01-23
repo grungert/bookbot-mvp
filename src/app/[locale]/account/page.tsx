@@ -16,18 +16,18 @@ export default async function AccountPage({ params }: AccountPageProps) {
     redirect(`/${locale}/login`);
   }
 
-  // Check if user has any companies
+  // Get user's primary company
   const membership = await prisma.companyMembership.findFirst({
     where: { userId: user.id },
     include: { company: true },
     orderBy: { isPrimary: "desc" },
   });
 
-  // If user has no company, redirect to onboarding
-  if (!membership) {
-    redirect(`/${locale}/onboarding`);
+  // If user has a company, redirect to admin settings subscription tab
+  if (membership) {
+    redirect(`/${locale}/c/${membership.company.slug}/admin/settings#subscription`);
   }
 
-  // User has a company - redirect to subscription page
-  redirect(`/${locale}/account/subscription`);
+  // If no company, redirect to onboarding
+  redirect(`/${locale}/onboarding`);
 }
