@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
@@ -97,9 +97,20 @@ interface CompanySettings {
   businessEmail: string | null;
   notificationEmails: string[];
   taxRate: number;
+  // WhatsApp Channel Settings
+  whatsappEnabled: boolean;
+  whatsappPhoneNumber: string | null;
+  whatsappGreeting: string | null;
+  whatsappAutoReply: string | null;
+  whatsappAccessToken: string | null;
+  whatsappPhoneNumberId: string | null;
+  whatsappAppSecret: string | null;
+  whatsappScope: string;
+  hasWhatsappAccessToken: boolean;
+  hasWhatsappAppSecret: boolean;
 }
 
-type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "subscription" | "invoices";
+type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "channels" | "subscription" | "invoices";
 
 const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[] = [
   { id: "general", labelKey: "tabGeneral", icon: Building2 },
@@ -108,6 +119,7 @@ const tabConfig: { id: SettingsTab; labelKey: string; icon: typeof Building2 }[]
   { id: "ai", labelKey: "tabAiChatbot", icon: Bot },
   { id: "bot", labelKey: "tabBotPersonality", icon: MessageSquare },
   { id: "embed", labelKey: "tabEmbed", icon: Code },
+  { id: "channels", labelKey: "tabChannels", icon: Radio },
   { id: "subscription", labelKey: "tabSubscription", icon: CreditCard },
   { id: "invoices", labelKey: "tabInvoices", icon: FileText },
 ];
@@ -202,6 +214,36 @@ export default function SettingsPage() {
 
   // Token limits
   const [maxCustomInstructionsTokens, setMaxCustomInstructionsTokens] = useState(500);
+
+  // WhatsApp Channel Settings
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [whatsappPhoneNumber, setWhatsappPhoneNumber] = useState("");
+  const [whatsappGreeting, setWhatsappGreeting] = useState("");
+  const [whatsappAutoReply, setWhatsappAutoReply] = useState("");
+  const [whatsappAccessToken, setWhatsappAccessToken] = useState("");
+  const [hasExistingWhatsappToken, setHasExistingWhatsappToken] = useState(false);
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState("");
+  const [whatsappAppSecret, setWhatsappAppSecret] = useState("");
+  const [hasExistingWhatsappSecret, setHasExistingWhatsappSecret] = useState(false);
+  const [whatsappScope, setWhatsappScope] = useState<"company" | "all">("company");
+  const [showWhatsappToken, setShowWhatsappToken] = useState(false);
+  const [showWhatsappSecret, setShowWhatsappSecret] = useState(false);
+  const [isTestingWhatsapp, setIsTestingWhatsapp] = useState(false);
+  const [whatsappTestResult, setWhatsappTestResult] = useState<{
+    success: boolean;
+    phoneNumber?: string;
+    verifiedName?: string;
+    qualityRating?: string;
+    error?: string;
+  } | null>(null);
+  // Test phone number for sending test messages
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [isSendingTestMessage, setIsSendingTestMessage] = useState(false);
+  const [testMessageResult, setTestMessageResult] = useState<{
+    success: boolean;
+    messageId?: string;
+    error?: string;
+  } | null>(null);
 
   // Business Details state
   const [businessAddress, setBusinessAddress] = useState("");
@@ -413,6 +455,17 @@ export default function SettingsPage() {
       setBusinessEmail(settings.businessEmail || "");
       setNotificationEmails(settings.notificationEmails || []);
       setTaxRate(settings.taxRate ?? 20);
+      // WhatsApp Channel Settings
+      setWhatsappEnabled(settings.whatsappEnabled ?? false);
+      setWhatsappPhoneNumber(settings.whatsappPhoneNumber || "");
+      setWhatsappGreeting(settings.whatsappGreeting || "");
+      setWhatsappAutoReply(settings.whatsappAutoReply || "");
+      setWhatsappAccessToken(settings.whatsappAccessToken || "");
+      setHasExistingWhatsappToken(settings.hasWhatsappAccessToken);
+      setWhatsappPhoneNumberId(settings.whatsappPhoneNumberId || "");
+      setWhatsappAppSecret(settings.whatsappAppSecret || "");
+      setHasExistingWhatsappSecret(settings.hasWhatsappAppSecret);
+      setWhatsappScope((settings.whatsappScope as "company" | "all") || "company");
     } catch (error) {
       console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
@@ -449,11 +502,26 @@ export default function SettingsPage() {
         businessEmail: businessEmail || null,
         notificationEmails,
         taxRate,
+        // WhatsApp Channel Settings
+        whatsappEnabled,
+        whatsappPhoneNumber: whatsappPhoneNumber || null,
+        whatsappGreeting: whatsappGreeting || null,
+        whatsappAutoReply: whatsappAutoReply || null,
+        whatsappPhoneNumberId: whatsappPhoneNumberId || null,
+        whatsappScope,
       };
 
       // Only include API key if it's been changed (not masked)
       if (aiApiKey && !aiApiKey.startsWith("***")) {
         updateData.aiApiKey = aiApiKey || null;
+      }
+
+      // Only include WhatsApp credentials if they've been changed (not masked)
+      if (whatsappAccessToken && !whatsappAccessToken.startsWith("****")) {
+        updateData.whatsappAccessToken = whatsappAccessToken || null;
+      }
+      if (whatsappAppSecret && !whatsappAppSecret.startsWith("****")) {
+        updateData.whatsappAppSecret = whatsappAppSecret || null;
       }
 
       const response = await fetch(`/api/c/${companySlug}/settings`, {
@@ -472,6 +540,11 @@ export default function SettingsPage() {
       // Update form with returned values
       setAiApiKey(updatedSettings.aiApiKey || "");
       setHasExistingApiKey(updatedSettings.hasAiApiKey);
+      // Update WhatsApp values
+      setWhatsappAccessToken(updatedSettings.whatsappAccessToken || "");
+      setHasExistingWhatsappToken(updatedSettings.hasWhatsappAccessToken);
+      setWhatsappAppSecret(updatedSettings.whatsappAppSecret || "");
+      setHasExistingWhatsappSecret(updatedSettings.hasWhatsappAppSecret);
 
       // Refresh the page to update header/layout with new settings
       router.refresh();
@@ -1077,6 +1150,519 @@ export default function SettingsPage() {
                 </a>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // WhatsApp test connection handler
+  const handleTestWhatsappConnection = async () => {
+    if (!whatsappPhoneNumberId) {
+      toast.error(t("whatsapp.phoneNumberIdRequired") || "Phone Number ID is required");
+      return;
+    }
+
+    if (!whatsappAccessToken && !hasExistingWhatsappToken) {
+      toast.error(t("whatsapp.accessTokenRequired") || "Access Token is required");
+      return;
+    }
+
+    setIsTestingWhatsapp(true);
+    setWhatsappTestResult(null);
+
+    try {
+      const response = await fetch(`/api/c/${companySlug}/settings/whatsapp-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessToken: whatsappAccessToken,
+          phoneNumberId: whatsappPhoneNumberId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setWhatsappTestResult({
+          success: true,
+          phoneNumber: data.phoneNumber,
+          verifiedName: data.verifiedName,
+          qualityRating: data.qualityRating,
+        });
+        toast.success(t("whatsapp.connectionSuccess") || "Connection successful!");
+      } else {
+        setWhatsappTestResult({
+          success: false,
+          error: data.error || "Connection failed",
+        });
+        toast.error(data.error || "Connection test failed");
+      }
+    } catch (error) {
+      console.error("WhatsApp test error:", error);
+      setWhatsappTestResult({
+        success: false,
+        error: "Network error. Please try again.",
+      });
+      toast.error(tCommon("error"));
+    } finally {
+      setIsTestingWhatsapp(false);
+    }
+  };
+
+  // Send test WhatsApp message handler
+  const handleSendTestMessage = async () => {
+    if (!testPhoneNumber) {
+      toast.error(t("whatsapp.testPhoneRequired") || "Phone number is required");
+      return;
+    }
+
+    if (!whatsappPhoneNumberId) {
+      toast.error(t("whatsapp.phoneNumberIdRequired") || "Configure Phone Number ID first");
+      return;
+    }
+
+    if (!whatsappAccessToken && !hasExistingWhatsappToken) {
+      toast.error(t("whatsapp.accessTokenRequired") || "Configure Access Token first");
+      return;
+    }
+
+    setIsSendingTestMessage(true);
+    setTestMessageResult(null);
+
+    try {
+      const response = await fetch(`/api/c/${companySlug}/settings/whatsapp-test-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: testPhoneNumber.replace(/\D/g, ""), // Remove non-digits
+          accessToken: whatsappAccessToken || undefined,
+          phoneNumberId: whatsappPhoneNumberId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setTestMessageResult({
+          success: true,
+          messageId: data.messageId,
+        });
+        toast.success(t("whatsapp.testMessageSent") || "Test message sent!");
+      } else {
+        setTestMessageResult({
+          success: false,
+          error: data.error || "Failed to send message",
+        });
+        toast.error(data.error || "Failed to send test message");
+      }
+    } catch (error) {
+      console.error("Send test message error:", error);
+      setTestMessageResult({
+        success: false,
+        error: "Network error. Please try again.",
+      });
+      toast.error(tCommon("error"));
+    } finally {
+      setIsSendingTestMessage(false);
+    }
+  };
+
+  const ChannelsSection = () => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const webhookUrl = `${baseUrl}/api/webhooks/whatsapp`;
+    const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+    const handleCopyWebhook = async () => {
+      try {
+        await navigator.clipboard.writeText(webhookUrl);
+        setCopiedWebhook(true);
+        toast.success(t("copied"));
+        setTimeout(() => setCopiedWebhook(false), 2000);
+      } catch {
+        toast.error(tCommon("error"));
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* WhatsApp Business Integration */}
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <Phone className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">{t("whatsapp.title") || "WhatsApp Business Integration"}</h3>
+              <p className="text-xs text-muted-foreground">{t("whatsapp.description") || "Connect your WhatsApp Business account to receive and send messages"}</p>
+            </div>
+          </div>
+
+          {/* API Credentials */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.apiCredentials") || "API Credentials"}</h4>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="whatsappAccessToken" className="text-sm font-medium">
+                  {t("whatsapp.accessToken") || "Meta Access Token"} *
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="whatsappAccessToken"
+                    type={showWhatsappToken ? "text" : "password"}
+                    value={whatsappAccessToken}
+                    onChange={(e) => setWhatsappAccessToken(e.target.value)}
+                    placeholder={hasExistingWhatsappToken ? (t("enterNewKeyToReplace") || "Enter new key to replace") : "EAAxxxxxxxx..."}
+                    className="h-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setShowWhatsappToken(!showWhatsappToken)}
+                  >
+                    {showWhatsappToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {hasExistingWhatsappToken && whatsappAccessToken?.startsWith("****") && (
+                  <p className="text-xs text-muted-foreground">{t("whatsapp.tokenConfigured") || "Access token is configured"}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsappPhoneNumberId" className="text-sm font-medium">
+                  {t("whatsapp.phoneNumberId") || "Phone Number ID"} *
+                </Label>
+                <Input
+                  id="whatsappPhoneNumberId"
+                  value={whatsappPhoneNumberId}
+                  onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                  placeholder="123456789012345"
+                  className="h-10"
+                />
+                <p className="text-xs text-muted-foreground">{t("whatsapp.phoneNumberIdHint") || "Found in WhatsApp > Getting Started in your Meta App"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsappAppSecret" className="text-sm font-medium">
+                  {t("whatsapp.appSecret") || "App Secret"} ({tCommon("optional") || "optional"})
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="whatsappAppSecret"
+                    type={showWhatsappSecret ? "text" : "password"}
+                    value={whatsappAppSecret}
+                    onChange={(e) => setWhatsappAppSecret(e.target.value)}
+                    placeholder={hasExistingWhatsappSecret ? (t("enterNewKeyToReplace") || "Enter new key to replace") : ""}
+                    className="h-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => setShowWhatsappSecret(!showWhatsappSecret)}
+                  >
+                    {showWhatsappSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("whatsapp.appSecretHint") || "Used for webhook signature verification"}</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsappPhoneNumber" className="text-sm font-medium">
+                  {t("whatsapp.displayPhoneNumber") || "Display Phone Number"}
+                </Label>
+                <Input
+                  id="whatsappPhoneNumber"
+                  value={whatsappPhoneNumber}
+                  onChange={(e) => setWhatsappPhoneNumber(e.target.value)}
+                  placeholder="+1 234 567 8900"
+                  className="h-10"
+                />
+                <p className="text-xs text-muted-foreground">{t("whatsapp.displayPhoneNumberHint") || "This is shown to customers"}</p>
+              </div>
+            </div>
+
+            {/* Test Connection Button */}
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestWhatsappConnection}
+                disabled={isTestingWhatsapp || (!whatsappPhoneNumberId)}
+              >
+                {isTestingWhatsapp ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
+                {t("whatsapp.testConnection") || "Test Connection"}
+              </Button>
+
+              {whatsappTestResult && (
+                <div className={cn(
+                  "flex items-center gap-2 text-sm",
+                  whatsappTestResult.success ? "text-green-600" : "text-destructive"
+                )}>
+                  {whatsappTestResult.success ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>{whatsappTestResult.verifiedName || whatsappTestResult.phoneNumber}</span>
+                      {whatsappTestResult.qualityRating && (
+                        <Badge variant="outline" className="ml-2">{whatsappTestResult.qualityRating}</Badge>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>{whatsappTestResult.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Scope Selection */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.scope") || "Scope"}</h4>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">{t("whatsapp.useFor") || "Use this WhatsApp number for:"}</Label>
+
+              <div className="space-y-2">
+                <label
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                    whatsappScope === "company" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="whatsappScope"
+                    value="company"
+                    checked={whatsappScope === "company"}
+                    onChange={() => setWhatsappScope("company")}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{t("whatsapp.scopeCompany") || "This company only"}</div>
+                    <div className="text-xs text-muted-foreground">{t("whatsapp.scopeCompanyHint") || "Messages will only be routed to this company"}</div>
+                  </div>
+                </label>
+
+                <label
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                    whatsappScope === "all" ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="whatsappScope"
+                    value="all"
+                    checked={whatsappScope === "all"}
+                    onChange={() => setWhatsappScope("all")}
+                    className="mt-1"
+                  />
+                  <div>
+                    <div className="font-medium text-sm">{t("whatsapp.scopeAll") || "All my companies"}</div>
+                    <div className="text-xs text-muted-foreground">{t("whatsapp.scopeAllHint") || "Messages will be routed to all companies I manage"}</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Customization */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.customization") || "Customization"}</h4>
+            </div>
+
+            {/* Enable Toggle */}
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Check className={cn("h-5 w-5", whatsappEnabled ? "text-green-600" : "text-muted-foreground")} />
+                <div>
+                  <div className="font-medium text-sm">{t("whatsapp.enableBooking") || "Enable WhatsApp Booking"}</div>
+                  <div className="text-xs text-muted-foreground">{t("whatsapp.enableBookingHint") || "Allow customers to book appointments via WhatsApp"}</div>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant={whatsappEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setWhatsappEnabled(!whatsappEnabled)}
+              >
+                {whatsappEnabled ? (t("whatsapp.enabled") || "Enabled") : (t("whatsapp.disabled") || "Disabled")}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="whatsappGreeting" className="text-sm font-medium">{t("whatsapp.welcomeMessage") || "Welcome Message"}</Label>
+              <Textarea
+                id="whatsappGreeting"
+                value={whatsappGreeting}
+                onChange={(e) => setWhatsappGreeting(e.target.value)}
+                placeholder={t("whatsapp.welcomeMessagePlaceholder") || "Hi! Welcome to {company}. I'm your booking assistant..."}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="whatsappAutoReply" className="text-sm font-medium">{t("whatsapp.autoReply") || "Outside Hours Auto-Reply"}</Label>
+              <Textarea
+                id="whatsappAutoReply"
+                value={whatsappAutoReply}
+                onChange={(e) => setWhatsappAutoReply(e.target.value)}
+                placeholder={t("whatsapp.autoReplyPlaceholder") || "Thanks for your message! We're currently outside business hours..."}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Webhook Configuration */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.webhookConfig") || "Webhook Configuration"}</h4>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("whatsapp.webhookUrl") || "Webhook URL"}</Label>
+              <p className="text-xs text-muted-foreground">{t("whatsapp.webhookUrlHint") || "Copy this URL to your Meta App webhook settings"}</p>
+              <div className="flex gap-2">
+                <Input
+                  value={webhookUrl}
+                  readOnly
+                  className="h-10 font-mono text-sm bg-muted"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={handleCopyWebhook}
+                >
+                  {copiedWebhook ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{t("whatsapp.subscribeHint") || "Subscribe to the 'messages' webhook field"}</p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Test Messages Section */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.testMessages") || "Test Messages"}</h4>
+              <p className="text-xs text-muted-foreground">
+                {t("whatsapp.testMessagesHint") || "Send a test message to verify your WhatsApp integration. The recipient must be added as a test number in your Meta App."}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="testPhoneNumber" className="text-sm font-medium">
+                  {t("whatsapp.recipientPhone") || "Recipient Phone Number"}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="testPhoneNumber"
+                    value={testPhoneNumber}
+                    onChange={(e) => setTestPhoneNumber(e.target.value)}
+                    placeholder="+381 64 123 4567"
+                    className="h-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSendTestMessage}
+                    disabled={isSendingTestMessage || !testPhoneNumber || !whatsappPhoneNumberId}
+                  >
+                    {isSendingTestMessage ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    {t("whatsapp.sendTestMessage") || "Send Test"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("whatsapp.testPhoneHint") || "Include country code without + (e.g., 381641234567). Must be registered in Meta > WhatsApp > Getting Started."}
+                </p>
+              </div>
+
+              {testMessageResult && (
+                <div className={cn(
+                  "flex items-center gap-2 p-3 rounded-lg text-sm",
+                  testMessageResult.success
+                    ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                    : "bg-destructive/10 text-destructive"
+                )}>
+                  {testMessageResult.success ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>{t("whatsapp.messageSentSuccess") || "Message sent successfully!"}</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4" />
+                      <span>{testMessageResult.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Setup Instructions */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <HelpCircle className="h-4 w-4 text-muted-foreground" />
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.setupInstructions") || "Setup Instructions"}</h4>
+            </div>
+
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p>1. {t("whatsapp.step1") || "Create a Meta Business Account at business.facebook.com"}</p>
+              <p>2. {t("whatsapp.step2") || "Create a Meta App at developers.facebook.com/apps"}</p>
+              <p>3. {t("whatsapp.step3") || "Add WhatsApp product to your app"}</p>
+              <p>4. {t("whatsapp.step4") || "Get your Phone Number ID from WhatsApp > Getting Started"}</p>
+              <p>5. {t("whatsapp.step5") || "Generate a permanent access token"}</p>
+              <p>6. {t("whatsapp.step6") || "Configure the webhook URL shown above in your Meta App"}</p>
+              <p>7. {t("whatsapp.step7") || "Enter credentials above and test connection"}</p>
+            </div>
+
+            <a
+              href="https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              {t("whatsapp.viewDocs") || "View Documentation"}
+              <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </div>
@@ -1719,6 +2305,7 @@ export default function SettingsPage() {
           )}
           {activeTab === "business" && <BusinessDetailsSection />}
           {activeTab === "embed" && <EmbedSection />}
+          {activeTab === "channels" && <ChannelsSection />}
           {activeTab === "subscription" && <SubscriptionSection />}
           {activeTab === "invoices" && (
             <InvoicesSection

@@ -1,0 +1,311 @@
+/**
+ * WhatsApp Webhook Handler
+ *
+ * Handles incoming WhatsApp messages via Meta Cloud API webhook.
+ * Processes messages through the AI chat engine and sends responses back.
+ */
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import {
+  whatsappAdapter,
+  findOrCreateWhatsAppSession,
+  handleWhatsAppStatusUpdate,
+  findCompanyByPhoneNumberId,
+} from "@/lib/channels/whatsapp";
+import {
+  chat,
+  saveChatMessage,
+  getChatHistory,
+  type CompanyContext,
+  type UserContext,
+} from "@/lib/ai/chat";
+import {
+  getCompanyOwnerId,
+  checkChatLimit,
+  incrementChatUsage,
+  checkSubscriptionActive,
+} from "@/lib/subscription";
+import { formatForWhatsApp } from "@/lib/channels/formatter";
+import type { ChatUIComponent, RichMessage } from "@/components/chat/types";
+
+/**
+ * GET - Handle webhook verification challenge from Meta
+ */
+export async function GET(request: Request) {
+  return whatsappAdapter.handleVerificationChallenge!(request);
+}
+
+/**
+ * Extract phone number ID from webhook payload
+ */
+function extractPhoneNumberIdFromPayload(body: unknown): string | null {
+  try {
+    const payload = body as {
+      entry?: Array<{
+        changes?: Array<{
+          value?: {
+            metadata?: {
+              phone_number_id?: string;
+            };
+          };
+        }>;
+      }>;
+    };
+    return payload?.entry?.[0]?.changes?.[0]?.value?.metadata?.phone_number_id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse rich message content to extract UI components
+ */
+function parseRichMessage(content: string): { text: string; ui?: ChatUIComponent } {
+  try {
+    const parsed = JSON.parse(content) as RichMessage;
+    if (parsed.type === "rich" && parsed.ui) {
+      return { text: parsed.text, ui: parsed.ui };
+    }
+    return { text: content };
+  } catch {
+    return { text: content };
+  }
+}
+
+/**
+ * POST - Handle incoming WhatsApp messages
+ */
+export async function POST(request: Request) {
+  try {
+    // Parse the incoming message
+    const incomingMessage = await whatsappAdapter.parseIncoming(
+      request.clone()
+    );
+
+    // If no message to process (might be a status update), acknowledge
+    if (!incomingMessage) {
+      // Check if it's a status update
+      const body = await request.json();
+      if (body.entry?.[0]?.changes?.[0]?.value?.statuses) {
+        const status = body.entry[0].changes[0].value.statuses[0];
+        await handleWhatsAppStatusUpdate(status.id, status.status);
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    const phoneNumber = incomingMessage.sessionKey;
+    const userMessage = incomingMessage.content;
+
+    // Extract phone number ID from the raw payload for routing
+    const phoneNumberId = extractPhoneNumberIdFromPayload(incomingMessage.metadata.rawPayload);
+
+    if (!phoneNumberId) {
+      console.error("No phone number ID found in webhook payload");
+      return NextResponse.json({ success: true });
+    }
+
+    // Find the company using the phone number ID (uses mapping table first)
+    const company = await findCompanyByPhoneNumberId(phoneNumberId);
+
+    if (!company) {
+      console.error("No WhatsApp-enabled company found");
+      return NextResponse.json({ success: true }); // Acknowledge but don't process
+    }
+
+    // Get full company details
+    const companyDetails = await prisma.company.findUnique({
+      where: { id: company.id },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        aiApiKey: true,
+        aiEndpoint: true,
+        aiModel: true,
+        aiSystemPrompt: true,
+        aiBotName: true,
+        aiGreeting: true,
+        aiPersonality: true,
+        whatsappEnabled: true,
+        whatsappGreeting: true,
+      },
+    });
+
+    if (!companyDetails || !companyDetails.whatsappEnabled) {
+      console.error("Company WhatsApp not enabled:", company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Check if company has AI configured
+    if (!companyDetails.aiApiKey) {
+      console.error("AI not configured for company:", company.id);
+      // Send error message to user
+      const errorMessage = formatForWhatsApp(
+        "Sorry, the booking assistant is not available at the moment. Please try again later or contact us directly.",
+        undefined
+      );
+      errorMessage.to = phoneNumber;
+      await whatsappAdapter.send(errorMessage, company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Get company owner for subscription checks
+    const ownerId = await getCompanyOwnerId(company.id);
+    if (!ownerId) {
+      console.error("Company owner not found:", company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Check subscription status
+    const subscriptionStatus = await checkSubscriptionActive(ownerId);
+    if (!subscriptionStatus.active) {
+      console.error("Subscription not active for company:", company.id);
+      const errorMessage = formatForWhatsApp(
+        "Sorry, the booking service is temporarily unavailable. Please try again later.",
+        undefined
+      );
+      errorMessage.to = phoneNumber;
+      await whatsappAdapter.send(errorMessage, company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Check chat limit
+    const chatLimitResult = await checkChatLimit(ownerId);
+    if (!chatLimitResult.allowed) {
+      console.error("Chat limit exceeded for company:", company.id);
+      const errorMessage = formatForWhatsApp(
+        "Sorry, we've reached our message limit for this month. Please try again next month or contact us directly to book.",
+        undefined
+      );
+      errorMessage.to = phoneNumber;
+      await whatsappAdapter.send(errorMessage, company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Find or create WhatsApp session
+    const { sessionId, isNew } = await findOrCreateWhatsAppSession(
+      company.id,
+      phoneNumber,
+      incomingMessage.metadata.userName
+    );
+
+    // If new session, send greeting
+    if (isNew && companyDetails.whatsappGreeting) {
+      const greetingMessage = formatForWhatsApp(
+        companyDetails.whatsappGreeting,
+        undefined
+      );
+      greetingMessage.to = phoneNumber;
+      const greetingResult = await whatsappAdapter.send(greetingMessage, company.id);
+
+      if (greetingResult.success && greetingResult.messageId) {
+        await saveChatMessage(sessionId, "assistant", companyDetails.whatsappGreeting);
+        await prisma.chatMessage.updateMany({
+          where: { sessionId, role: "assistant" },
+          data: { externalMsgId: greetingResult.messageId, status: "sent" },
+        });
+      }
+    }
+
+    // Get chat history
+    const history = await getChatHistory(sessionId);
+    const messages = history.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+    // Save user message
+    await saveChatMessage(sessionId, "user", userMessage);
+    if (incomingMessage.metadata.messageId) {
+      await prisma.chatMessage.updateMany({
+        where: {
+          sessionId,
+          role: "user",
+          content: userMessage,
+        },
+        data: {
+          externalMsgId: incomingMessage.metadata.messageId,
+          status: "delivered",
+        },
+      });
+    }
+
+    // Build company context
+    const companyContext: CompanyContext = {
+      id: companyDetails.id,
+      slug: companyDetails.slug,
+      name: companyDetails.name,
+      botName: companyDetails.aiBotName,
+      greeting: companyDetails.aiGreeting,
+      personality: companyDetails.aiPersonality,
+    };
+
+    // Build user context if we can find the user
+    let userContext: UserContext | null = null;
+    const session = await prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      include: { user: true },
+    });
+
+    if (session?.user?.email) {
+      userContext = {
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.name,
+      };
+    }
+
+    // Generate AI response
+    const response = await chat(
+      companyContext,
+      {
+        apiKey: companyDetails.aiApiKey,
+        endpoint: companyDetails.aiEndpoint || undefined,
+        model: companyDetails.aiModel || undefined,
+        systemPrompt: companyDetails.aiSystemPrompt || undefined,
+      },
+      messages,
+      userMessage,
+      userContext,
+      sessionId
+    );
+
+    // Save assistant response
+    await saveChatMessage(sessionId, "assistant", response);
+
+    // Parse the response for rich content
+    const { text, ui } = parseRichMessage(response);
+
+    // Format response for WhatsApp
+    const outgoingMessage = formatForWhatsApp(text, ui);
+    outgoingMessage.to = phoneNumber;
+
+    // Send response
+    const sendResult = await whatsappAdapter.send(outgoingMessage, company.id);
+
+    // Update message status
+    if (sendResult.success && sendResult.messageId) {
+      await prisma.chatMessage.updateMany({
+        where: {
+          sessionId,
+          role: "assistant",
+          content: response,
+        },
+        data: {
+          externalMsgId: sendResult.messageId,
+          status: "sent",
+        },
+      });
+    }
+
+    // Increment chat usage
+    await incrementChatUsage(ownerId, 1);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("WhatsApp webhook error:", error);
+    // Always return 200 to acknowledge receipt
+    return NextResponse.json({ success: true });
+  }
+}

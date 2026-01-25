@@ -8,9 +8,8 @@ datasource db {
 
 // Enums
 enum UserRole {
-  SUPER_ADMIN
-  COMPANY_ADMIN
-  END_USER
+  SUPER_ADMIN  // Platform admin
+  USER         // Regular user - can create companies, book appointments
 }
 
 enum PlanTier {
@@ -83,6 +82,21 @@ model Company {
   aiGreeting     String?   // Custom greeting message
   aiPersonality  String?   // Personality preset key (e.g., "professional", "friendly")
 
+  // Channel Integration Settings
+  whatsappEnabled       Boolean   @default(false)
+  whatsappPhoneNumber   String?   // Display phone number shown to customers
+  whatsappGreeting      String?   // Custom WhatsApp greeting message
+  whatsappAutoReply     String?   // Auto-reply message outside business hours
+
+  // WhatsApp API Credentials (company-managed, encrypted)
+  whatsappAccessToken   String?   // Encrypted Meta API access token
+  whatsappPhoneNumberId String?   // Meta phone number ID
+  whatsappAppSecret     String?   // Encrypted - for webhook verification
+  whatsappScope         String    @default("company") // "company" | "all"
+
+  // Relation to phone mapping
+  whatsappPhoneMapping  WhatsAppPhoneMapping?
+
   // Business Details for Invoices
   businessAddress String?   // Full business address
   taxId           String?   // Tax ID / PIB
@@ -118,7 +132,7 @@ model User {
   phone         String?
   password      String?
   image         String?
-  role          UserRole  @default(END_USER)
+  role          UserRole  @default(USER)
 
   // Tenant relation (null for SUPER_ADMIN)
   companyId     String?
@@ -366,6 +380,11 @@ model ChatSession {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
 
+  // Channel info
+  channel     String    @default("web") // "web" | "whatsapp" | "messenger" | "instagram" | "sms" | "telegram"
+  phoneNumber String?   // For WhatsApp/SMS - user's phone number
+  externalId  String?   // External platform conversation ID
+
   isRead      Boolean @default(false)  // Mark as reviewed by admin
   isImportant Boolean @default(false)  // Flag important conversations
 
@@ -377,6 +396,7 @@ model ChatSession {
 
   @@index([companyId])
   @@index([userId])
+  @@index([channel, phoneNumber])
 }
 
 // Chat Message
@@ -387,6 +407,10 @@ model ChatMessage {
 
   role      String      // "user" | "assistant" | "system"
   content   String      @db.Text
+
+  // Channel delivery tracking
+  status        String?   // "sent" | "delivered" | "read" | "failed"
+  externalMsgId String?   // WhatsApp/Twilio message SID
 
   createdAt DateTime    @default(now())
 
@@ -477,6 +501,9 @@ model UserSubscription {
 
   // Company slots
   extraCompanySlots  Int                @default(0) // Additional companies purchased
+
+  // Chatbot addon (for PRO plan - included in BUSINESS)
+  hasChatbot         Boolean            @default(false)
 
   // Trial tracking
   trialEndsAt        DateTime?
@@ -614,4 +641,17 @@ model SystemSettings {
   description String?
   updatedAt   DateTime @updatedAt
   updatedBy   String?
+}
+
+// WhatsApp Phone Number to Company Mapping
+// Maps Meta phone number IDs to companies for webhook routing
+model WhatsAppPhoneMapping {
+  id              String   @id @default(cuid())
+  phoneNumberId   String   @unique  // META_PHONE_NUMBER_ID - unique across all companies
+  companyId       String   @unique  // Each company can only have one phone mapping
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([phoneNumberId])
 }

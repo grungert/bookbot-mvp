@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
 import { estimateTokens, DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS } from "@/lib/document-tokens";
+import { encrypt, safeDecrypt, maskValue } from "@/lib/encryption";
 import { z } from "zod";
 
 const updateSettingsSchema = z.object({
@@ -29,6 +30,15 @@ const updateSettingsSchema = z.object({
   businessEmail: z.string().email().nullable().optional(),
   notificationEmails: z.array(z.string().email()).optional(),
   taxRate: z.number().min(0).max(100).nullable().optional(),
+  // WhatsApp Channel Settings
+  whatsappEnabled: z.boolean().optional(),
+  whatsappPhoneNumber: z.string().nullable().optional(),
+  whatsappGreeting: z.string().nullable().optional(),
+  whatsappAutoReply: z.string().nullable().optional(),
+  whatsappAccessToken: z.string().nullable().optional(),
+  whatsappPhoneNumberId: z.string().nullable().optional(),
+  whatsappAppSecret: z.string().nullable().optional(),
+  whatsappScope: z.enum(["company", "all"]).optional(),
 });
 
 interface RouteParams {
@@ -80,6 +90,18 @@ export async function GET(request: Request, { params }: RouteParams) {
       businessEmail: company.businessEmail,
       notificationEmails: company.notificationEmails || [],
       taxRate: company.taxRate ? Number(company.taxRate) : 20,
+      // WhatsApp Channel Settings (mask sensitive credentials)
+      whatsappEnabled: company.whatsappEnabled,
+      whatsappPhoneNumber: company.whatsappPhoneNumber,
+      whatsappGreeting: company.whatsappGreeting,
+      whatsappAutoReply: company.whatsappAutoReply,
+      whatsappPhoneNumberId: company.whatsappPhoneNumberId,
+      whatsappScope: company.whatsappScope,
+      // Masked credentials - only show last 4 chars
+      whatsappAccessToken: company.whatsappAccessToken ? maskValue(safeDecrypt(company.whatsappAccessToken)) : null,
+      whatsappAppSecret: company.whatsappAppSecret ? maskValue(safeDecrypt(company.whatsappAppSecret)) : null,
+      hasWhatsappAccessToken: !!company.whatsappAccessToken,
+      hasWhatsappAppSecret: !!company.whatsappAppSecret,
     };
 
     return NextResponse.json(settings);
@@ -178,10 +200,79 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       updateData.aiApiKey = data.aiApiKey;
     }
 
+    // WhatsApp Channel Settings
+    if (data.whatsappEnabled !== undefined) updateData.whatsappEnabled = data.whatsappEnabled;
+    if (data.whatsappPhoneNumber !== undefined) updateData.whatsappPhoneNumber = data.whatsappPhoneNumber;
+    if (data.whatsappGreeting !== undefined) updateData.whatsappGreeting = data.whatsappGreeting;
+    if (data.whatsappAutoReply !== undefined) updateData.whatsappAutoReply = data.whatsappAutoReply;
+    if (data.whatsappPhoneNumberId !== undefined) updateData.whatsappPhoneNumberId = data.whatsappPhoneNumberId;
+    if (data.whatsappScope !== undefined) updateData.whatsappScope = data.whatsappScope;
+
+    // Encrypt WhatsApp credentials before saving (only if new value provided, not masked)
+    if (data.whatsappAccessToken !== undefined && data.whatsappAccessToken !== null && !data.whatsappAccessToken.startsWith("****")) {
+      try {
+        updateData.whatsappAccessToken = encrypt(data.whatsappAccessToken);
+      } catch (encryptError) {
+        console.error("Failed to encrypt WhatsApp access token:", encryptError);
+        return NextResponse.json(
+          { error: "Failed to encrypt credentials. Please check ENCRYPTION_KEY is configured." },
+          { status: 500 }
+        );
+      }
+    } else if (data.whatsappAccessToken === null) {
+      updateData.whatsappAccessToken = null;
+    }
+
+    if (data.whatsappAppSecret !== undefined && data.whatsappAppSecret !== null && !data.whatsappAppSecret.startsWith("****")) {
+      try {
+        updateData.whatsappAppSecret = encrypt(data.whatsappAppSecret);
+      } catch (encryptError) {
+        console.error("Failed to encrypt WhatsApp app secret:", encryptError);
+        return NextResponse.json(
+          { error: "Failed to encrypt credentials. Please check ENCRYPTION_KEY is configured." },
+          { status: 500 }
+        );
+      }
+    } else if (data.whatsappAppSecret === null) {
+      updateData.whatsappAppSecret = null;
+    }
+
     const updatedCompany = await prisma.company.update({
       where: { id: company.id },
       data: updateData,
     });
+
+    // Manage WhatsAppPhoneMapping based on the phone number ID
+    if (data.whatsappPhoneNumberId !== undefined) {
+      if (data.whatsappPhoneNumberId) {
+        // Check if this phone number ID is already used by another company
+        const existingMapping = await prisma.whatsAppPhoneMapping.findUnique({
+          where: { phoneNumberId: data.whatsappPhoneNumberId },
+        });
+
+        if (existingMapping && existingMapping.companyId !== company.id) {
+          return NextResponse.json(
+            { error: "This WhatsApp phone number ID is already in use by another company." },
+            { status: 400 }
+          );
+        }
+
+        // Upsert the phone mapping
+        await prisma.whatsAppPhoneMapping.upsert({
+          where: { companyId: company.id },
+          update: { phoneNumberId: data.whatsappPhoneNumberId },
+          create: {
+            phoneNumberId: data.whatsappPhoneNumberId,
+            companyId: company.id,
+          },
+        });
+      } else {
+        // Remove the phone mapping if phone number ID is cleared
+        await prisma.whatsAppPhoneMapping.deleteMany({
+          where: { companyId: company.id },
+        });
+      }
+    }
 
     // Return updated settings without exposing full API key
     const settings = {
@@ -214,6 +305,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       businessEmail: updatedCompany.businessEmail,
       notificationEmails: updatedCompany.notificationEmails || [],
       taxRate: updatedCompany.taxRate ? Number(updatedCompany.taxRate) : 20,
+      // WhatsApp Channel Settings (mask sensitive credentials)
+      whatsappEnabled: updatedCompany.whatsappEnabled,
+      whatsappPhoneNumber: updatedCompany.whatsappPhoneNumber,
+      whatsappGreeting: updatedCompany.whatsappGreeting,
+      whatsappAutoReply: updatedCompany.whatsappAutoReply,
+      whatsappPhoneNumberId: updatedCompany.whatsappPhoneNumberId,
+      whatsappScope: updatedCompany.whatsappScope,
+      // Masked credentials - only show last 4 chars
+      whatsappAccessToken: updatedCompany.whatsappAccessToken ? maskValue(safeDecrypt(updatedCompany.whatsappAccessToken)) : null,
+      whatsappAppSecret: updatedCompany.whatsappAppSecret ? maskValue(safeDecrypt(updatedCompany.whatsappAppSecret)) : null,
+      hasWhatsappAccessToken: !!updatedCompany.whatsappAccessToken,
+      hasWhatsappAppSecret: !!updatedCompany.whatsappAppSecret,
     };
 
     return NextResponse.json(settings);

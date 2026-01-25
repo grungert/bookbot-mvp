@@ -92,6 +92,7 @@ interface AdminSidebarProps {
   primaryColor?: string | null;
   pendingAppointmentsCount?: number;
   actionableInvoicesCount?: number;
+  hasChatbotAccess?: boolean;
 }
 
 interface NavItem {
@@ -100,14 +101,18 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   badgeTooltip?: string;
+  disabled?: boolean;
+  disabledTooltip?: string;
 }
 
-function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number) {
+function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number, hasChatbotAccess: boolean = false) {
   const t = useTranslations("nav");
   const tAdmin = useTranslations("admin");
   const tWorkingHours = useTranslations("workingHours");
+  const tSub = useTranslations("subscription");
 
   const basePath = `/c/${companySlug}/admin`;
+  const chatbotDisabledTooltip = tSub("upgradeToPro");
 
   const mainItems: NavItem[] = [
     {
@@ -133,6 +138,8 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       href: `${basePath}/conversations`,
       label: tAdmin("conversations"),
       icon: MessageSquare,
+      disabled: !hasChatbotAccess,
+      disabledTooltip: chatbotDisabledTooltip,
     },
     {
       href: `${basePath}/services`,
@@ -148,6 +155,8 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       href: `${basePath}/documents`,
       label: tAdmin("documents"),
       icon: FileArchive,
+      disabled: !hasChatbotAccess,
+      disabledTooltip: chatbotDisabledTooltip,
     },
   ];
 
@@ -195,6 +204,38 @@ function NavContent({
       pathname.endsWith(item.href) ||
       (item.href !== basePath && pathname.includes(item.href));
 
+    // Disabled item - show tooltip with upgrade message
+    if (item.disabled) {
+      const disabledContent = (
+        <div
+          key={item.href}
+          className={cn(
+            "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
+            "opacity-50 cursor-not-allowed",
+            isCollapsed && "justify-center px-2"
+          )}
+        >
+          <span className="text-muted-foreground">
+            <item.icon className="h-4 w-4 shrink-0" />
+          </span>
+          {!isCollapsed && (
+            <span className="text-muted-foreground">
+              {item.label}
+            </span>
+          )}
+        </div>
+      );
+
+      return (
+        <Tooltip key={item.href}>
+          <TooltipTrigger asChild>{disabledContent}</TooltipTrigger>
+          <TooltipContent side={isCollapsed ? "right" : "top"}>
+            {item.disabledTooltip || item.label}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
     const navLink = (
       <Link key={item.href} href={item.href} onClick={onItemClick}>
         <div
@@ -236,7 +277,7 @@ function NavContent({
           {isCollapsed && item.badge !== undefined && item.badge > 0 && (
             <span
               className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full text-[10px] px-1"
-              style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : { backgroundColor: 'hsl(var(--primary))', color: 'hsl(var(--primary-foreground))' }}
+              style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : { backgroundColor: 'hsl(var(--primary))', color: 'white' }}
             >
               {item.badge > 9 ? "9+" : item.badge}
             </span>
@@ -327,9 +368,9 @@ function NavContent({
   );
 }
 
-export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAppointmentsCount, actionableInvoicesCount }: AdminSidebarProps) {
+export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess }: AdminSidebarProps) {
   const pathname = usePathname();
-  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess);
   const basePath = `/c/${companySlug}/admin`;
   const { isCollapsed, setIsCollapsed } = useSidebar();
 
@@ -385,10 +426,11 @@ export function AdminMobileNav({
   primaryColor,
   pendingAppointmentsCount,
   actionableInvoicesCount,
+  hasChatbotAccess,
 }: AdminSidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess);
   const basePath = `/c/${companySlug}/admin`;
 
   return (
