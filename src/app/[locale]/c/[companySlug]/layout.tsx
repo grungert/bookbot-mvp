@@ -6,6 +6,8 @@ import { Header } from "@/components/navigation/header";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { generateThemePalette } from "@/lib/utils/colors";
 import { prisma } from "@/lib/prisma";
+import { getUserSubscription } from "@/lib/subscription/limits";
+import { getTrialStatus } from "@/lib/subscription/trial";
 
 interface CompanyLayoutProps {
   children: React.ReactNode;
@@ -25,24 +27,19 @@ export default async function CompanyLayout({
     notFound();
   }
 
-  // Check if user can access admin
+  // Check if user can access admin (based on company membership, not role)
   const user = await getCurrentUser();
   const isLoggedIn = !!user;
-  const canAccessAdmin = user?.role === "COMPANY_ADMIN" || user?.role === "SUPER_ADMIN"
+  const canAccessAdmin = user
     ? await checkUserCompanyAccess(user.id, company.id)
     : false;
 
-  // Get upcoming appointments count for the user
-  // Admin users see all company appointments, regular users see only their own
+  // Get upcoming appointments count for the user across ALL companies
   let appointmentCount = 0;
   if (user) {
-    const isAdmin = user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN";
-
     appointmentCount = await prisma.appointment.count({
       where: {
-        companyId: company.id,
-        // Admin sees all company appointments, regular users see only their own
-        ...(isAdmin ? {} : { userId: user.id }),
+        userId: user.id,
         startTime: { gte: new Date() },
         status: { in: ["PENDING", "CONFIRMED"] },
       },
@@ -51,6 +48,29 @@ export default async function CompanyLayout({
 
   // Generate theme palette from company's primary color
   const palette = generateThemePalette(company.primaryColor);
+
+  // Check chatbot access for the company owner
+  const ownerMembership = await prisma.companyMembership.findFirst({
+    where: {
+      companyId: company.id,
+      role: "OWNER",
+    },
+    select: { userId: true },
+  });
+
+  let hasChatbotAccess = false;
+  if (ownerMembership) {
+    const [subscription, trialStatus] = await Promise.all([
+      getUserSubscription(ownerMembership.userId),
+      getTrialStatus(ownerMembership.userId),
+    ]);
+    if (subscription) {
+      hasChatbotAccess =
+        subscription.plan.tier === "BUSINESS" ||
+        subscription.hasChatbot === true ||
+        (subscription.status === "TRIALING" && trialStatus.isExpired === false);
+    }
+  }
 
   return (
     <div
@@ -75,7 +95,9 @@ export default async function CompanyLayout({
         appointmentCount={appointmentCount}
       />
       {children}
-      <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
+      {hasChatbotAccess && (
+        <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
+      )}
     </div>
   );
 }

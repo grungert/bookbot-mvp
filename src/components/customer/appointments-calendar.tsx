@@ -29,6 +29,14 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+interface Company {
+  id: string;
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+}
+
 interface Appointment {
   id: string;
   startTime: string;
@@ -43,6 +51,7 @@ interface Appointment {
     currency: string;
     color: string | null;
   };
+  company?: Company;
 }
 
 interface ServiceWithCount {
@@ -416,6 +425,11 @@ function AppointmentDayCard({
                   {t(appointment.status.toLowerCase() as "pending" | "confirmed" | "cancelled" | "completed")}
                 </Badge>
               </div>
+              {appointment.company && (
+                <p className="text-xs text-muted-foreground mb-1 truncate">
+                  {appointment.company.name}
+                </p>
+              )}
               <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                 <div
                   className="flex items-center gap-1 px-2 py-0.5 rounded-md transition-all duration-300"

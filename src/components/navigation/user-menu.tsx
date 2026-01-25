@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, LayoutDashboard } from "lucide-react";
+import { LogOut, User, LayoutDashboard, CalendarDays } from "lucide-react";
 
 interface UserMenuProps {
   showDashboardLink?: boolean;
@@ -110,14 +110,22 @@ export function UserMenu({ showDashboardLink = true, companySlug }: UserMenuProp
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {showDashboardLink && (
+        {showDashboardLink && companySlug && (
           <DropdownMenuItem asChild>
             <Link
-              href={companySlug ? `/c/${companySlug}/my-appointments` : "/user"}
+              href={`/c/${companySlug}/my-appointments`}
               className="cursor-pointer"
             >
+              <CalendarDays className="mr-2 h-4 w-4" />
+              {tNav("allBookings")}
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {showDashboardLink && !companySlug && (
+          <DropdownMenuItem asChild>
+            <Link href="/user" className="cursor-pointer">
               <LayoutDashboard className="mr-2 h-4 w-4" />
-              {companySlug ? tNav("myAppointments") : tNav("dashboard")}
+              {tNav("dashboard")}
             </Link>
           </DropdownMenuItem>
         )}

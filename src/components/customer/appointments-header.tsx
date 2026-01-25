@@ -1,7 +1,7 @@
 "use client";
 
 import { format, parseISO, isPast } from "date-fns";
-import { Calendar, CalendarDays, List, ArrowLeft, Plus } from "lucide-react";
+import { Calendar, CalendarDays, List, ArrowLeft, Plus, Building2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
@@ -28,6 +28,8 @@ interface AppointmentsHeaderProps {
   appointments: Appointment[];
   viewMode: "calendar" | "list";
   onViewModeChange: (mode: "calendar" | "list") => void;
+  scope: "all" | "company";
+  onScopeChange: (scope: "all" | "company") => void;
   companySlug: string;
   t: ReturnType<typeof useTranslations<"appointments">>;
 }
@@ -36,6 +38,8 @@ export function AppointmentsHeader({
   appointments,
   viewMode,
   onViewModeChange,
+  scope,
+  onScopeChange,
   companySlug,
   t,
 }: AppointmentsHeaderProps) {
@@ -85,7 +89,7 @@ export function AppointmentsHeader({
               </Button>
             </Link>
             <div>
-              <h1 className="text-xl font-bold">{t("myAppointments")}</h1>
+              <h1 className="text-xl font-bold">{t("allBookings")}</h1>
               <p className="text-muted-foreground text-sm hidden sm:block">
                 {t("viewAndManage")}
               </p>
@@ -107,6 +111,40 @@ export function AppointmentsHeader({
                 <span className="hidden sm:inline">{t("bookNew")}</span>
               </Button>
             </Link>
+
+            {/* Scope Toggle (All / Company) */}
+            <div
+              className={cn(
+                "flex items-center rounded-lg border bg-muted/50 p-1",
+                !prefersReducedMotion && "animate-fade-up stagger-2"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onScopeChange("all")}
+                className={cn(
+                  "gap-2 h-8 px-3 rounded-md transition-all duration-200 press-feedback",
+                  scope === "all" && "bg-background shadow-sm"
+                )}
+              >
+                <Globe className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("scopeAll")}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onScopeChange("company")}
+                className={cn(
+                  "gap-2 h-8 px-3 rounded-md transition-all duration-200 press-feedback",
+                  scope === "company" && "bg-background shadow-sm"
+                )}
+              >
+                <Building2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{t("scopeCompany")}</span>
+              </Button>
+            </div>
 
             {/* View Toggle */}
             <div

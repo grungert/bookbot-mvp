@@ -12,6 +12,15 @@ import { AppointmentsHeader } from "@/components/customer/appointments-header";
 import { AppointmentsCalendar } from "@/components/customer/appointments-calendar";
 import { AppointmentsList } from "@/components/customer/appointments-list";
 import { AppointmentSheet } from "@/components/customer/appointment-sheet";
+import { GlobalAppointmentsList } from "@/components/customer/global-appointments-list";
+
+interface Company {
+  id: string;
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+  primaryColor: string | null;
+}
 
 interface Appointment {
   id: string;
@@ -19,6 +28,7 @@ interface Appointment {
   endTime: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   notes: string | null;
+  companyId?: string;
   service: {
     id: string;
     name: string;
@@ -27,6 +37,7 @@ interface Appointment {
     currency: string;
     color: string | null;
   };
+  company?: Company;
 }
 
 interface WorkingHours {
@@ -40,14 +51,17 @@ export default function MyAppointmentsPage() {
   const companySlug = params.companySlug as string;
   const t = useTranslations("appointments");
   const tCommon = useTranslations("common");
+  const tGlobal = useTranslations("globalAppointments");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [closedDays, setClosedDays] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   // View state
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [scope, setScope] = useState<"all" | "company">("all");
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointment | null>(null);
@@ -58,11 +72,35 @@ export default function MyAppointmentsPage() {
 
   const storageKey = `appointments-service-filter-${companySlug}`;
   const viewModeStorageKey = `appointments-view-mode-${companySlug}`;
+  const scopeStorageKey = `appointments-scope`;
+
+  // Current appointments based on scope
+  const currentAppointments = scope === "all" ? allAppointments : appointments;
+
+  // Get unique companies with appointment counts (for global view)
+  const companiesWithCounts = useMemo(() => {
+    const companyMap = new Map<string, { company: Company; count: number }>();
+    allAppointments
+      .filter(a => !isPast(parseISO(a.startTime)) && a.status !== "CANCELLED" && a.company)
+      .forEach(apt => {
+        if (!apt.company) return;
+        const existing = companyMap.get(apt.company.id);
+        if (existing) {
+          existing.count++;
+        } else {
+          companyMap.set(apt.company.id, {
+            company: apt.company,
+            count: 1,
+          });
+        }
+      });
+    return Array.from(companyMap.values());
+  }, [allAppointments]);
 
   // Get unique services with counts for filter badges
   const servicesWithCounts = useMemo(() => {
     const serviceMap = new Map<string, { id: string; name: string; color: string | null; count: number }>();
-    appointments
+    currentAppointments
       .filter(a => !isPast(parseISO(a.startTime)) && a.status !== "CANCELLED")
       .forEach(apt => {
         const existing = serviceMap.get(apt.service.id);
@@ -78,13 +116,35 @@ export default function MyAppointmentsPage() {
         }
       });
     return Array.from(serviceMap.values());
-  }, [appointments]);
+  }, [currentAppointments]);
 
   // Get all service IDs for "all active" default
   const allServiceIds = useMemo(() =>
     servicesWithCounts.map(s => s.id),
     [servicesWithCounts]
   );
+
+  // Initialize scope from localStorage
+  useEffect(() => {
+    try {
+      const savedScope = localStorage.getItem(scopeStorageKey);
+      if (savedScope === "all" || savedScope === "company") {
+        setScope(savedScope);
+      }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [scopeStorageKey]);
+
+  // Save scope to localStorage when it changes
+  const handleScopeChange = useCallback((newScope: "all" | "company") => {
+    setScope(newScope);
+    try {
+      localStorage.setItem(scopeStorageKey, newScope);
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [scopeStorageKey]);
 
   // Initialize selected services from localStorage or default to all
   useEffect(() => {
@@ -135,12 +195,26 @@ export default function MyAppointmentsPage() {
     }
   }, [viewModeStorageKey]);
 
-  // Filter appointments based on selected services and date range
+  // Filter appointments based on status, selected services, and date range
   const filteredAppointments = useMemo(() => {
-    let filtered = appointments;
+    let filtered = currentAppointments;
 
-    // Service filter
-    if (selectedServiceIds !== null && selectedServiceIds.length > 0 &&
+    // Status filter (all, upcoming, past, confirmed, pending, cancelled)
+    if (filterStatus === "upcoming") {
+      filtered = filtered.filter(a => !isPast(parseISO(a.startTime)) && a.status !== "CANCELLED");
+    } else if (filterStatus === "past") {
+      filtered = filtered.filter(a => isPast(parseISO(a.startTime)) || a.status === "COMPLETED");
+    } else if (filterStatus === "confirmed") {
+      filtered = filtered.filter(a => a.status === "CONFIRMED");
+    } else if (filterStatus === "pending") {
+      filtered = filtered.filter(a => a.status === "PENDING");
+    } else if (filterStatus === "cancelled") {
+      filtered = filtered.filter(a => a.status === "CANCELLED");
+    }
+    // "all" shows everything
+
+    // Service filter (only for company view - "all" view has per-company badges that don't filter)
+    if (scope === "company" && selectedServiceIds !== null && selectedServiceIds.length > 0 &&
         selectedServiceIds.length !== allServiceIds.length) {
       filtered = filtered.filter(a => selectedServiceIds.includes(a.service.id));
     }
@@ -160,7 +234,7 @@ export default function MyAppointmentsPage() {
     }
 
     return filtered;
-  }, [appointments, selectedServiceIds, allServiceIds, dateRange]);
+  }, [currentAppointments, scope, selectedServiceIds, allServiceIds, dateRange, filterStatus]);
 
   // Toggle service filter
   const handleServiceToggle = (serviceId: string) => {
@@ -174,8 +248,9 @@ export default function MyAppointmentsPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [appointmentsRes, workingHoursRes] = await Promise.all([
+      const [appointmentsRes, allAppointmentsRes, workingHoursRes] = await Promise.all([
         fetch(`/api/c/${companySlug}/appointments?myOnly=true`),
+        fetch(`/api/user/appointments`),
         fetch(`/api/c/${companySlug}/working-hours`),
       ]);
 
@@ -185,6 +260,11 @@ export default function MyAppointmentsPage() {
       } else if (appointmentsRes.status === 401) {
         router.push(`/login?callbackUrl=/c/${companySlug}/my-appointments`);
         return;
+      }
+
+      if (allAppointmentsRes.ok) {
+        const data = await allAppointmentsRes.json();
+        setAllAppointments(data);
       }
 
       if (workingHoursRes.ok) {
@@ -209,12 +289,13 @@ export default function MyAppointmentsPage() {
     loadData();
   }, [loadData]);
 
-  async function handleCancel(appointmentId: string) {
+  async function handleCancel(appointmentId: string, cancelCompanySlug?: string) {
     setCancellingId(appointmentId);
+    const slugToUse = cancelCompanySlug || companySlug;
 
     try {
       const response = await fetch(
-        `/api/c/${companySlug}/appointments/${appointmentId}`,
+        `/api/c/${slugToUse}/appointments/${appointmentId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -253,9 +334,11 @@ export default function MyAppointmentsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-muted/30 via-background to-background">
       <AppointmentsHeader
-        appointments={appointments}
+        appointments={currentAppointments}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
+        scope={scope}
+        onScopeChange={handleScopeChange}
         companySlug={companySlug}
         t={t}
       />
@@ -267,17 +350,33 @@ export default function MyAppointmentsPage() {
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             onSelectAppointment={handleSelectAppointment}
-            closedDays={closedDays}
+            closedDays={scope === "company" ? closedDays : []}
             filterStatus={filterStatus}
             onFilterStatusChange={setFilterStatus}
-            servicesWithCounts={servicesWithCounts}
+            servicesWithCounts={scope === "company" ? servicesWithCounts : []}
             selectedServiceIds={selectedServiceIds}
             onServiceToggle={handleServiceToggle}
             dateRange={dateRange}
             onDateRangeChange={setDateRange}
             t={t}
           />
+        ) : scope === "all" ? (
+          // Global list view - show all appointments grouped by company
+          <GlobalAppointmentsList
+            appointments={filteredAppointments as (Appointment & { company: Company })[]}
+            companiesWithCounts={companiesWithCounts}
+            filterStatus={filterStatus}
+            onFilterStatusChange={setFilterStatus}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+            onCancel={(aptId, aptCompanySlug) => handleCancel(aptId, aptCompanySlug)}
+            cancellingId={cancellingId}
+            t={t}
+            tGlobal={tGlobal}
+            tCommon={tCommon}
+          />
         ) : (
+          // Company-specific list view
           <AppointmentsList
             appointments={filteredAppointments}
             onSelectAppointment={handleSelectAppointment}
@@ -298,9 +397,9 @@ export default function MyAppointmentsPage() {
         appointment={selectedAppointment}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        onCancel={handleCancel}
+        onCancel={(aptId) => handleCancel(aptId, scope === "all" ? selectedAppointment?.company?.slug : undefined)}
         isCancelling={cancellingId === selectedAppointment?.id}
-        companySlug={companySlug}
+        companySlug={scope === "all" && selectedAppointment?.company ? selectedAppointment.company.slug : companySlug}
         t={t}
         tCommon={tCommon}
       />

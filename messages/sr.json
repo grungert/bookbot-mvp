@@ -91,6 +91,7 @@
     "dashboard": "Kontrolna tabla",
     "bookings": "Rezervacije",
     "myAppointments": "Moji termini",
+    "allBookings": "Sve rezervacije",
     "services": "Usluge",
     "invoices": "Fakture",
     "settings": "Podesavanja",
@@ -150,6 +151,7 @@
     "notesPlaceholder": "Posebni zahtevi ili napomene...",
     "minutes": "{count} minuta",
     "datesWithAppointments": "Datumi sa vasim terminima",
+    "yourAppointments": "Vasi termini",
     "yourAppointmentsOnDate": "Vasi termini na ovaj datum",
     "appointmentConfirmed": "Termin potvrdjen",
     "appointmentPending": "Vas termin je na cekanju potvrde. Uskoro cete dobiti email.",
@@ -241,6 +243,9 @@
   "appointments": {
     "title": "Termini",
     "myAppointments": "Moji termini",
+    "allBookings": "Sve rezervacije",
+    "scopeAll": "Sve",
+    "scopeCompany": "Ova kompanija",
     "viewAndManage": "Pregledajte i upravljajte vasim terminima",
     "upcoming": "Predstojeci",
     "past": "Prosli",
@@ -1104,6 +1109,17 @@
     "createdOn": "Zatrazeno",
     "approvedEmailSubject": "Pretplata aktivirana",
     "rejectedEmailSubject": "Azuriranje zahteva za nadogradnju"
+  },
+  "globalAppointments": {
+    "title": "Svi moji termini",
+    "subtitle": "Pregledajte i upravljajte terminima kod svih kompanija",
+    "companiesCount": "{count} kompanija",
+    "bookAgain": "Zakazi ponovo",
+    "noAppointments": "Nema zakazanih termina",
+    "viewCompany": "Pogledaj kompaniju",
+    "oldestFirst": "Najstariji prvo",
+    "newestFirst": "Najnoviji prvo",
+    "searchPlaceholder": "Pretrazi usluge, kompanije..."
   },
   "account": {
     "subscription": "Pretplata",

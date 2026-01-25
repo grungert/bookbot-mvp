@@ -91,6 +91,7 @@
     "dashboard": "Dashboard",
     "bookings": "Bookings",
     "myAppointments": "My Appointments",
+    "allBookings": "All Bookings",
     "services": "Services",
     "invoices": "Invoices",
     "settings": "Settings",
@@ -150,6 +151,7 @@
     "notesPlaceholder": "Any special requests or notes...",
     "minutes": "{count} minutes",
     "datesWithAppointments": "Dates with your appointments",
+    "yourAppointments": "Your appointments",
     "yourAppointmentsOnDate": "Your appointments on this date",
     "appointmentConfirmed": "Appointment Confirmed",
     "appointmentPending": "Your appointment is pending confirmation. We'll send you an email shortly.",
@@ -241,6 +243,9 @@
   "appointments": {
     "title": "Appointments",
     "myAppointments": "My Appointments",
+    "allBookings": "All Bookings",
+    "scopeAll": "All",
+    "scopeCompany": "This Company",
     "viewAndManage": "View and manage your appointments",
     "upcoming": "Upcoming",
     "past": "Past",
@@ -1104,6 +1109,17 @@
     "createdOn": "Requested on",
     "approvedEmailSubject": "Subscription Activated",
     "rejectedEmailSubject": "Upgrade Request Update"
+  },
+  "globalAppointments": {
+    "title": "All My Appointments",
+    "subtitle": "View and manage appointments across all companies",
+    "companiesCount": "{count} companies",
+    "bookAgain": "Book Again",
+    "noAppointments": "No appointments found",
+    "viewCompany": "View Company",
+    "oldestFirst": "Oldest first",
+    "newestFirst": "Newest first",
+    "searchPlaceholder": "Search services, companies..."
   },
   "account": {
     "subscription": "Subscription",
