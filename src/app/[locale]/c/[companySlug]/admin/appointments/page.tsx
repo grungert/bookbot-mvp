@@ -70,7 +70,12 @@ export default function AppointmentsPage() {
   // Initialize state from URL params
   const initialViewMode = (searchParams.get("view") as "schedule" | "table") || "schedule";
   const initialDate = searchParams.get("date") ? new Date(searchParams.get("date")!) : new Date();
-  const initialStatuses = searchParams.get("statuses")?.split(",").filter(Boolean) || ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"];
+  // Support both "status" (singular from pending button) and "statuses" (plural from filters)
+  const statusParam = searchParams.get("status");
+  const statusesParam = searchParams.get("statuses");
+  const initialStatuses = statusParam
+    ? [statusParam]
+    : statusesParam?.split(",").filter(Boolean) || ["PENDING", "CONFIRMED", "COMPLETED", "CANCELLED"];
   const initialServices = searchParams.get("services")?.split(",").filter(Boolean) || [];
 
   const [viewMode, setViewMode] = useState<"schedule" | "table">(initialViewMode);
@@ -548,6 +553,7 @@ export default function AppointmentsPage() {
           onSlotClick={handleSlotClick}
           timezone={companyTimezone}
           workingHours={workingHours}
+          selectedAppointmentId={selectedAppointment?.id}
         />
       ) : (
         // Table View
@@ -712,7 +718,8 @@ export default function AppointmentsPage() {
                           key={apt.id}
                           className={cn(
                             "cursor-pointer hover:bg-muted/50 transition-colors",
-                            selectedIds.has(apt.id) && "bg-primary/5"
+                            selectedIds.has(apt.id) && "bg-primary/5",
+                            selectedAppointment?.id === apt.id && "ring-2 ring-inset ring-primary bg-primary/10"
                           )}
                           onClick={() => handleAppointmentClick(apt)}
                           data-state={selectedIds.has(apt.id) ? "selected" : undefined}

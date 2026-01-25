@@ -54,6 +54,7 @@ interface DashboardContentProps {
       count: number;
     }>;
     chatActivityTrendData: Array<{ date: string; sessions: number; messages: number }>;
+    firstPendingAppointmentId: string | null;
   };
   todaySummary: {
     appointmentsToday: number;
@@ -267,7 +268,7 @@ export function DashboardContent({
           <div className="flex items-center gap-2 flex-wrap">
             {quickActionsData.pendingAppointments > 0 && (
               <Link
-                href={`/${locale}/c/${companySlug}/admin/appointments?status=PENDING`}
+                href={`/${locale}/c/${companySlug}/admin/appointments?status=PENDING${stats.firstPendingAppointmentId ? `&id=${stats.firstPendingAppointmentId}` : ""}`}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors"
               >
                 <Clock className="h-3.5 w-3.5" />

@@ -9,6 +9,7 @@ import { TrialBannerWrapper } from "@/components/admin/trial-banner";
 import { ExpiredOverlay } from "@/components/subscription/expired-overlay";
 import { prisma } from "@/lib/prisma";
 import { getTrialStatus } from "@/lib/subscription/trial";
+import { getUserSubscription } from "@/lib/subscription/limits";
 import { SubscriptionStatus } from "@prisma/client";
 
 interface AdminLayoutProps {
@@ -29,22 +30,8 @@ export default async function AdminLayout({
     redirect(`/${locale}/login`);
   }
 
-  // Fetch fresh user data from database (session might have stale role)
-  const user = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { id: true, role: true },
-  });
-
-  if (!user) {
-    redirect(`/${locale}/login`);
-  }
-
-  // Only super admin and company admin can access
-  if (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN") {
-    redirect(`/${locale}/c/${companySlug}`);
-  }
-
   // Validate company access using membership (supports multi-company)
+  // Any user with a membership to this company can access admin
   const { error, company } = await validateCompanyMembershipAccess(companySlug);
 
   if (error || !company) {
@@ -60,7 +47,7 @@ export default async function AdminLayout({
     select: { userId: true },
   });
 
-  const [pendingAppointmentsCount, actionableInvoicesCount, trialStatus] = await Promise.all([
+  const [pendingAppointmentsCount, actionableInvoicesCount, trialStatus, subscription] = await Promise.all([
     prisma.appointment.count({
       where: {
         companyId: company.id,
@@ -80,7 +67,18 @@ export default async function AdminLayout({
       },
     }),
     ownerMembership ? getTrialStatus(ownerMembership.userId) : Promise.resolve(null),
+    ownerMembership ? getUserSubscription(ownerMembership.userId) : Promise.resolve(null),
   ]);
+
+  // Chatbot is available if:
+  // 1. Plan is BUSINESS (always included)
+  // 2. Plan is PRO with hasChatbot addon
+  // 3. User is in trial period (trial includes all features)
+  const hasChatbotAccess = subscription
+    ? subscription.plan.tier === "BUSINESS" ||
+      subscription.hasChatbot === true ||
+      (subscription.status === "TRIALING" && trialStatus?.isExpired === false)
+    : false;
 
   // Prepare subscription data for the trial banner
   const subscriptionData = trialStatus ? {
@@ -127,6 +125,7 @@ export default async function AdminLayout({
               primaryColor={company.primaryColor}
               pendingAppointmentsCount={pendingAppointmentsCount}
               actionableInvoicesCount={actionableInvoicesCount}
+              hasChatbotAccess={hasChatbotAccess}
             />
             <span className="font-semibold ml-2">{company.name}</span>
             <div className="ml-auto flex items-center gap-1">
@@ -144,6 +143,7 @@ export default async function AdminLayout({
             primaryColor={company.primaryColor}
             pendingAppointmentsCount={pendingAppointmentsCount}
             actionableInvoicesCount={actionableInvoicesCount}
+            hasChatbotAccess={hasChatbotAccess}
           />
           <AdminMainContent>{children}</AdminMainContent>
         </div>

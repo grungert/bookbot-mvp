@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { getCompanyBySlug } from "@/lib/db/tenant";
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import { ChatWidget } from "@/components/chat/chat-widget";
+import { prisma } from "@/lib/prisma";
+import { getUserSubscription } from "@/lib/subscription/limits";
+import { getTrialStatus } from "@/lib/subscription/trial";
 
 interface EmbedPageProps {
   params: Promise<{ locale: string; companySlug: string }>;
@@ -16,6 +19,29 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
 
   if (!company) {
     notFound();
+  }
+
+  // Check chatbot access for the company owner
+  const ownerMembership = await prisma.companyMembership.findFirst({
+    where: {
+      companyId: company.id,
+      role: "OWNER",
+    },
+    select: { userId: true },
+  });
+
+  let hasChatbotAccess = false;
+  if (ownerMembership) {
+    const [subscription, trialStatus] = await Promise.all([
+      getUserSubscription(ownerMembership.userId),
+      getTrialStatus(ownerMembership.userId),
+    ]);
+    if (subscription) {
+      hasChatbotAccess =
+        subscription.plan.tier === "BUSINESS" ||
+        subscription.hasChatbot === true ||
+        (subscription.status === "TRIALING" && trialStatus.isExpired === false);
+    }
   }
 
   return (
@@ -125,7 +151,9 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
       </footer>
 
       {/* The actual chat widget */}
-      <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
+      {hasChatbotAccess && (
+        <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
+      )}
     </div>
   );
 }

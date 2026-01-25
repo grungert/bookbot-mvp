@@ -45,6 +45,17 @@ export async function GET(request: Request, { params }: RouteParams) {
     const endDate = searchParams.get("endDate");
     const myOnly = searchParams.get("myOnly") === "true";
 
+    // Check if user has admin access to this company (via membership)
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
+
     // Build where clause
     const where: Prisma.AppointmentWhereInput = {
       companyId: company.id,
@@ -52,7 +63,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     // Non-admin users can only see their own appointments
     // OR if myOnly=true is passed (for "My Appointments" customer page)
-    if (myOnly || (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN")) {
+    if (myOnly || !isCompanyAdmin) {
       where.userId = user.id;
     }
 
@@ -152,7 +163,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             name: guestName,
             phone: guestPhone || null,
             password: hashedPassword,
-            role: "END_USER",
+            role: "USER",
           },
         });
       }

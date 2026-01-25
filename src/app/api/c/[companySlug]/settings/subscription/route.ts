@@ -19,15 +19,25 @@ export async function GET(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only SUPER_ADMIN or COMPANY_ADMIN can access
-    if (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     // Get company and verify access
     const company = await getCompanyBySlug(companySlug);
     if (!company) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
+    }
+
+    // Check if user has admin access to this company (via membership)
+    const userMembership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!userMembership;
+
+    if (!isCompanyAdmin) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Find the company owner's subscription
@@ -46,20 +56,25 @@ export async function GET(request: Request, context: RouteContext) {
     const ownerId = ownerMembership.userId;
 
     // Get subscription data in parallel
-    const [subscription, companySlots, chatUsage, trialStatus, documentCount] = await Promise.all([
+    const [subscription, companySlots, chatUsage, trialStatus, documentCount, pricingConfigs] = await Promise.all([
       getUserSubscription(ownerId),
       getCompanySlots(ownerId),
       getChatUsageStats(ownerId),
       getTrialStatus(ownerId),
       prisma.document.count({ where: { companyId: company.id } }),
+      prisma.pricingConfig.findMany({ where: { isActive: true, key: { in: ["CHATBOT_ADDON", "EXTRA_COMPANY"] } } }),
     ]);
+
+    // Extract pricing from config
+    const chatbotAddonPricing = pricingConfigs.find(p => p.key === "CHATBOT_ADDON");
+    const extraCompanyPricing = pricingConfigs.find(p => p.key === "EXTRA_COMPANY");
 
     if (!subscription) {
       return NextResponse.json(null);
     }
 
-    // Get all companies owned by this user with document counts
-    const companiesWithDocs = await prisma.companyMembership.findMany({
+    // Get all companies owned by this user with service counts
+    const companiesWithServices = await prisma.companyMembership.findMany({
       where: {
         userId: ownerId,
         role: "OWNER",
@@ -68,19 +83,28 @@ export async function GET(request: Request, context: RouteContext) {
         company: {
           include: {
             _count: {
-              select: { documents: true },
+              select: { services: true },
             },
           },
         },
       },
     });
 
-    const companies = companiesWithDocs.map((membership) => ({
+    const companies = companiesWithServices.map((membership) => ({
       id: membership.company.id,
       name: membership.company.name,
       slug: membership.company.slug,
-      documentCount: membership.company._count.documents,
+      serviceCount: membership.company._count.services,
     }));
+
+    // Chatbot is available if:
+    // 1. Plan is BUSINESS (always included)
+    // 2. Plan is PRO with hasChatbot addon
+    // 3. User is in trial period (trial includes all features)
+    const hasChatbotAccess =
+      subscription.plan.tier === "BUSINESS" ||
+      subscription.hasChatbot ||
+      (subscription.status === "TRIALING" && !trialStatus.isExpired);
 
     return NextResponse.json({
       status: subscription.status,
@@ -111,10 +135,12 @@ export async function GET(request: Request, context: RouteContext) {
       features: {
         customBranding: subscription.plan.customBranding,
         prioritySupport: subscription.plan.prioritySupport,
+        aiChatbot: hasChatbotAccess,
       },
       plan: {
         maxDocumentsPerCompany: subscription.plan.maxDocumentsPerCompany,
-        extraCompanyPrice: subscription.plan.extraCompanyPrice,
+        extraCompanyPrice: extraCompanyPricing?.priceEurCents ?? 699, // Default to €6.99 (699 cents)
+        chatbotAddonPrice: chatbotAddonPricing?.priceEurCents ?? 999, // Default to €9.99 (999 cents)
       },
       companies,
     });

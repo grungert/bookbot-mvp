@@ -21,24 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch fresh user data from database (session might have stale role)
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { id: true, role: true },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Only COMPANY_ADMIN and SUPER_ADMIN can create companies
-    if (user.role !== "COMPANY_ADMIN" && user.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only company admins can create companies" },
-        { status: 403 }
-      );
-    }
-
+    // Any authenticated user can create companies (based on subscription limits)
     // Check if user can create more companies
     const canCreate = await checkCanCreateCompany(session.user.id);
     if (!canCreate.allowed) {

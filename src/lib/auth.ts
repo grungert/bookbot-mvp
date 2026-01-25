@@ -172,16 +172,16 @@ export const authOptions: NextAuthOptions = {
             userCompanyId = dbUser.companyId;
           } else {
             // Fallback for new OAuth users
-            userRole = UserRole.END_USER;
+            userRole = UserRole.USER;
             userCompanyId = null;
           }
         }
 
-        token.role = userRole ?? UserRole.END_USER;
+        token.role = userRole ?? UserRole.USER;
         token.companyId = userCompanyId ?? null;
 
-        // Fetch memberships for COMPANY_ADMIN users
-        if (userRole === UserRole.COMPANY_ADMIN) {
+        // Fetch memberships for all users (any user can own companies)
+        if (userRole !== UserRole.SUPER_ADMIN) {
           const memberships = await prisma.companyMembership.findMany({
             where: { userId: user.id },
             include: {
@@ -211,8 +211,8 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // Refresh memberships on session update
-      if (trigger === "update" && token.role === UserRole.COMPANY_ADMIN) {
+      // Refresh memberships on session update (for all non-super-admin users)
+      if (trigger === "update" && token.role !== UserRole.SUPER_ADMIN) {
         const memberships = await prisma.companyMembership.findMany({
           where: { userId: token.id },
           include: {

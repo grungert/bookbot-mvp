@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendAppointmentReminderEmail } from "@/lib/email/send";
-import { addHours, startOfDay, endOfDay, addDays } from "date-fns";
+import { addHours } from "date-fns";
 
 // Verify cron secret to prevent unauthorized access
 function verifyCronSecret(request: Request): boolean {
@@ -32,15 +32,15 @@ export async function GET(request: Request) {
 
   try {
     const now = new Date();
-    const tomorrow = addDays(now, 1);
+    const in24Hours = addHours(now, 24);
 
-    // Find appointments starting tomorrow that haven't received a reminder
+    // Find appointments starting in the next 24 hours that haven't received a reminder
     // and are not cancelled
     const appointments = await prisma.appointment.findMany({
       where: {
         startTime: {
-          gte: startOfDay(tomorrow),
-          lte: endOfDay(tomorrow),
+          gte: now,
+          lte: in24Hours,
         },
         status: {
           in: ["PENDING", "CONFIRMED"],

@@ -11,11 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only COMPANY_ADMIN can have multiple companies
-    if (session.user.role !== "COMPANY_ADMIN" && session.user.role !== "SUPER_ADMIN") {
-      return NextResponse.json({ companies: [], canCreateMore: false });
-    }
-
+    // Any user can have companies
     const companies = await getUserCompanies(session.user.id);
     const canCreateResult = await checkCanCreateCompany(session.user.id);
 

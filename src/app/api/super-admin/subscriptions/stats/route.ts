@@ -35,10 +35,10 @@ export async function GET() {
     // Get total subscriptions
     const totalSubscriptions = await prisma.userSubscription.count();
 
-    // Get users without subscriptions (COMPANY_ADMIN users)
+    // Get users without subscriptions
     const usersWithoutSubscription = await prisma.user.count({
       where: {
-        role: "COMPANY_ADMIN",
+        role: "USER",
         subscription: null,
       },
     });

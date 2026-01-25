@@ -10,6 +10,7 @@ interface UsageMeterProps {
   showPercentage?: boolean;
   className?: string;
   size?: "sm" | "md" | "lg";
+  color?: string; // Custom color (hex) for the progress bar
 }
 
 export function UsageMeter({
@@ -20,6 +21,7 @@ export function UsageMeter({
   showPercentage = true,
   className,
   size = "md",
+  color,
 }: UsageMeterProps) {
   const percentage = unlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const isWarning = percentage >= 80 && percentage < 100;
@@ -31,6 +33,9 @@ export function UsageMeter({
     lg: "h-3",
   };
 
+  // Custom color always takes precedence when provided
+  const barColor = color;
+
   return (
     <div className={cn("space-y-1.5", className)}>
       <div className="flex items-center justify-between text-sm">
@@ -38,9 +43,10 @@ export function UsageMeter({
         <span
           className={cn(
             "text-muted-foreground",
-            isWarning && "text-amber-600",
-            isExceeded && "text-destructive font-medium"
+            !barColor && isWarning && "text-amber-600",
+            !barColor && isExceeded && "text-destructive font-medium"
           )}
+          style={barColor && isExceeded ? { color: barColor, fontWeight: 500 } : undefined}
         >
           {unlimited ? (
             <span className="text-muted-foreground">{used} used</span>
@@ -64,19 +70,28 @@ export function UsageMeter({
           <div
             className={cn(
               "h-full transition-all duration-300 rounded-full",
-              isExceeded
+              !barColor && isExceeded
                 ? "bg-destructive"
-                : isWarning
+                : !barColor && isWarning
                 ? "bg-amber-500"
-                : "bg-primary"
+                : !barColor && "bg-primary"
             )}
-            style={{ width: `${Math.min(100, percentage)}%` }}
+            style={{
+              width: `${Math.min(100, percentage)}%`,
+              ...(barColor && { backgroundColor: barColor }),
+            }}
           />
         </div>
       )}
       {unlimited && (
-        <div className={cn("w-full bg-primary/20 rounded-full", sizeClasses[size])}>
-          <div className="h-full w-full bg-gradient-to-r from-primary/40 to-primary/60 rounded-full" />
+        <div
+          className={cn("w-full rounded-full", sizeClasses[size])}
+          style={{ backgroundColor: color ? `${color}20` : undefined }}
+        >
+          <div
+            className={cn("h-full w-full rounded-full", !color && "bg-gradient-to-r from-primary/40 to-primary/60")}
+            style={color ? { background: `linear-gradient(to right, ${color}40, ${color}60)` } : undefined}
+          />
         </div>
       )}
     </div>

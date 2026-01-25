@@ -80,7 +80,7 @@ async function main() {
     }
   }
 
-  // Create trial subscriptions for existing COMPANY_ADMIN users without a subscription
+  // Create trial subscriptions for existing users without a subscription
   console.log("Creating trial subscriptions for existing users...");
 
   const trialPlan = await prisma.plan.findUnique({
@@ -90,7 +90,7 @@ async function main() {
   if (trialPlan) {
     const usersWithoutSubscription = await prisma.user.findMany({
       where: {
-        role: "COMPANY_ADMIN",
+        role: "USER",
         subscription: null,
       },
       select: { id: true, email: true },

@@ -7,6 +7,7 @@ export interface SubscriptionWithPlan {
   planId: string;
   status: SubscriptionStatus;
   extraCompanySlots: number;
+  hasChatbot: boolean;
   trialEndsAt: Date | null;
   currentPeriodStart: Date;
   currentPeriodEnd: Date;

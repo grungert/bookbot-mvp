@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
-        role: "COMPANY_ADMIN", // New users can create companies
+        role: "USER", // New users can create companies
         // emailVerified is intentionally left null - requires verification
       },
       select: {

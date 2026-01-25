@@ -3,7 +3,7 @@ import { setRequestLocale } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Building2, CreditCard, ArrowUpCircle, Euro, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, CreditCard, ArrowUpCircle, Euro, Settings, MessageSquare } from "lucide-react";
 
 interface SuperAdminLayoutProps {
   children: React.ReactNode;
@@ -29,6 +29,7 @@ export default async function SuperAdminLayout({
     { href: "/super-admin/subscriptions", label: "Subscriptions", icon: CreditCard },
     { href: "/super-admin/upgrade-requests", label: "Upgrade Requests", icon: ArrowUpCircle },
     { href: "/super-admin/pricing", label: "Pricing", icon: Euro },
+    { href: "/super-admin/channels", label: "Channels", icon: MessageSquare },
     { href: "/super-admin/settings", label: "Settings", icon: Settings },
   ];
 

@@ -72,12 +72,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Check if user has admin access to this company (via membership)
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
+
     // Non-admin users can only see their own invoices
-    if (
-      user.role !== "SUPER_ADMIN" &&
-      user.role !== "COMPANY_ADMIN" &&
-      invoice.userId !== user.id
-    ) {
+    if (!isCompanyAdmin && invoice.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -222,31 +229,39 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
       // Send invoice email when status changes to SENT
       if (parsed.data.status === "SENT" && invoice.status !== "SENT") {
-        const dueDate = updated.dueDate || addDays(updated.issueDate, 30);
-        await sendInvoiceSentEmail({
-          customerEmail: updated.user.email,
-          customerName: updated.user.name || "Customer",
-          invoiceNumber: updated.invoiceNumber,
-          issueDate: updated.issueDate,
-          dueDate,
-          total: Number(updated.total),
-          currency: updated.currency,
-          companyName: company.name,
-          invoiceUrl: `${baseUrl}/en/c/${companySlug}/invoices/${invoiceId}`,
-        });
+        try {
+          const dueDate = updated.dueDate || addDays(updated.issueDate, 30);
+          await sendInvoiceSentEmail({
+            customerEmail: updated.user.email,
+            customerName: updated.user.name || "Customer",
+            invoiceNumber: updated.invoiceNumber,
+            issueDate: updated.issueDate,
+            dueDate,
+            total: Number(updated.total),
+            currency: updated.currency,
+            companyName: company.name,
+            invoiceUrl: `${baseUrl}/en/c/${companySlug}/invoices/${invoiceId}`,
+          });
+        } catch (error) {
+          console.error("[EMAIL] Failed to send invoice sent email:", error);
+        }
       }
 
       // Send payment confirmation when status changes to PAID
       if (parsed.data.status === "PAID" && invoice.status !== "PAID") {
-        await sendInvoicePaidEmail({
-          customerEmail: updated.user.email,
-          customerName: updated.user.name || "Customer",
-          invoiceNumber: updated.invoiceNumber,
-          paidDate: updated.paidAt || new Date(),
-          total: Number(updated.total),
-          currency: updated.currency,
-          companyName: company.name,
-        });
+        try {
+          await sendInvoicePaidEmail({
+            customerEmail: updated.user.email,
+            customerName: updated.user.name || "Customer",
+            invoiceNumber: updated.invoiceNumber,
+            paidDate: updated.paidAt || new Date(),
+            total: Number(updated.total),
+            currency: updated.currency,
+            companyName: company.name,
+          });
+        } catch (error) {
+          console.error("[EMAIL] Failed to send invoice paid email:", error);
+        }
       }
     }
 

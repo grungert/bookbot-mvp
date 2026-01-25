@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { includeChatbot, extraCompanyCount } = body;
+    const { planTier, includeChatbot, extraCompanyCount, isAddonOnly } = body;
+
+    // Validate plan tier
+    const validPlanTiers = ["PRO", "BUSINESS"];
+    const requestedPlanTier = validPlanTiers.includes(planTier) ? planTier : "PRO";
 
     // Validate inputs
     if (typeof includeChatbot !== "boolean") {
@@ -33,6 +37,8 @@ export async function POST(request: Request) {
     }
 
     const companyCount = Math.max(0, Math.min(10, parseInt(extraCompanyCount) || 0));
+    const addonOnlyMode = isAddonOnly === true;
+    const isBusinessUpgrade = requestedPlanTier === "BUSINESS";
 
     // Check for existing pending request
     const existingRequest = await prisma.upgradeRequest.findFirst({
@@ -63,21 +69,39 @@ export async function POST(request: Request) {
       pricing[config.key] = config.priceEurCents;
     }
 
-    const basePrice = pricing["PRO_BASE"] || 1000;
-    const chatbotPrice = includeChatbot ? (pricing["CHATBOT_ADDON"] || 1000) : 0;
-    const extraCompaniesPrice = companyCount * (pricing["EXTRA_COMPANY"] || 700);
+    // Calculate prices based on plan tier
+    let basePrice: number;
+    let chatbotPrice: number;
+    let extraCompaniesPrice: number;
+
+    if (isBusinessUpgrade) {
+      // Business plan - flat fee, includes everything
+      basePrice = pricing["BUSINESS_BASE"] || 9900;
+      chatbotPrice = 0; // Included in business
+      extraCompaniesPrice = 0; // Unlimited in business
+    } else {
+      // PRO plan
+      // If addon-only mode (user already has PRO), don't charge base price
+      basePrice = addonOnlyMode ? 0 : (pricing["PRO_BASE"] || 1000);
+      chatbotPrice = includeChatbot ? (pricing["CHATBOT_ADDON"] || 1000) : 0;
+      extraCompaniesPrice = companyCount * (pricing["EXTRA_COMPANY"] || 700);
+    }
+
     const totalMonthlyPrice = basePrice + chatbotPrice + extraCompaniesPrice;
 
     // Generate payment reference
     const paymentReference = generatePaymentReference(user.id);
 
+    // Determine plan name for display
+    const planName = isBusinessUpgrade ? "Business" : "Pro";
+
     // Create upgrade request
     const upgradeRequest = await prisma.upgradeRequest.create({
       data: {
         userId: user.id,
-        requestedPlanTier: "PRO",
-        includeChatbot,
-        extraCompanyCount: companyCount,
+        requestedPlanTier: requestedPlanTier,
+        includeChatbot: isBusinessUpgrade ? true : includeChatbot,
+        extraCompanyCount: isBusinessUpgrade ? 0 : companyCount,
         basePrice,
         chatbotPrice,
         extraCompaniesPrice,
@@ -90,9 +114,9 @@ export async function POST(request: Request) {
     await sendUpgradeRequestUserEmail({
       userEmail: user.email,
       userName: user.name || user.email,
-      planName: "Pro",
-      includeChatbot,
-      extraCompanyCount: companyCount,
+      planName,
+      includeChatbot: isBusinessUpgrade ? true : includeChatbot,
+      extraCompanyCount: isBusinessUpgrade ? 0 : companyCount,
       basePrice,
       chatbotPrice,
       extraCompaniesPrice,
@@ -104,9 +128,9 @@ export async function POST(request: Request) {
     await sendUpgradeRequestAdminEmail({
       userName: user.name || "",
       userEmail: user.email,
-      planName: "Pro",
-      includeChatbot,
-      extraCompanyCount: companyCount,
+      planName,
+      includeChatbot: isBusinessUpgrade ? true : includeChatbot,
+      extraCompanyCount: isBusinessUpgrade ? 0 : companyCount,
       basePrice,
       chatbotPrice,
       extraCompaniesPrice,

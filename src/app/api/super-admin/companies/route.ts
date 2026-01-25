@@ -30,6 +30,19 @@ export async function GET() {
             invoices: true,
           },
         },
+        memberships: {
+          where: { role: "OWNER" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          take: 1,
+        },
       },
       orderBy: { createdAt: "desc" },
     });

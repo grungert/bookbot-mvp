@@ -69,12 +69,23 @@ export async function GET(request: Request, { params }: RouteParams) {
     const customerId = searchParams.get("customerId"); // Filter by customer/user ID
     const search = searchParams.get("search"); // Search by invoice number
 
+    // Check if user has admin access to this company (via membership)
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
+
     const where: Prisma.InvoiceWhereInput = {
       companyId: company.id,
     };
 
     // Non-admin users can only see their own invoices
-    if (user.role !== "SUPER_ADMIN" && user.role !== "COMPANY_ADMIN") {
+    if (!isCompanyAdmin) {
       where.userId = user.id;
     }
 
@@ -83,7 +94,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     }
 
     // Filter by customer (admin only)
-    if (customerId && (user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN")) {
+    if (customerId && isCompanyAdmin) {
       where.userId = customerId;
     }
 

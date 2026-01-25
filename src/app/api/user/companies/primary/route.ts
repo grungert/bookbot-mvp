@@ -16,14 +16,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only COMPANY_ADMIN can set primary company
-    if (session.user.role !== "COMPANY_ADMIN" && session.user.role !== "SUPER_ADMIN") {
-      return NextResponse.json(
-        { error: "Only company admins can set primary company" },
-        { status: 403 }
-      );
-    }
-
+    // Any user with memberships can set primary company
     const body = await request.json();
     const parsed = setPrimarySchema.safeParse(body);
 

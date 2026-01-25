@@ -123,7 +123,7 @@ export function BookingFlow({
     if (isGuest) return;
 
     try {
-      const response = await fetch(`/api/c/${companySlug}/appointments`);
+      const response = await fetch(`/api/c/${companySlug}/appointments?myOnly=true`);
       if (response.ok) {
         const data = await response.json();
         // Filter to only upcoming appointments
@@ -178,6 +178,32 @@ export function BookingFlow({
     const appointments = getAppointmentsForDate(date);
     const colors = [...new Set(appointments.map(apt => apt.service.color || "#3B82F6"))];
     return colors;
+  }
+
+  // Get tooltip content for a date with appointments
+  function getTooltipForDate(date: Date): React.ReactNode {
+    const appointments = getAppointmentsForDate(date);
+    if (appointments.length === 0) return null;
+
+    return (
+      <div className="space-y-1.5 py-1">
+        <div className="text-xs font-medium text-muted-foreground mb-1">
+          {t("yourAppointments")}:
+        </div>
+        {appointments.map((apt) => (
+          <div key={apt.id} className="flex items-center gap-2 text-sm">
+            <div
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+            />
+            <span className="font-medium">{apt.service.name}</span>
+            <span className="text-muted-foreground">
+              {format(parseISO(apt.startTime), "HH:mm")}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   async function loadSlots(date: Date, serviceId: string) {
@@ -489,6 +515,7 @@ export function BookingFlow({
               }}
               className="rounded-md border"
               getDayIndicators={getColorsForDate}
+              getDayTooltip={getTooltipForDate}
             />
             {userAppointments.length > 0 && (
               <div className="space-y-2">

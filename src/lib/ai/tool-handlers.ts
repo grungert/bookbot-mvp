@@ -367,7 +367,7 @@ async function handleCreateBooking(
           name: params.guestName,
           phone: params.guestPhone || null,
           password: hashedPassword,
-          role: "END_USER",
+          role: "USER",
         },
       });
       userId = newUser.id;

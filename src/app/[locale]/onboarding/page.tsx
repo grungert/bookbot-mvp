@@ -40,8 +40,6 @@ export default async function OnboardingPage({ params }: OnboardingPageProps) {
   }
 
   // User has no company - show company creation form
-  // Check if they can create companies (COMPANY_ADMIN or SUPER_ADMIN)
-  const canCreateCompany = user.role === "COMPANY_ADMIN" || user.role === "SUPER_ADMIN";
-
-  return <OnboardingClient canCreateCompany={canCreateCompany} locale={locale} />;
+  // Any authenticated user can create a company
+  return <OnboardingClient canCreateCompany={true} locale={locale} />;
 }

@@ -68,12 +68,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Check if user has admin access to this company (via membership)
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
+
     // Non-admin users can only see their own appointments
-    if (
-      user.role !== "SUPER_ADMIN" &&
-      user.role !== "COMPANY_ADMIN" &&
-      appointment.userId !== user.id
-    ) {
+    if (!isCompanyAdmin && appointment.userId !== user.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -129,9 +136,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
+    // Check if user has admin access to this company (via membership)
+    const membership = await prisma.companyMembership.findUnique({
+      where: {
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
+      },
+    });
+
     // Users can only cancel their own appointments
     // Admins can change any status
-    const isAdmin = user.role === "SUPER_ADMIN" || user.role === "COMPANY_ADMIN";
+    const isAdmin = user.role === "SUPER_ADMIN" || !!membership;
     const isOwner = appointment.userId === user.id;
 
     if (!isAdmin && !isOwner) {

@@ -68,7 +68,7 @@ export async function validateCompanyAccess(companySlug: string) {
   return { error: "Access denied", company: null };
 }
 
-// Validate company admin access
+// Validate company admin access (based on membership, not role)
 export async function validateCompanyAdminAccess(companySlug: string) {
   const result = await validateCompanyAccess(companySlug);
 
@@ -76,10 +76,7 @@ export async function validateCompanyAdminAccess(companySlug: string) {
     return result;
   }
 
-  if (result.user!.role !== "SUPER_ADMIN" && result.user!.role !== "COMPANY_ADMIN") {
-    return { error: "Admin access required", company: null };
-  }
-
+  // If user has company access (via membership), they have admin access
   return result;
 }
 
@@ -123,6 +120,34 @@ export async function validateCompanyMembershipAccess(companySlug: string) {
   }
 
   return { error: "Access denied", company: null, membership: null };
+}
+
+// Check if user is admin of a specific company
+export async function isCompanyAdmin(userId: string, companyId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, companyId: true },
+  });
+
+  if (!user) return false;
+
+  // Super admin can manage any company
+  if (user.role === "SUPER_ADMIN") return true;
+
+  // Check membership with admin role
+  const membership = await prisma.companyMembership.findUnique({
+    where: {
+      userId_companyId: { userId, companyId },
+    },
+    select: { role: true },
+  });
+
+  if (membership && (membership.role === "OWNER" || membership.role === "ADMIN")) {
+    return true;
+  }
+
+  // Fall back to legacy companyId check
+  return user.companyId === companyId;
 }
 
 // Check if a user has admin access to a specific company
@@ -194,7 +219,7 @@ export async function getUserCompanies(userId: string) {
     }));
   }
 
-  // Get memberships for COMPANY_ADMIN
+  // Get memberships for regular users
   const memberships = await prisma.companyMembership.findMany({
     where: { userId },
     include: {
@@ -519,6 +544,9 @@ export async function getCompanyDashboardStats(
     authenticatedChatSessions,
     chatActivityTrend,
     uniqueChatters,
+
+    // First pending appointment
+    firstPendingAppointment,
   ] = await Promise.all([
     // Appointments grouped by status for current period (includes future)
     prisma.appointment.groupBy({
@@ -699,6 +727,17 @@ export async function getCompanyDashboardStats(
         createdAt: { gte: periodStart },
       },
     }),
+
+    // First pending appointment (for deep-linking from dashboard)
+    prisma.appointment.findFirst({
+      where: {
+        companyId,
+        status: "PENDING",
+        startTime: { gte: new Date() },
+      },
+      orderBy: { startTime: "asc" },
+      select: { id: true },
+    }),
   ]);
 
   // Calculate trends (percentage change)
@@ -793,6 +832,9 @@ export async function getCompanyDashboardStats(
     revenueTrendData: formattedRevenueTrend,
     serviceStats: formattedServiceStats,
     chatActivityTrendData: formattedChatActivityTrend,
+
+    // First pending appointment ID for deep-linking
+    firstPendingAppointmentId: firstPendingAppointment?.id ?? null,
   };
 }
 

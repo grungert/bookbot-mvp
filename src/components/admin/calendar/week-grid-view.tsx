@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   format,
   startOfWeek,
@@ -31,6 +31,7 @@ interface WeekGridViewProps {
   endHour?: number;
   timezone?: string;
   workingHours?: WorkingHoursEntry[];
+  selectedAppointmentId?: string | null;
 }
 
 const HOUR_HEIGHT = 80; // pixels per hour
@@ -106,10 +107,14 @@ export function WeekGridView({
   endHour: defaultEndHour = 18,
   timezone = "Europe/Belgrade",
   workingHours = [],
+  selectedAppointmentId,
 }: WeekGridViewProps) {
   // Locale for date formatting
   const locale = useLocale();
   const dateLocale = locale === "sr" ? srLatn : enUS;
+
+  // Ref for the grid container to enable scrolling
+  const gridRef = useRef<HTMLDivElement>(null);
 
   // Current time state for the "now" indicator
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -165,6 +170,39 @@ export function WeekGridView({
 
     return { startHour: paddedStart, endHour: paddedEnd };
   }, [workingHours, defaultStartHour, defaultEndHour]);
+
+  // Find selected appointment for scrolling
+  const selectedAppointment = useMemo(() => {
+    if (!selectedAppointmentId) return null;
+    return appointments.find(apt => apt.id === selectedAppointmentId) || null;
+  }, [selectedAppointmentId, appointments]);
+
+  // Scroll to selected appointment when it changes
+  useEffect(() => {
+    if (selectedAppointment && gridRef.current) {
+      // Calculate scroll position based on appointment time
+      const appointmentStart = parseISO(selectedAppointment.startTime);
+      const appointmentHour = appointmentStart.getHours() + appointmentStart.getMinutes() / 60;
+
+      // Calculate the pixel position of the appointment
+      const appointmentTop = (appointmentHour - startHour) * HOUR_HEIGHT;
+
+      // Get the grid's visible height
+      const gridHeight = gridRef.current.clientHeight;
+
+      // Scroll to center the appointment in the viewport
+      const scrollTarget = Math.max(0, appointmentTop - gridHeight / 2 + HOUR_HEIGHT / 2);
+
+      // Small delay to ensure the DOM has updated
+      const timeoutId = setTimeout(() => {
+        gridRef.current?.scrollTo({
+          top: scrollTarget,
+          behavior: "smooth",
+        });
+      }, 150);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedAppointment, startHour]);
 
   // Check if a day is closed
   const isDayClosed = (day: Date): boolean => {
@@ -304,6 +342,7 @@ export function WeekGridView({
 
       {/* Time grid */}
       <div
+        ref={gridRef}
         className="relative grid grid-cols-[70px_repeat(7,1fr)] overflow-y-auto"
         style={{ maxHeight: "calc(100vh - 300px)" }}
       >
@@ -424,6 +463,7 @@ export function WeekGridView({
                         style={getCardStyle(appointment, overlapInfo)}
                         onClick={onAppointmentClick}
                         className="pointer-events-auto"
+                        isSelected={selectedAppointmentId === appointment.id}
                       />
                     );
                   })}

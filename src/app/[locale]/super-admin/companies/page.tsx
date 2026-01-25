@@ -42,6 +42,13 @@ interface Company {
     appointments: number;
     invoices: number;
   };
+  memberships: Array<{
+    user: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+  }>;
 }
 
 export default function CompaniesPage() {
@@ -233,6 +240,7 @@ export default function CompaniesPage() {
               <TableRow>
                 <TableHead>Company</TableHead>
                 <TableHead>Slug</TableHead>
+                <TableHead>Owner</TableHead>
                 <TableHead>Users</TableHead>
                 <TableHead>Services</TableHead>
                 <TableHead>Appointments</TableHead>
@@ -253,6 +261,16 @@ export default function CompaniesPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="secondary">/c/{company.slug}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {company.memberships[0] ? (
+                      <div className="text-sm">
+                        <div className="font-medium">{company.memberships[0].user.name || "—"}</div>
+                        <div className="text-muted-foreground text-xs">{company.memberships[0].user.email}</div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">No owner</span>
+                    )}
                   </TableCell>
                   <TableCell>{company._count.users}</TableCell>
                   <TableCell>{company._count.services}</TableCell>

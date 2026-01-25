@@ -37,6 +37,7 @@ interface AppointmentCardProps {
   onClick?: (appointment: Appointment) => void;
   style?: React.CSSProperties;
   className?: string;
+  isSelected?: boolean;
 }
 
 // Status colors for the indicator dot
@@ -83,6 +84,7 @@ export function AppointmentCard({
   onClick,
   style,
   className,
+  isSelected,
 }: AppointmentCardProps) {
   const serviceColor = appointment.service.color || "#3B82F6";
   const startTime = parseISO(appointment.startTime);
@@ -96,6 +98,7 @@ export function AppointmentCard({
       tabIndex={0}
       className={cn(
         "absolute left-0.5 right-0.5 cursor-pointer rounded-lg p-2 transition-all hover:shadow-md hover:z-10 overflow-hidden group",
+        isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background z-20 shadow-lg",
         className
       )}
       style={{
