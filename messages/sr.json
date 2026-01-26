@@ -135,6 +135,7 @@
     "title": "Zakazivanje termina",
     "selectService": "Izaberite uslugu",
     "selectDate": "Izaberite datum",
+    "selectDateTime": "Izaberite datum i vreme",
     "selectTime": "Izaberite vreme",
     "confirmBooking": "Potvrdite rezervaciju",
     "bookingSuccess": "Vasa rezervacija je potvrdena!",

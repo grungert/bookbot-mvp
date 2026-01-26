@@ -135,6 +135,7 @@
     "title": "Book an Appointment",
     "selectService": "Select a Service",
     "selectDate": "Select a Date",
+    "selectDateTime": "Select a Date & Time",
     "selectTime": "Select a Time",
     "confirmBooking": "Confirm Booking",
     "bookingSuccess": "Your booking has been confirmed!",

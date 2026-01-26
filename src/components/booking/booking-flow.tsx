@@ -76,7 +76,7 @@ interface BookingFlowProps {
   user?: UserInfo | null;
 }
 
-type BookingStep = "service" | "date" | "time" | "details" | "confirm" | "success";
+type BookingStep = "service" | "date" | "details" | "confirm" | "success";
 
 export function BookingFlow({
   companySlug,
@@ -236,14 +236,23 @@ export function BookingFlow({
     setStep("date");
   }
 
+  // Ref to scroll time slots into view
+  const timeSlotsRef = useRef<HTMLDivElement>(null);
+
   function handleDateSelect(date: Date | undefined) {
     setSelectedDate(date);
     if (date && selectedService) {
       loadSlots(date, selectedService.id);
-      setStepDirection("forward");
-      setStep("time");
+      // Stay on date step — slots appear inline below calendar
     }
   }
+
+  // Scroll time slots into view when they load
+  useEffect(() => {
+    if (selectedDate && !isLoadingSlots && slots.length > 0 && timeSlotsRef.current) {
+      timeSlotsRef.current.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth" });
+    }
+  }, [selectedDate, isLoadingSlots, slots.length, prefersReducedMotion]);
 
   function handleSlotSelect(slot: TimeSlot) {
     setSelectedSlot(slot);
@@ -320,14 +329,11 @@ export function BookingFlow({
       case "date":
         setStep("service");
         break;
-      case "time":
+      case "details":
         setStep("date");
         break;
-      case "details":
-        setStep("time");
-        break;
       case "confirm":
-        setStep(isGuest ? "details" : "time");
+        setStep(isGuest ? "details" : "date");
         break;
     }
   }
@@ -344,22 +350,20 @@ export function BookingFlow({
   const steps = isGuest
     ? [
         { key: "service", label: t("selectService") },
-        { key: "date", label: t("selectDate") },
-        { key: "time", label: t("selectTime") },
+        { key: "date", label: t("selectDateTime") },
         { key: "details", label: t("yourDetails") },
         { key: "confirm", label: t("confirmBooking") },
       ]
     : [
         { key: "service", label: t("selectService") },
-        { key: "date", label: t("selectDate") },
-        { key: "time", label: t("selectTime") },
+        { key: "date", label: t("selectDateTime") },
         { key: "confirm", label: t("confirmBooking") },
       ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className={cn("mx-auto", step === "date" && selectedDate ? "max-w-4xl" : "max-w-2xl", "transition-[max-width] duration-300")}>
       {/* Progress Steps */}
       {step !== "success" && (
         <div className="flex items-center justify-center gap-2 mb-8">
@@ -488,11 +492,11 @@ export function BookingFlow({
         </Card>
       )}
 
-      {/* Date Selection */}
+      {/* Date & Time Selection */}
       {step === "date" && selectedService && (
         <Card className={getStepAnimationClass()}>
           <CardHeader>
-            <CardTitle>{t("selectDate")}</CardTitle>
+            <CardTitle>{t("selectDateTime")}</CardTitle>
             <CardDescription className="flex items-center gap-2">
               <div
                 className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -501,123 +505,130 @@ export function BookingFlow({
               {selectedService.name} - {t("minutes", { count: selectedService.duration })}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDateSelect}
-              disabled={(date) => {
-                // Disable past dates
-                if (date < new Date()) return true;
-                // Disable closed days (non-working days)
-                if (closedDays.includes(date.getDay())) return true;
-                return false;
-              }}
-              className="rounded-md border"
-              getDayIndicators={getColorsForDate}
-              getDayTooltip={getTooltipForDate}
-            />
-            {userAppointments.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground text-center">
-                  {t("datesWithAppointments")}:
-                </p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {userAppointments
-                    .filter((apt, i, arr) =>
-                      arr.findIndex(a => a.service.name === apt.service.name) === i
-                    )
-                    .map((apt) => (
-                      <div key={apt.service.name} className="flex items-center gap-1.5 text-xs">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: apt.service.color || "#3B82F6" }}
-                        />
-                        <span>{apt.service.name}</span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-          <div className="px-6 pb-6">
-            <Button variant="outline" onClick={goBack}>
-              {tCommon("back")}
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* Time Selection */}
-      {step === "time" && selectedService && selectedDate && (
-        <Card className={getStepAnimationClass()}>
-          <CardHeader>
-            <CardTitle>{t("selectTime")}</CardTitle>
-            <CardDescription className="flex items-center gap-2">
-              <div
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: selectedService.color || "#3B82F6" }}
-              />
-              {selectedService.name} • {format(selectedDate, "EEEE, MMMM d, yyyy")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Show user's existing appointments on this date */}
-            {getAppointmentsForDate(selectedDate).length > 0 && (
-              <div className="bg-primary/10 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <CalendarCheck className="h-4 w-4 text-primary" />
-                  <span className="text-sm font-medium">{t("yourAppointmentsOnDate")}</span>
-                </div>
-                <div className="space-y-2">
-                  {getAppointmentsForDate(selectedDate).map((apt) => (
-                    <div
-                      key={apt.id}
-                      className="flex items-center justify-between text-sm bg-background/50 rounded px-3 py-2"
-                    >
-                      <span className="font-medium flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: apt.service.color || "#3B82F6" }}
-                        />
-                        {apt.service.name}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {format(parseISO(apt.startTime), "HH:mm")} - {format(parseISO(apt.endTime), "HH:mm")}
-                      </span>
+          <CardContent>
+            <div className={cn(
+              "flex flex-col gap-4",
+              selectedDate && "lg:flex-row lg:gap-6 lg:items-start"
+            )}>
+              {/* Left side: Calendar + legend */}
+              <div className="flex flex-col items-center gap-4 lg:shrink-0">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  disabled={(date) => {
+                    // Disable past dates
+                    if (date < new Date()) return true;
+                    // Disable closed days (non-working days)
+                    if (closedDays.includes(date.getDay())) return true;
+                    return false;
+                  }}
+                  className="rounded-md border"
+                  getDayIndicators={getColorsForDate}
+                  getDayTooltip={getTooltipForDate}
+                />
+                {userAppointments.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground text-center">
+                      {t("datesWithAppointments")}:
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {userAppointments
+                        .filter((apt, i, arr) =>
+                          arr.findIndex(a => a.service.name === apt.service.name) === i
+                        )
+                        .map((apt) => (
+                          <div key={apt.service.name} className="flex items-center gap-1.5 text-xs">
+                            <div
+                              className="w-2.5 h-2.5 rounded-full"
+                              style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                            />
+                            <span>{apt.service.name}</span>
+                          </div>
+                        ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {isLoadingSlots ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : slots.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">
-                {t("noAvailableSlots")}
-              </p>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {slots.map((slot, index) => (
-                  <Button
-                    key={slot.start}
-                    variant={selectedSlot?.start === slot.start ? "default" : "outline"}
-                    onClick={() => handleSlotSelect(slot)}
-                    className={cn(
-                      "w-full press-feedback",
-                      !prefersReducedMotion && "animate-fade-up",
-                      !prefersReducedMotion && `stagger-${Math.min((index % 5) + 1, 5)}`
+              {/* Right side: Time slots — shown when a date is selected */}
+              {selectedDate && (
+                <div
+                  key={selectedDate.toISOString()}
+                  ref={timeSlotsRef}
+                  className={cn(
+                    "w-full min-w-0 space-y-4",
+                    !prefersReducedMotion && "animate-fade-up"
+                  )}
+                >
+                  <div className="border-t pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+                    <h3 className="text-sm font-medium text-center lg:text-left mb-1">
+                      {t("selectTime")}
+                    </h3>
+                    <p className="text-xs text-muted-foreground text-center lg:text-left mb-4">
+                      {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                    </p>
+
+                    {/* Show user's existing appointments on this date */}
+                    {getAppointmentsForDate(selectedDate).length > 0 && (
+                      <div className="bg-primary/10 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <CalendarCheck className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">{t("yourAppointmentsOnDate")}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {getAppointmentsForDate(selectedDate).map((apt) => (
+                            <div
+                              key={apt.id}
+                              className="flex items-center justify-between text-sm bg-background/50 rounded px-3 py-2"
+                            >
+                              <span className="font-medium flex items-center gap-2">
+                                <div
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{ backgroundColor: apt.service.color || "#3B82F6" }}
+                                />
+                                {apt.service.name}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {format(parseISO(apt.startTime), "HH:mm")} - {format(parseISO(apt.endTime), "HH:mm")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                    style={!prefersReducedMotion ? { opacity: 0 } : undefined}
-                  >
-                    {format(parseISO(slot.start), "HH:mm")}
-                  </Button>
-                ))}
-              </div>
-            )}
+
+                    {isLoadingSlots ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : slots.length === 0 ? (
+                      <p className="text-center lg:text-left py-8 text-muted-foreground">
+                        {t("noAvailableSlots")}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 gap-2">
+                        {slots.map((slot, index) => (
+                          <Button
+                            key={slot.start}
+                            variant={selectedSlot?.start === slot.start ? "default" : "outline"}
+                            onClick={() => handleSlotSelect(slot)}
+                            className={cn(
+                              "w-full press-feedback",
+                              !prefersReducedMotion && "animate-fade-up",
+                              !prefersReducedMotion && `stagger-${Math.min((index % 5) + 1, 5)}`
+                            )}
+                            style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+                          >
+                            {format(parseISO(slot.start), "HH:mm")}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
           <div className="px-6 pb-6">
             <Button variant="outline" onClick={goBack}>
