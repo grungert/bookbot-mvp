@@ -657,38 +657,34 @@ export default function ServicesPage() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={t("searchPlaceholder")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select
+          value={discountFilter}
+          onValueChange={(value: "all" | "with_discount" | "no_discount") => setDiscountFilter(value)}
+        >
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder={t("filterByDiscount")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("filterAll")}</SelectItem>
+            <SelectItem value="with_discount">{t("filterWithDiscount")}</SelectItem>
+            <SelectItem value="no_discount">{t("filterNoDiscount")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Services Table Container */}
       <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="p-4 border-b space-y-3">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {t("allServices")}
-          </h3>
-          {/* Search and Filter Controls */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t("searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Select
-              value={discountFilter}
-              onValueChange={(value: "all" | "with_discount" | "no_discount") => setDiscountFilter(value)}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder={t("filterByDiscount")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("filterAll")}</SelectItem>
-                <SelectItem value="with_discount">{t("filterWithDiscount")}</SelectItem>
-                <SelectItem value="no_discount">{t("filterNoDiscount")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
         {services.length === 0 && !searchQuery && discountFilter === "all" ? (
           <div className="py-16 text-center">
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-muted mb-4">
