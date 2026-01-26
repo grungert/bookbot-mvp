@@ -324,6 +324,7 @@
     "statusSent": "Sent",
     "statusPaid": "Paid",
     "statusCancelled": "Cancelled",
+    "allStatuses": "All Statuses",
     "noInvoices": "No invoices found",
     "customer": "Customer",
     "statusActions": "Status Actions",

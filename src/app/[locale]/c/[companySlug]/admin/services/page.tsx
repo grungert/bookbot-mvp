@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2, PackageOpen, ArrowUpDown, ArrowUp, ArrowDown, Percent, Tag, X, CalendarIcon, Search, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, PackageOpen, ArrowUpDown, ArrowUp, ArrowDown, Percent, Tag, X, CalendarIcon, Search, ChevronLeft, ChevronRight, AlertTriangle, RefreshCw } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -92,6 +92,7 @@ export default function ServicesPage() {
 
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -615,6 +616,15 @@ export default function ServicesPage() {
     }
   }
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadServices(currentPage);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -633,13 +643,18 @@ export default function ServicesPage() {
             {t("subtitle")}
           </p>
         </div>
-        <Button
-          onClick={openCreatePanel}
-          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t("addService")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+          <Button
+            onClick={openCreatePanel}
+            style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t("addService")}
+          </Button>
+        </div>
       </div>
 
       {/* Services Table Container */}

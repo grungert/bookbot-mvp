@@ -39,7 +39,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
+import { Plus, Loader2, Trash2, FileText, ArrowUpDown, ArrowUp, ArrowDown, X, Calendar, ChevronLeft, ChevronRight, Pencil, Search, RefreshCw } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -122,6 +122,7 @@ export default function InvoicesPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [companyCurrency, setCompanyCurrency] = useState("RSD");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -159,6 +160,21 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedServiceIds, setSelectedServiceIds] = useState<Set<string>>(new Set());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  // Status dropdown computed values
+  const currentStatusValue = useMemo(() => {
+    if (statusFilters.size === 0) return "all";
+    if (statusFilters.size === 1) return Array.from(statusFilters)[0];
+    return "all";
+  }, [statusFilters]);
+
+  function handleStatusChange(value: string) {
+    if (value === "all") {
+      setStatusFilters(new Set());
+    } else {
+      setStatusFilters(new Set([value as Invoice["status"]]));
+    }
+  }
 
   // Get primary color from CSS variable set by parent layout
   const [primaryColor, setPrimaryColor] = useState<string | undefined>(undefined);
@@ -743,6 +759,15 @@ export default function InvoicesPage() {
     }, 300);
   }
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadInvoices();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -761,19 +786,24 @@ export default function InvoicesPage() {
             {t("subtitle")}
           </p>
         </div>
-        <Button
-          onClick={openCreatePanel}
-          style={primaryColor ? { backgroundColor: primaryColor } : undefined}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t("createInvoice")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+          <Button
+            onClick={openCreatePanel}
+            style={primaryColor ? { backgroundColor: primaryColor } : undefined}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t("createInvoice")}
+          </Button>
+        </div>
       </div>
 
-      {/* Search and Filters Row */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 animate-fade-up" style={{ animationDelay: "50ms" }}>
         {/* Search Input */}
-        <div className="relative w-full lg:w-64">
+        <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder={t("searchInvoiceNumber")}
@@ -784,131 +814,135 @@ export default function InvoicesPage() {
         </div>
 
         {/* Customer Filter */}
-        <div className="w-full lg:w-48">
-          <Select value={selectedCustomerId || "all"} onValueChange={(value) => setSelectedCustomerId(value === "all" ? "" : value)}>
-            <SelectTrigger>
-              <SelectValue placeholder={t("allCustomers")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("allCustomers")}</SelectItem>
-              {uniqueCustomers.map((customer) => (
-                <SelectItem key={customer.id} value={customer.id}>
-                  {customer.name || customer.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={selectedCustomerId || "all"} onValueChange={(value) => setSelectedCustomerId(value === "all" ? "" : value)}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder={t("allCustomers")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("allCustomers")}</SelectItem>
+            {uniqueCustomers.map((customer) => (
+              <SelectItem key={customer.id} value={customer.id}>
+                {customer.name || customer.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Status Filter Dropdown */}
+        <Select value={currentStatusValue} onValueChange={handleStatusChange}>
+          <SelectTrigger
+            className={cn(
+              "w-full sm:w-[160px] bg-card/80 backdrop-blur-sm transition-colors",
+              currentStatusValue === "all" && "text-primary border-primary/30 hover:border-primary/50",
+              currentStatusValue === "DRAFT" && "text-gray-700 border-gray-500/50 hover:border-gray-500/70",
+              currentStatusValue === "SENT" && "text-blue-700 border-blue-500/50 hover:border-blue-500/70",
+              currentStatusValue === "PAID" && "text-green-700 border-green-500/50 hover:border-green-500/70",
+              currentStatusValue === "CANCELLED" && "text-red-700 border-red-500/50 hover:border-red-500/70"
+            )}
+          >
+            <SelectValue placeholder={t("allStatuses")} />
+          </SelectTrigger>
+          <SelectContent className="bg-card/95 backdrop-blur-md border-border/50">
+            <SelectItem
+              value="all"
+              className={cn(
+                "cursor-pointer",
+                currentStatusValue === "all"
+                  ? "!bg-primary/10 !text-primary font-medium"
+                  : "data-[highlighted]:!bg-primary/10 data-[highlighted]:!text-primary"
+              )}
+            >
+              {t("allStatuses")}
+            </SelectItem>
+            <SelectItem
+              value="DRAFT"
+              className={cn(
+                "cursor-pointer",
+                currentStatusValue === "DRAFT"
+                  ? "!bg-gray-500/10 !text-gray-700 font-medium"
+                  : "data-[highlighted]:!bg-gray-500/10 data-[highlighted]:!text-gray-700"
+              )}
+            >
+              {t("statusDraft")}
+            </SelectItem>
+            <SelectItem
+              value="SENT"
+              className={cn(
+                "cursor-pointer",
+                currentStatusValue === "SENT"
+                  ? "!bg-blue-500/10 !text-blue-700 font-medium"
+                  : "data-[highlighted]:!bg-blue-500/10 data-[highlighted]:!text-blue-700"
+              )}
+            >
+              {t("statusSent")}
+            </SelectItem>
+            <SelectItem
+              value="PAID"
+              className={cn(
+                "cursor-pointer",
+                currentStatusValue === "PAID"
+                  ? "!bg-green-500/10 !text-green-700 font-medium"
+                  : "data-[highlighted]:!bg-green-500/10 data-[highlighted]:!text-green-700"
+              )}
+            >
+              {t("statusPaid")}
+            </SelectItem>
+            <SelectItem
+              value="CANCELLED"
+              className={cn(
+                "cursor-pointer",
+                currentStatusValue === "CANCELLED"
+                  ? "!bg-red-500/10 !text-red-700 font-medium"
+                  : "data-[highlighted]:!bg-red-500/10 data-[highlighted]:!text-red-700"
+              )}
+            >
+              {t("statusCancelled")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
 
         {/* Service Filter - Multi-select badges */}
         {uniqueServicesInInvoices.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-muted-foreground">{t("service")}:</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {uniqueServicesInInvoices.map((service) => {
-                const isActive = selectedServiceIds.has(service.id);
-                return (
-                  <Badge
-                    key={service.id}
-                    variant="outline"
-                    className={cn(
-                      "cursor-pointer transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted hover:bg-muted/80"
-                    )}
-                    style={isActive && primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
-                    onClick={() => {
-                      const newSet = new Set(selectedServiceIds);
-                      if (newSet.has(service.id)) {
-                        newSet.delete(service.id);
-                      } else {
-                        newSet.add(service.id);
-                      }
-                      setSelectedServiceIds(newSet);
-                    }}
-                  >
-                    {service.name}
-                  </Badge>
-                );
-              })}
-              {selectedServiceIds.size > 0 && (
-                <button
-                  className="text-xs text-muted-foreground hover:text-foreground ml-1"
-                  onClick={() => setSelectedServiceIds(new Set())}
-                >
-                  {t("clear")}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Status and Date Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-fade-up" style={{ animationDelay: "75ms" }}>
-        {/* Status Filter - Multi-select */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm text-muted-foreground">Status:</span>
-          <div className="flex items-center gap-1.5">
-            {([
-              { value: "DRAFT" as const, label: t("statusDraft"), activeClass: "bg-gray-700 text-white border-gray-700", inactiveClass: "bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200" },
-              { value: "SENT" as const, label: t("statusSent"), activeClass: "", inactiveClass: "" }, // Will be styled with primaryColor
-              { value: "PAID" as const, label: t("statusPaid"), activeClass: "bg-green-700 text-white border-green-700", inactiveClass: "bg-green-100 text-green-700 border-green-200 hover:bg-green-200" },
-              { value: "CANCELLED" as const, label: t("statusCancelled"), activeClass: "bg-red-700 text-white border-red-700", inactiveClass: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200" },
-            ]).map((status) => {
-              const isActive = statusFilters.has(status.value);
-              const isSent = status.value === "SENT";
-
-              // Special styling for SENT with company primaryColor
-              const sentStyle = isSent && primaryColor
-                ? isActive
-                  ? { backgroundColor: primaryColor, color: "white", borderColor: primaryColor }
-                  : { backgroundColor: `${primaryColor}15`, color: primaryColor, borderColor: `${primaryColor}30` }
-                : undefined;
-
-              const sentClass = isSent && !primaryColor
-                ? isActive
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
-                : "";
-
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {uniqueServicesInInvoices.map((service) => {
+              const isActive = selectedServiceIds.has(service.id);
               return (
                 <Badge
-                  key={status.value}
+                  key={service.id}
                   variant="outline"
                   className={cn(
                     "cursor-pointer transition-colors",
-                    !isSent && (isActive ? status.activeClass : status.inactiveClass),
-                    sentClass
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted hover:bg-muted/80"
                   )}
-                  style={sentStyle}
+                  style={isActive && primaryColor ? { backgroundColor: primaryColor, borderColor: primaryColor } : undefined}
                   onClick={() => {
-                    const newFilters = new Set(statusFilters);
-                    if (newFilters.has(status.value)) {
-                      newFilters.delete(status.value);
+                    const newSet = new Set(selectedServiceIds);
+                    if (newSet.has(service.id)) {
+                      newSet.delete(service.id);
                     } else {
-                      newFilters.add(status.value);
+                      newSet.add(service.id);
                     }
-                    setStatusFilters(newFilters);
+                    setSelectedServiceIds(newSet);
                   }}
                 >
-                  {status.label}
+                  {service.name}
                 </Badge>
               );
             })}
-            {statusFilters.size > 0 && (
+            {selectedServiceIds.size > 0 && (
               <button
                 className="text-xs text-muted-foreground hover:text-foreground ml-1"
-                onClick={() => setStatusFilters(new Set())}
+                onClick={() => setSelectedServiceIds(new Set())}
               >
                 {t("clear")}
               </button>
             )}
           </div>
-        </div>
+        )}
 
-        {/* Date Period Filter - Dashboard style */}
+        {/* Date Period Filter */}
         <div className="inline-flex items-center gap-1 rounded-lg border bg-muted p-1">
           {([
             { value: "7d", label: t("days7") },

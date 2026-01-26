@@ -324,6 +324,7 @@
     "statusSent": "Poslata",
     "statusPaid": "Placena",
     "statusCancelled": "Otkazana",
+    "allStatuses": "Svi statusi",
     "noInvoices": "Nema faktura",
     "customer": "Klijent",
     "statusActions": "Akcije statusa",

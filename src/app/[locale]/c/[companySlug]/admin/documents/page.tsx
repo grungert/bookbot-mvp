@@ -67,6 +67,7 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 20, total: 0, totalPages: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -547,6 +548,15 @@ export default function DocumentsPage() {
   const allFilteredSelected = filteredAndSortedDocuments.length > 0 &&
     filteredAndSortedDocuments.every((doc) => selectedIds.has(doc.id));
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadDocuments(pagination.page);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -565,10 +575,15 @@ export default function DocumentsPage() {
             {t("documentsSubtitle")}
           </p>
         </div>
-        <Button onClick={openCreatePanel} className="bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          {t("uploadDocument")}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </Button>
+          <Button onClick={openCreatePanel} className="bg-primary hover:bg-primary/90">
+            <Plus className="h-4 w-4 mr-2" />
+            {t("uploadDocument")}
+          </Button>
+        </div>
       </div>
 
       {/* Documents Table Container */}

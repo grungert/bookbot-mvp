@@ -60,6 +60,7 @@ import {
   ChevronUp,
   LayoutList,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -163,6 +164,7 @@ export default function ConversationsPage() {
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter state
   const [userType, setUserType] = useState<"all" | "guest" | "authenticated">("all");
@@ -579,6 +581,15 @@ export default function ConversationsPage() {
     return t("guest");
   }
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadConversations();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (isLoading && !stats) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -608,6 +619,9 @@ export default function ConversationsPage() {
             {t("conversationsSubtitle")}
           </p>
         </div>
+        <Button variant="ghost" size="icon" onClick={handleRefresh} disabled={isRefreshing}>
+          <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+        </Button>
       </div>
 
       {/* Stats Cards */}
