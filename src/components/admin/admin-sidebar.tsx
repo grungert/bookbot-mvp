@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -84,6 +84,38 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       {children}
     </SidebarContext.Provider>
   );
+}
+
+const POLL_INTERVAL = 30_000;
+
+function usePendingCount(companySlug: string, serverCount?: number) {
+  const [count, setCount] = useState(serverCount);
+  const companySlugRef = useRef(companySlug);
+  companySlugRef.current = companySlug;
+
+  // Sync with server-provided value on navigation
+  useEffect(() => {
+    setCount(serverCount);
+  }, [serverCount]);
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/c/${companySlugRef.current}/stats/pending`);
+      if (res.ok) {
+        const data = await res.json();
+        setCount(data.count);
+      }
+    } catch {
+      // Silently ignore fetch errors — keep showing last known count
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(fetchCount, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [fetchCount]);
+
+  return count;
 }
 
 interface AdminSidebarProps {
@@ -370,8 +402,9 @@ function NavContent({
 
 export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess }: AdminSidebarProps) {
   const pathname = usePathname();
-  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess);
   const basePath = `/c/${companySlug}/admin`;
+  const livePendingCount = usePendingCount(companySlug, pendingAppointmentsCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, livePendingCount, actionableInvoicesCount, hasChatbotAccess);
   const { isCollapsed, setIsCollapsed } = useSidebar();
 
   return (
@@ -430,8 +463,9 @@ export function AdminMobileNav({
 }: AdminSidebarProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const { mainItems, bottomItems } = useNavItems(companySlug, pendingAppointmentsCount, actionableInvoicesCount, hasChatbotAccess);
   const basePath = `/c/${companySlug}/admin`;
+  const livePendingCount = usePendingCount(companySlug, pendingAppointmentsCount);
+  const { mainItems, bottomItems } = useNavItems(companySlug, livePendingCount, actionableInvoicesCount, hasChatbotAccess);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
