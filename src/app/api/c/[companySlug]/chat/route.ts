@@ -35,9 +35,10 @@ const bookingActionSchema = z.object({
 });
 
 const chatRequestSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().min(1).max(10000),
   sessionId: z.string().nullish(), // Allow null, undefined, or string
   bookingAction: bookingActionSchema.optional(),
+  greetingMessage: z.string().optional(),
 });
 
 interface RouteParams {
@@ -117,7 +118,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { message, sessionId: existingSessionId, bookingAction } = parsed.data;
+    const { message, sessionId: existingSessionId, bookingAction, greetingMessage } = parsed.data;
 
     // Get or create session
     let session;
@@ -130,8 +131,14 @@ export async function POST(request: Request, { params }: RouteParams) {
       });
     }
 
+    const isNewSession = !session;
     if (!session) {
       session = await getOrCreateChatSession(company.id, currentUser?.id);
+    }
+
+    // Persist greeting as the first assistant message for new sessions (0 tokens - no LLM)
+    if (isNewSession && greetingMessage) {
+      await saveChatMessage(session.id, "assistant", greetingMessage, 0, 0);
     }
 
     // --- Booking action bypass: handle option clicks directly (no LLM) ---
@@ -142,10 +149,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       const toolContext: ToolContext = {
         companyId: company.id,
         companyName: company.name,
+        companySlug: company.slug,
         userId: currentUser?.id,
         userEmail: currentUser?.email || undefined,
         userName: currentUser?.name || undefined,
         sessionId: session.id,
+        language: company.language || "en",
       };
 
       const result = await handleBookingSelection(
@@ -186,6 +195,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       botName: company.aiBotName,
       greeting: company.aiGreeting,
       personality: company.aiPersonality,
+      language: company.language,
     };
 
     // Build user context if logged in (only if email is available)

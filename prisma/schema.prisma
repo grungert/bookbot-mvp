@@ -70,6 +70,7 @@ model Company {
   primaryColor      String   @default("#3B82F6")
   timezone     String   @default("Europe/Belgrade")
   currency     String   @default("RSD")
+  language     String   @default("en")
 
   // AI Configuration
   aiApiKey       String?

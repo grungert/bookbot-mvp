@@ -16,6 +16,7 @@ import {
   findOrCreateWhatsAppSession,
   handleWhatsAppStatusUpdate,
   findCompanyByPhoneNumberId,
+  sendTypingIndicator,
 } from "@/lib/channels/whatsapp";
 import {
   chat,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/ai/booking-flow";
 import type { ToolContext } from "@/lib/ai/tool-handlers";
 import type { ChatUIComponent, RichMessage } from "@/components/chat/types";
+import { getTranslator } from "@/lib/i18n/backend";
 
 /**
  * GET - Handle webhook verification challenge from Meta
@@ -169,6 +171,7 @@ export async function POST(request: Request) {
         aiBotName: true,
         aiGreeting: true,
         aiPersonality: true,
+        language: true,
         whatsappEnabled: true,
         whatsappGreeting: true,
       },
@@ -179,13 +182,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
+    const language = companyDetails.language || "en";
+    const t = getTranslator(language);
+
     // Check if company has AI configured
     if (!companyDetails.aiApiKey) {
       console.error("AI not configured for company:", company.id);
       // Send error message to user
       const errorMessage = formatForWhatsApp(
-        "Sorry, the booking assistant is not available at the moment. Please try again later or contact us directly.",
-        undefined
+        t("botChat.errors.assistantUnavailable"),
+        undefined,
+        language
       );
       errorMessage.to = phoneNumber;
       await whatsappAdapter.send(errorMessage, company.id);
@@ -204,8 +211,9 @@ export async function POST(request: Request) {
     if (!subscriptionStatus.active) {
       console.error("Subscription not active for company:", company.id);
       const errorMessage = formatForWhatsApp(
-        "Sorry, the booking service is temporarily unavailable. Please try again later.",
-        undefined
+        t("botChat.errors.serviceUnavailable"),
+        undefined,
+        language
       );
       errorMessage.to = phoneNumber;
       await whatsappAdapter.send(errorMessage, company.id);
@@ -217,8 +225,9 @@ export async function POST(request: Request) {
     if (!chatLimitResult.allowed) {
       console.error("Chat limit exceeded for company:", company.id);
       const errorMessage = formatForWhatsApp(
-        "Sorry, we've reached our usage limit for this month. Please try again next month or contact us directly to book.",
-        undefined
+        t("botChat.errors.usageLimitReached"),
+        undefined,
+        language
       );
       errorMessage.to = phoneNumber;
       await whatsappAdapter.send(errorMessage, company.id);
@@ -236,23 +245,47 @@ export async function POST(request: Request) {
     if (isNew && companyDetails.whatsappGreeting) {
       const greetingMessage = formatForWhatsApp(
         companyDetails.whatsappGreeting,
-        undefined
+        undefined,
+        language
       );
       greetingMessage.to = phoneNumber;
       const greetingResult = await whatsappAdapter.send(greetingMessage, company.id);
 
       if (greetingResult.success && greetingResult.messageId) {
-        await saveChatMessage(sessionId, "assistant", companyDetails.whatsappGreeting);
-        await prisma.chatMessage.updateMany({
-          where: { sessionId, role: "assistant" },
+        const greetingMsg = await saveChatMessage(sessionId, "assistant", companyDetails.whatsappGreeting);
+        await prisma.chatMessage.update({
+          where: { id: greetingMsg.id },
           data: { externalMsgId: greetingResult.messageId, status: "sent" },
         });
       }
     }
 
+    // Send typing indicator immediately (fire-and-forget, covers both bypass & LLM paths)
+    if (incomingMessage.metadata.messageId) {
+      sendTypingIndicator(company.id, incomingMessage.metadata.messageId);
+    }
+
     // --- Booking selection bypass: handle button/list replies directly (no LLM) ---
     const messageType = incomingMessage.metadata.messageType || "text";
     const replyId = incomingMessage.metadata.replyId;
+
+    // Reject unsupported message types (images, documents, audio, video)
+    if (messageType === "unsupported") {
+      const reply = formatForWhatsApp(
+        t("botChat.errors.textOnlySupported"),
+        undefined,
+        language
+      );
+      reply.to = phoneNumber;
+      await whatsappAdapter.send(reply, company.id);
+      return NextResponse.json({ success: true });
+    }
+
+    // Hoist session+user lookup (reused by both booking bypass and LLM paths)
+    const sessionWithUser = await prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      include: { user: true },
+    });
 
     if (replyId && (messageType === "button_reply" || messageType === "list_reply")) {
       const selection = parseWhatsAppSelection(messageType, userMessage, replyId);
@@ -267,10 +300,10 @@ export async function POST(request: Request) {
           // Only bypass if we have active state OR it's a service selection (which creates state lazily)
           if (bookingState?.active || bookingAction.type === "service") {
             // Save user message
-            await saveChatMessage(sessionId, "user", userMessage);
+            const userMsg = await saveChatMessage(sessionId, "user", userMessage);
             if (incomingMessage.metadata.messageId) {
-              await prisma.chatMessage.updateMany({
-                where: { sessionId, role: "user", content: userMessage },
+              await prisma.chatMessage.update({
+                where: { id: userMsg.id },
                 data: { externalMsgId: incomingMessage.metadata.messageId, status: "delivered" },
               });
             }
@@ -278,35 +311,32 @@ export async function POST(request: Request) {
             const toolContext: ToolContext = {
               companyId: company.id,
               companyName: companyDetails.name,
+              companySlug: companyDetails.slug,
               sessionId,
+              language,
             };
 
-            // Look up user for the tool context
-            const session = await prisma.chatSession.findUnique({
-              where: { id: sessionId },
-              include: { user: true },
-            });
-            if (session?.user) {
-              toolContext.userId = session.user.id;
-              toolContext.userEmail = session.user.email;
-              toolContext.userName = session.user.name || undefined;
+            if (sessionWithUser?.user) {
+              toolContext.userId = sessionWithUser.user.id;
+              toolContext.userEmail = sessionWithUser.user.email;
+              toolContext.userName = sessionWithUser.user.name || undefined;
             }
 
             const result = await handleBookingSelection(toolContext, sessionId, bookingAction);
 
             // Save assistant response (0 tokens - no LLM)
-            await saveChatMessage(sessionId, "assistant", result.assistantMessage, 0, 0);
+            const assistantMsg = await saveChatMessage(sessionId, "assistant", result.assistantMessage, 0, 0);
 
             // Parse and format for WhatsApp
             const { text, ui } = parseRichMessage(result.assistantMessage);
-            const outgoingMessage = formatForWhatsApp(text, ui);
+            const outgoingMessage = formatForWhatsApp(text, ui, language);
             outgoingMessage.to = phoneNumber;
 
             const sendResult = await whatsappAdapter.send(outgoingMessage, company.id);
 
             if (sendResult.success && sendResult.messageId) {
-              await prisma.chatMessage.updateMany({
-                where: { sessionId, role: "assistant", content: result.assistantMessage },
+              await prisma.chatMessage.update({
+                where: { id: assistantMsg.id },
                 data: { externalMsgId: sendResult.messageId, status: "sent" },
               });
             }
@@ -328,14 +358,10 @@ export async function POST(request: Request) {
     }));
 
     // Save user message
-    await saveChatMessage(sessionId, "user", userMessage);
+    const userMsg = await saveChatMessage(sessionId, "user", userMessage);
     if (incomingMessage.metadata.messageId) {
-      await prisma.chatMessage.updateMany({
-        where: {
-          sessionId,
-          role: "user",
-          content: userMessage,
-        },
+      await prisma.chatMessage.update({
+        where: { id: userMsg.id },
         data: {
           externalMsgId: incomingMessage.metadata.messageId,
           status: "delivered",
@@ -351,20 +377,16 @@ export async function POST(request: Request) {
       botName: companyDetails.aiBotName,
       greeting: companyDetails.aiGreeting,
       personality: companyDetails.aiPersonality,
+      language,
     };
 
-    // Build user context if we can find the user
+    // Build user context from hoisted session lookup
     let userContext: UserContext | null = null;
-    const session = await prisma.chatSession.findUnique({
-      where: { id: sessionId },
-      include: { user: true },
-    });
-
-    if (session?.user?.email) {
+    if (sessionWithUser?.user?.email) {
       userContext = {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
+        id: sessionWithUser.user.id,
+        email: sessionWithUser.user.email,
+        name: sessionWithUser.user.name,
       };
     }
 
@@ -388,13 +410,13 @@ export async function POST(request: Request) {
     );
 
     // Save assistant response with token usage
-    await saveChatMessage(sessionId, "assistant", response, usage.inputTokens, usage.outputTokens);
+    const assistantMsg = await saveChatMessage(sessionId, "assistant", response, usage.inputTokens, usage.outputTokens);
 
     // Parse the response for rich content
     const { text, ui } = parseRichMessage(response);
 
     // Format response for WhatsApp
-    const outgoingMessage = formatForWhatsApp(text, ui);
+    const outgoingMessage = formatForWhatsApp(text, ui, language);
     outgoingMessage.to = phoneNumber;
 
     // Send response
@@ -402,12 +424,8 @@ export async function POST(request: Request) {
 
     // Update message status
     if (sendResult.success && sendResult.messageId) {
-      await prisma.chatMessage.updateMany({
-        where: {
-          sessionId,
-          role: "assistant",
-          content: response,
-        },
+      await prisma.chatMessage.update({
+        where: { id: assistantMsg.id },
         data: {
           externalMsgId: sendResult.messageId,
           status: "sent",

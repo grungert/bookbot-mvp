@@ -17,6 +17,7 @@ import { prisma } from "@/lib/prisma";
 import type { ToolContext, ToolResult } from "./tool-handlers";
 import { executeToolAction } from "./tool-handlers";
 import { createRichMessageContent } from "@/components/chat/message-parser";
+import { getTranslator } from "@/lib/i18n/backend";
 
 // Booking state stored on ChatSession.bookingState (Json field)
 export interface BookingState {
@@ -105,6 +106,8 @@ export async function handleBookingSelection(
   sessionId: string,
   action: BookingAction
 ): Promise<BookingFlowResult> {
+  const t = getTranslator(context.language);
+
   // Load or lazily create booking state
   let state = await getBookingState(sessionId);
   if (!state) {
@@ -137,8 +140,7 @@ export async function handleBookingSelection(
       const date = action.date || action.dateISO;
       if (!date || !state.serviceId) {
         return {
-          assistantMessage:
-            "Something went wrong. Please start the booking process again.",
+          assistantMessage: t("botChat.bookingFlowError"),
           usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
         };
       }
@@ -170,8 +172,7 @@ export async function handleBookingSelection(
       const startTime = action.time || action.startTime;
       if (!startTime || !state.serviceId) {
         return {
-          assistantMessage:
-            "Something went wrong. Please start the booking process again.",
+          assistantMessage: t("botChat.bookingFlowError"),
           usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
         };
       }
@@ -215,8 +216,7 @@ export async function handleBookingSelection(
 
     default:
       return {
-        assistantMessage:
-          "Unknown booking action. Please start the booking process again.",
+        assistantMessage: t("botChat.unknownBookingAction"),
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
   }

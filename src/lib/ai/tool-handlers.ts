@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { getAvailableSlots, isSlotAvailable } from "@/lib/utils/slots";
-import { sendBookingConfirmationEmail } from "@/lib/email/send";
+import { sendBookingConfirmationEmail, sendNewBookingAdminEmail } from "@/lib/email/send";
 import { addMinutes, format, parseISO } from "date-fns";
 import type {
   ToolParams,
@@ -14,15 +14,19 @@ import type {
 } from "./tools";
 import type { ChatUIComponent } from "@/components/chat/types";
 import { handleUpdateBookingState } from "./booking-flow";
+import { getTranslator } from "@/lib/i18n/backend";
+import { getDateLocale } from "@/lib/i18n/date-locale";
 
 // Context passed to tool handlers
 export interface ToolContext {
   companyId: string;
   companyName: string;
+  companySlug?: string;
   userId?: string;
   userEmail?: string;
   userName?: string;
   sessionId?: string;
+  language?: string;
 }
 
 // Result returned from tool handlers
@@ -49,25 +53,30 @@ export async function executeToolAction(
       return handleCreateBooking(context, params);
     case "searchAppointments":
       return handleSearchAppointments(context, params);
-    case "updateBookingState":
+    case "updateBookingState": {
+      const t = getTranslator(context.language);
       if (!context.sessionId) {
-        return { success: false, userMessage: "Session not available for booking state update." };
+        return { success: false, userMessage: t("botChat.sessionNotAvailable") };
       }
       return handleUpdateBookingState(context, context.sessionId, {
         serviceId: params.serviceId,
         serviceName: params.serviceName,
         date: params.date,
       });
-    default:
+    }
+    default: {
+      const t = getTranslator(context.language);
       return {
         success: false,
-        userMessage: `Unknown tool: ${(params as { tool: string }).tool}`,
+        userMessage: t("botChat.unknownTool", { tool: (params as { tool: string }).tool }),
       };
+    }
   }
 }
 
 // Get list of available services
 async function handleGetServices(context: ToolContext): Promise<ToolResult> {
+  const t = getTranslator(context.language);
   const services = await prisma.service.findMany({
     where: { companyId: context.companyId, isActive: true },
     select: {
@@ -92,7 +101,7 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
     return {
       success: true,
       data: [],
-      userMessage: "No services are currently available.",
+      userMessage: t("botChat.noServicesAvailable"),
     };
   }
 
@@ -124,7 +133,7 @@ async function handleGetServices(context: ToolContext): Promise<ToolResult> {
   return {
     success: true,
     data: formattedServices,
-    userMessage: `Found ${services.length} available service(s).`,
+    userMessage: t("botChat.foundServices", { count: services.length }),
     ui: {
       component: "service-selector",
       props: { services: uiServices },
@@ -137,6 +146,8 @@ async function handleGetDatePicker(
   context: ToolContext,
   params: GetDatePickerParams
 ): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+
   // Validate service exists
   const service = await prisma.service.findFirst({
     where: {
@@ -149,8 +160,7 @@ async function handleGetDatePicker(
   if (!service) {
     return {
       success: false,
-      userMessage:
-        "Service not found. Please use getServices to see available services.",
+      userMessage: t("botChat.serviceNotFound"),
     };
   }
 
@@ -169,7 +179,7 @@ async function handleGetDatePicker(
       service: service.name,
       serviceId: service.id,
     },
-    userMessage: `Ready to select a date for ${service.name}.`,
+    userMessage: t("botChat.readyToSelectDate", { serviceName: service.name }),
     ui: {
       component: "date-picker",
       props: {
@@ -186,6 +196,9 @@ async function handleGetAvailableSlots(
   context: ToolContext,
   params: GetAvailableSlotsParams
 ): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+  const dateLocale = getDateLocale(context.language);
+
   // Validate service exists
   const service = await prisma.service.findFirst({
     where: {
@@ -198,8 +211,7 @@ async function handleGetAvailableSlots(
   if (!service) {
     return {
       success: false,
-      userMessage:
-        "Service not found. Please use getServices to see available services.",
+      userMessage: t("botChat.serviceNotFound"),
     };
   }
 
@@ -213,13 +225,13 @@ async function handleGetAvailableSlots(
   } catch {
     return {
       success: false,
-      userMessage:
-        "Invalid date format. Please use YYYY-MM-DD format (e.g., 2025-01-21).",
+      userMessage: t("botChat.invalidDateFormat"),
     };
   }
 
   const dayOfWeek = date.getDay();
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayKeys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const dayName = t(`botChat.days.${dayKeys[dayOfWeek]}`);
 
   // Check if business is open on this day
   const workingHours = await prisma.workingHours.findUnique({
@@ -234,8 +246,8 @@ async function handleGetAvailableSlots(
   if (!workingHours || !workingHours.isOpen) {
     return {
       success: true,
-      data: { closed: true, dayOfWeek: dayNames[dayOfWeek] },
-      userMessage: `The business is closed on ${dayNames[dayOfWeek]}s. Please choose a different day. Business is typically open Monday through Friday.`,
+      data: { closed: true, dayOfWeek: dayName },
+      userMessage: t("botChat.businessClosed", { dayName }),
     };
   }
 
@@ -252,10 +264,11 @@ async function handleGetAvailableSlots(
       .filter((wh) => !wh.isOpen)
       .map((wh) => wh.dayOfWeek);
 
+    const formattedDate = format(date, "EEEE, MMMM d, yyyy", { locale: dateLocale });
     return {
       success: true,
       data: { fullyBooked: true },
-      userMessage: `All time slots for ${service.name} on ${format(date, "EEEE, MMMM d, yyyy")} are fully booked. Please try another date.`,
+      userMessage: t("botChat.allSlotsBooked", { serviceName: service.name, date: formattedDate }),
       ui: {
         component: "date-picker",
         props: {
@@ -272,20 +285,22 @@ async function handleGetAvailableSlots(
     displayTime: format(slot.start, "HH:mm"),
   }));
 
+  const formattedDate = format(date, "EEEE, MMMM d, yyyy", { locale: dateLocale });
+
   return {
     success: true,
     data: {
       service: service.name,
-      date: format(date, "EEEE, MMMM d, yyyy"),
+      date: formattedDate,
       slots: formattedSlots,
     },
-    userMessage: `Found ${slots.length} available time slot(s) for ${service.name} on ${format(date, "EEEE, MMMM d, yyyy")}.`,
+    userMessage: t("botChat.foundSlots", { count: slots.length, serviceName: service.name, date: formattedDate }),
     ui: {
       component: "time-slots",
       props: {
         serviceId: service.id,
         serviceName: service.name,
-        date: format(date, "EEEE, MMMM d, yyyy"),
+        date: formattedDate,
         dateISO: params.date,
         slots: formattedSlots,
       },
@@ -298,6 +313,9 @@ async function handleCreateBooking(
   context: ToolContext,
   params: CreateBookingParams
 ): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+  const dateLocale = getDateLocale(context.language);
+
   // Validate service exists
   const service = await prisma.service.findFirst({
     where: {
@@ -310,7 +328,7 @@ async function handleCreateBooking(
   if (!service) {
     return {
       success: false,
-      userMessage: "Service not found. Please check the service ID.",
+      userMessage: t("botChat.serviceNotFoundCheck"),
     };
   }
 
@@ -324,7 +342,7 @@ async function handleCreateBooking(
   } catch {
     return {
       success: false,
-      userMessage: "Invalid date/time format. Please use ISO format.",
+      userMessage: t("botChat.invalidDateTime"),
     };
   }
 
@@ -338,8 +356,7 @@ async function handleCreateBooking(
   if (!available) {
     return {
       success: false,
-      userMessage:
-        "This time slot is no longer available. Please choose another time.",
+      userMessage: t("botChat.slotUnavailable"),
     };
   }
 
@@ -353,8 +370,7 @@ async function handleCreateBooking(
     if (!params.guestEmail || !params.guestName) {
       return {
         success: false,
-        userMessage:
-          "Please provide your name and email to complete the booking.",
+        userMessage: t("botChat.provideNameEmail"),
       };
     }
 
@@ -422,10 +438,46 @@ async function handleCreateBooking(
     }
   }
 
+  // Send admin notification emails
+  try {
+    const company = await prisma.company.findUnique({
+      where: { id: context.companyId },
+      select: { notificationEmails: true, businessEmail: true, slug: true },
+    });
+
+    if (company) {
+      const notificationEmails = (company.notificationEmails as string[]) || [];
+      if (company.businessEmail && !notificationEmails.includes(company.businessEmail)) {
+        notificationEmails.push(company.businessEmail);
+      }
+
+      if (notificationEmails.length > 0) {
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
+        const slug = context.companySlug || company.slug;
+        await Promise.allSettled(
+          notificationEmails.map((adminEmail) =>
+            sendNewBookingAdminEmail({
+              adminEmail,
+              customerName: userName || "Customer",
+              customerEmail: userEmail || "",
+              serviceName: service.name,
+              startTime,
+              duration: service.duration,
+              companyName: context.companyName,
+              appointmentUrl: `${baseUrl}/en/c/${slug}/admin/appointments?id=${appointment.id}`,
+            })
+          )
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[EMAIL] Failed to send admin notifications:", error);
+  }
+
   const bookingData = {
     appointmentId: appointment.id,
     service: service.name,
-    date: format(startTime, "EEEE, MMMM d, yyyy"),
+    date: format(startTime, "EEEE, MMMM d, yyyy", { locale: dateLocale }),
     time: format(startTime, "HH:mm"),
     duration: `${service.duration} minutes`,
     price: `${service.currency} ${Number(service.price).toLocaleString()}`,
@@ -435,7 +487,11 @@ async function handleCreateBooking(
   return {
     success: true,
     data: bookingData,
-    userMessage: `Booking confirmed! ${service.name} on ${format(startTime, "EEEE, MMMM d")} at ${format(startTime, "HH:mm")}. A confirmation email has been sent.`,
+    userMessage: t("botChat.bookingConfirmed", {
+      serviceName: service.name,
+      date: format(startTime, "EEEE, MMMM d", { locale: dateLocale }),
+      time: format(startTime, "HH:mm"),
+    }),
     ui: {
       component: "booking-card",
       props: bookingData,
@@ -448,11 +504,13 @@ async function handleSearchAppointments(
   context: ToolContext,
   params: SearchAppointmentsParams
 ): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+  const dateLocale = getDateLocale(context.language);
+
   if (!context.userId) {
     return {
       success: false,
-      userMessage:
-        "Please provide your email so I can look up your appointments.",
+      userMessage: t("botChat.provideEmailForLookup"),
     };
   }
 
@@ -507,13 +565,13 @@ async function handleSearchAppointments(
     return {
       success: true,
       data: [],
-      userMessage: "No appointments found matching your criteria.",
+      userMessage: t("botChat.noAppointmentsFound"),
     };
   }
 
   // Format results
   const results = filtered.map((a) => ({
-    date: format(a.startTime, "EEEE, MMM d, yyyy"),
+    date: format(a.startTime, "EEEE, MMM d, yyyy", { locale: dateLocale }),
     time: format(a.startTime, "HH:mm"),
     service: a.service.name,
     status: a.status,
@@ -523,6 +581,6 @@ async function handleSearchAppointments(
   return {
     success: true,
     data: results,
-    userMessage: `Found ${results.length} appointment(s).`,
+    userMessage: t("botChat.foundAppointments", { count: results.length }),
   };
 }

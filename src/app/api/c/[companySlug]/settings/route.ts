@@ -13,6 +13,7 @@ const updateSettingsSchema = z.object({
   primaryColor: z.string().optional(),
   timezone: z.string().optional(),
   currency: z.enum(["RSD", "EUR"]).optional(),
+  language: z.enum(["en", "sr"]).optional(),
   aiApiKey: z.string().nullable().optional(),
   aiEndpoint: z.string().nullable().optional(),
   aiModel: z.string().nullable().optional(),
@@ -69,6 +70,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       primaryColor: company.primaryColor,
       timezone: company.timezone,
       currency: company.currency,
+      language: company.language,
       // Mask API key - only show last 4 chars if exists
       aiApiKey: company.aiApiKey
         ? `***${company.aiApiKey.slice(-4)}`
@@ -172,6 +174,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.primaryColor !== undefined) updateData.primaryColor = data.primaryColor;
     if (data.timezone !== undefined) updateData.timezone = data.timezone;
     if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.language !== undefined) updateData.language = data.language;
     if (data.aiEndpoint !== undefined) updateData.aiEndpoint = data.aiEndpoint;
     if (data.aiModel !== undefined) updateData.aiModel = data.aiModel;
     if (data.aiSystemPrompt !== undefined) updateData.aiSystemPrompt = data.aiSystemPrompt;
@@ -285,6 +288,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       primaryColor: updatedCompany.primaryColor,
       timezone: updatedCompany.timezone,
       currency: updatedCompany.currency,
+      language: updatedCompany.language,
       aiApiKey: updatedCompany.aiApiKey
         ? `***${updatedCompany.aiApiKey.slice(-4)}`
         : null,

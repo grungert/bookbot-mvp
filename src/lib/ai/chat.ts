@@ -7,6 +7,8 @@ import { executeToolAction, type ToolContext, type ToolResult } from "./tool-han
 import { createRichMessageContent } from "@/components/chat/message-parser";
 import { estimateTokens } from "@/lib/document-tokens";
 import type { BookingState } from "./booking-flow";
+import { getTranslator } from "@/lib/i18n/backend";
+import { getDateLocale } from "@/lib/i18n/date-locale";
 
 export interface ChatResult {
   response: string;
@@ -33,6 +35,7 @@ export interface CompanyContext {
   botName?: string | null;
   greeting?: string | null;
   personality?: string | null;
+  language?: string | null;
 }
 
 // User context for personalization
@@ -105,10 +108,12 @@ async function getCompanyServices(companyId: string): Promise<string> {
 // Get user's upcoming appointments (next 7 days, max 5)
 async function getUserUpcomingAppointments(
   companyId: string,
-  userId: string
+  userId: string,
+  language?: string | null
 ): Promise<string> {
   const now = new Date();
   const weekFromNow = addDays(now, 7);
+  const dateLocale = getDateLocale(language);
 
   const appointments = await prisma.appointment.findMany({
     where: {
@@ -132,7 +137,7 @@ async function getUserUpcomingAppointments(
   return appointments
     .map(
       (a) =>
-        `- ${format(a.startTime, "EEEE, MMM d")} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
+        `- ${format(a.startTime, "EEEE, MMM d", { locale: dateLocale })} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
     )
     .join("\n");
 }
@@ -140,8 +145,10 @@ async function getUserUpcomingAppointments(
 // Get user's recent appointment history (last 5)
 async function getUserRecentAppointments(
   companyId: string,
-  userId: string
+  userId: string,
+  language?: string | null
 ): Promise<string> {
+  const dateLocale = getDateLocale(language);
   const appointments = await prisma.appointment.findMany({
     where: {
       companyId,
@@ -160,7 +167,7 @@ async function getUserRecentAppointments(
   return appointments
     .map(
       (a) =>
-        `- ${format(a.startTime, "MMM d, yyyy")} - ${a.service.name} (${a.status})`
+        `- ${format(a.startTime, "MMM d, yyyy", { locale: dateLocale })} - ${a.service.name} (${a.status})`
     )
     .join("\n");
 }
@@ -181,16 +188,26 @@ async function buildSystemPrompt(
   let recentAppointments = "";
   if (user) {
     [upcomingAppointments, recentAppointments] = await Promise.all([
-      getUserUpcomingAppointments(company.id, user.id),
-      getUserRecentAppointments(company.id, user.id),
+      getUserUpcomingAppointments(company.id, user.id, company.language),
+      getUserRecentAppointments(company.id, user.id, company.language),
     ]);
   }
 
   const botName = company.botName || "Assistant";
   const personalityPrompt = getPersonalityPrompt(company.personality);
-  const today = format(new Date(), "EEEE, MMMM d, yyyy");
+  const dateLocale = getDateLocale(company.language);
+  const today = format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale });
 
-  let prompt = `You are ${botName}, a booking assistant for ${company.name}.
+  // Language instruction for non-English languages
+  const language = company.language || "en";
+  const t = getTranslator(language);
+  const languageNames: Record<string, string> = { en: "English", sr: "Serbian" };
+  const languageName = languageNames[language] || "English";
+  const languageInstruction = language !== "en"
+    ? `${t("botChat.languageInstruction", { languageName })}\n\n`
+    : "";
+
+  let prompt = `${languageInstruction}You are ${botName}, a booking assistant for ${company.name}.
 
 YOUR IDENTITY:
 - Name: ${botName}
@@ -386,10 +403,12 @@ IMPORTANT - When the user mentions booking details in text (e.g. "eye exam on Ja
   const toolContext: ToolContext = {
     companyId: company.id,
     companyName: company.name,
+    companySlug: company.slug,
     userId: user?.id,
     userEmail: user?.email,
     userName: user?.name || undefined,
     sessionId,
+    language: company.language || "en",
   };
 
   let iterations = 0;
@@ -492,8 +511,9 @@ Result: ${result.userMessage}
   }
 
   // Max iterations reached - return last response or error
+  const t = getTranslator(company.language);
   return {
-    response: "I'm sorry, I encountered an issue processing your request. Please try again.",
+    response: t("botChat.maxIterationsError"),
     usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens },
   };
 }

@@ -7,6 +7,7 @@
 
 import type { ChatUIComponent, ChatService, ChatTimeSlot, ChatBookingData } from "@/components/chat/types";
 import type { OutgoingMessage, ListSection, MessageButton } from "./types";
+import { getTranslator, type TranslatorFn } from "@/lib/i18n/backend";
 
 /**
  * Format currency with proper symbol
@@ -64,7 +65,7 @@ function formatServiceText(service: ChatService, index: number): string {
 /**
  * Format service selector UI for WhatsApp
  */
-function formatServicesForWhatsApp(services: ChatService[]): OutgoingMessage {
+function formatServicesForWhatsApp(services: ChatService[], t: TranslatorFn): OutgoingMessage {
   // For 3 or fewer services, use buttons
   if (services.length <= 3) {
     const buttons: MessageButton[] = services.map((s, i) => ({
@@ -78,16 +79,16 @@ function formatServicesForWhatsApp(services: ChatService[]): OutgoingMessage {
 
     return {
       to: "", // Will be set by caller
-      content: `Please select a service:\n\n${servicesText}`,
+      content: `${t("botChat.whatsapp.selectService")}\n\n${servicesText}`,
       buttons,
-      header: "Our Services",
+      header: t("botChat.whatsapp.ourServices"),
     };
   }
 
   // For more services, use a list
   const sections: ListSection[] = [
     {
-      title: "Available Services",
+      title: t("botChat.whatsapp.availableServices"),
       items: services.map((s) => {
         const { original, discounted } = getEffectivePrice(s);
         const price = discounted !== null ? discounted : original;
@@ -106,9 +107,9 @@ function formatServicesForWhatsApp(services: ChatService[]): OutgoingMessage {
 
   return {
     to: "",
-    content: `Please select a service:\n\n${servicesText}\n\nOr choose from the list below:`,
+    content: `${t("botChat.whatsapp.selectService")}\n\n${servicesText}\n\n${t("botChat.whatsapp.orChooseFromList")}`,
     listSections: sections,
-    listButtonText: "View Services",
+    listButtonText: t("botChat.whatsapp.viewServices"),
   };
 }
 
@@ -116,29 +117,33 @@ function formatServicesForWhatsApp(services: ChatService[]): OutgoingMessage {
  * Format date picker UI for WhatsApp
  * Since WhatsApp doesn't have a date picker, we offer common date options
  */
-function formatDatePickerForWhatsApp(serviceName: string): OutgoingMessage {
+function formatDatePickerForWhatsApp(serviceName: string, t: TranslatorFn, language?: string): OutgoingMessage {
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   const dayAfter = new Date(today);
   dayAfter.setDate(dayAfter.getDate() + 2);
 
+  const locale = language === "sr" ? "sr-Latn" : "en-US";
   const formatDate = (d: Date) => {
     const options: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
-    return d.toLocaleDateString("en-US", options);
+    return d.toLocaleDateString(locale, options);
   };
 
+  const todayLabel = t("botChat.whatsapp.today", { date: formatDate(today) }).substring(0, 20);
+  const tomorrowLabel = t("botChat.whatsapp.tomorrow", { date: formatDate(tomorrow) }).substring(0, 20);
+
   const buttons: MessageButton[] = [
-    { id: `date_${today.toISOString().split("T")[0]}`, label: `Today (${formatDate(today)})`.substring(0, 20) },
-    { id: `date_${tomorrow.toISOString().split("T")[0]}`, label: `Tomorrow (${formatDate(tomorrow)})`.substring(0, 20) },
+    { id: `date_${today.toISOString().split("T")[0]}`, label: todayLabel },
+    { id: `date_${tomorrow.toISOString().split("T")[0]}`, label: tomorrowLabel },
     { id: `date_${dayAfter.toISOString().split("T")[0]}`, label: formatDate(dayAfter).substring(0, 20) },
   ];
 
   return {
     to: "",
-    content: `Great! You've selected *${serviceName}*.\n\nPlease choose a date:\n\n1. Today (${formatDate(today)})\n2. Tomorrow (${formatDate(tomorrow)})\n3. ${formatDate(dayAfter)}\n\nOr type a date like "Feb 5" or "next Monday"`,
+    content: `${t("botChat.whatsapp.selectedService", { serviceName })}\n\n${t("botChat.whatsapp.selectDate")}\n\n1. ${todayLabel}\n2. ${tomorrowLabel}\n3. ${formatDate(dayAfter)}\n\n${t("botChat.whatsapp.orTypeDate")}`,
     buttons,
-    header: "Select Date",
+    header: t("botChat.whatsapp.selectDateHeader"),
   };
 }
 
@@ -149,19 +154,20 @@ function formatTimeSlotsForWhatsApp(
   serviceName: string,
   date: string,
   dateISO: string,
-  slots: ChatTimeSlot[]
+  slots: ChatTimeSlot[],
+  t: TranslatorFn
 ): OutgoingMessage {
   if (slots.length === 0) {
     return {
       to: "",
-      content: `Sorry, there are no available time slots for *${serviceName}* on *${date}*.\n\nPlease try another date.`,
+      content: t("botChat.whatsapp.noSlotsAvailable", { serviceName, date }),
     };
   }
 
   // For 3 or fewer slots, use buttons
   if (slots.length <= 3) {
     const buttons: MessageButton[] = slots.map((slot) => ({
-      id: `time_${dateISO}_${slot.displayTime}`,
+      id: `time_${slot.startTime}`,
       label: slot.displayTime,
     }));
 
@@ -171,20 +177,20 @@ function formatTimeSlotsForWhatsApp(
 
     return {
       to: "",
-      content: `Available times for *${serviceName}* on *${date}*:\n\n${slotsText}\n\nPlease select a time:`,
+      content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${slotsText}\n\n${t("botChat.whatsapp.selectTime")}`,
       buttons,
-      header: "Select Time",
+      header: t("botChat.whatsapp.selectTimeHeader"),
     };
   }
 
   // For more slots, use a list or numbered text
   const sections: ListSection[] = [
     {
-      title: "Available Times",
+      title: t("botChat.whatsapp.availableTimesTitle"),
       items: slots.slice(0, 10).map((slot) => ({
-        id: `time_${dateISO}_${slot.displayTime}`,
+        id: `time_${slot.startTime}`,
         title: slot.displayTime,
-        description: `Book ${serviceName} at ${slot.displayTime}`,
+        description: t("botChat.whatsapp.bookServiceAt", { serviceName, time: slot.displayTime }),
       })),
     },
   ];
@@ -195,21 +201,21 @@ function formatTimeSlotsForWhatsApp(
 
   return {
     to: "",
-    content: `Available times for *${serviceName}* on *${date}*:\n\n${slotsText}\n\nReply with the number of your preferred time, or select from the list:`,
+    content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${slotsText}\n\n${t("botChat.whatsapp.replyWithNumber")}`,
     listSections: sections,
-    listButtonText: "View Times",
+    listButtonText: t("botChat.whatsapp.viewTimes"),
   };
 }
 
 /**
  * Format booking confirmation card for WhatsApp
  */
-function formatBookingCardForWhatsApp(booking: ChatBookingData): OutgoingMessage {
+function formatBookingCardForWhatsApp(booking: ChatBookingData, t: TranslatorFn): OutgoingMessage {
   const statusEmoji = booking.status === "CONFIRMED" ? "✅" : "⏳";
 
   return {
     to: "",
-    content: `${statusEmoji} *Booking Confirmed!*\n\n📋 *Service:* ${booking.service}\n📅 *Date:* ${booking.date}\n🕐 *Time:* ${booking.time}\n⏱️ *Duration:* ${booking.duration}${booking.price ? `\n💰 *Price:* ${booking.price}` : ""}\n\n📝 *Booking ID:* ${booking.appointmentId.slice(-8).toUpperCase()}\n\nThank you for your booking! We look forward to seeing you.`,
+    content: `${statusEmoji} *${t("botChat.whatsapp.bookingConfirmedTitle")}*\n\n📋 *${t("botChat.whatsapp.bookingService")}* ${booking.service}\n📅 *${t("botChat.whatsapp.bookingDate")}* ${booking.date}\n🕐 *${t("botChat.whatsapp.bookingTime")}* ${booking.time}\n⏱️ *${t("botChat.whatsapp.bookingDuration")}* ${booking.duration}${booking.price ? `\n💰 *${t("botChat.whatsapp.bookingPrice")}* ${booking.price}` : ""}\n\n📝 *${t("botChat.whatsapp.bookingId")}* ${booking.appointmentId.slice(-8).toUpperCase()}\n\n${t("botChat.whatsapp.bookingThankYou")}`,
   };
 }
 
@@ -219,8 +225,11 @@ function formatBookingCardForWhatsApp(booking: ChatBookingData): OutgoingMessage
  */
 export function formatForWhatsApp(
   textContent: string,
-  ui?: ChatUIComponent
+  ui?: ChatUIComponent,
+  language?: string
 ): OutgoingMessage {
+  const t = getTranslator(language);
+
   // No UI component - just return the text
   if (!ui) {
     return {
@@ -232,21 +241,22 @@ export function formatForWhatsApp(
   // Format based on UI component type
   switch (ui.component) {
     case "service-selector":
-      return formatServicesForWhatsApp(ui.props.services);
+      return formatServicesForWhatsApp(ui.props.services, t);
 
     case "date-picker":
-      return formatDatePickerForWhatsApp(ui.props.serviceName);
+      return formatDatePickerForWhatsApp(ui.props.serviceName, t, language);
 
     case "time-slots":
       return formatTimeSlotsForWhatsApp(
         ui.props.serviceName,
         ui.props.date,
         ui.props.dateISO,
-        ui.props.slots
+        ui.props.slots,
+        t
       );
 
     case "booking-card":
-      return formatBookingCardForWhatsApp(ui.props);
+      return formatBookingCardForWhatsApp(ui.props, t);
 
     default:
       // Unknown UI component - just return the text
@@ -278,9 +288,7 @@ export function parseWhatsAppSelection(
       return { type: "date", value: replyId.replace("date_", "") };
     }
     if (replyId.startsWith("time_")) {
-      // Format: time_2025-01-28_09:00
-      const parts = replyId.replace("time_", "").split("_");
-      return { type: "time", value: `${parts[0]}T${parts[1]}:00` };
+      return { type: "time", value: replyId.replace("time_", "") };
     }
   }
 
@@ -308,9 +316,10 @@ export function formatTextMessage(to: string, content: string): OutgoingMessage 
 /**
  * Format an error message for WhatsApp
  */
-export function formatErrorMessage(to: string, error: string): OutgoingMessage {
+export function formatErrorMessage(to: string, error: string, language?: string): OutgoingMessage {
+  const t = getTranslator(language);
   return {
     to,
-    content: `❌ ${error}\n\nPlease try again or type "help" for assistance.`,
+    content: `❌ ${error}\n\n${t("botChat.whatsapp.errorRetry")}`,
   };
 }

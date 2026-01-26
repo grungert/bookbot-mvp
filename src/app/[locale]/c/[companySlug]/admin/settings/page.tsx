@@ -79,6 +79,7 @@ interface CompanySettings {
   primaryColor: string;
   timezone: string;
   currency: string;
+  language: string;
   aiApiKey: string | null;
   hasAiApiKey: boolean;
   aiEndpoint: string | null;
@@ -203,6 +204,7 @@ export default function SettingsPage() {
   const [primaryColor, setPrimaryColor] = useState("#3B82F6");
   const [timezone, setTimezone] = useState("Europe/Belgrade");
   const [currency, setCurrency] = useState("RSD");
+  const [language, setLanguage] = useState("en");
   const [aiApiKey, setAiApiKey] = useState("");
   const [hasExistingApiKey, setHasExistingApiKey] = useState(false);
   const [aiEndpoint, setAiEndpoint] = useState("");
@@ -437,6 +439,7 @@ export default function SettingsPage() {
       setPrimaryColor(settings.primaryColor || "#3B82F6");
       setTimezone(settings.timezone || "Europe/Belgrade");
       setCurrency(settings.currency || "RSD");
+      setLanguage(settings.language || "en");
       setAiApiKey(settings.aiApiKey || "");
       setHasExistingApiKey(settings.hasAiApiKey);
       setAiEndpoint(settings.aiEndpoint || "");
@@ -486,6 +489,7 @@ export default function SettingsPage() {
         primaryColor,
         timezone,
         currency,
+        language,
         aiEndpoint: aiEndpoint || null,
         aiModel: aiModel || null,
         aiSystemPrompt: aiSystemPrompt || null,
@@ -2273,18 +2277,35 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
-                  <Input
-                    id="aiGreeting"
-                    value={aiGreeting}
-                    onChange={(e) => setAiGreeting(e.target.value)}
-                    placeholder="Hello! How can I help you today?"
-                    className="h-10"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("aiGreetingDescription")}
-                  </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
+                    <Input
+                      id="aiGreeting"
+                      value={aiGreeting}
+                      onChange={(e) => setAiGreeting(e.target.value)}
+                      placeholder="Hello! How can I help you today?"
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("aiGreetingDescription")}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="language" className="text-sm font-medium">{t("language")}</Label>
+                    <Select value={language} onValueChange={setLanguage}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="sr">Srpski</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t("languageHint")}
+                    </p>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>

@@ -6,6 +6,8 @@ import { format, addDays, startOfDay, endOfDay } from "date-fns";
 import { getPersonalityPrompt } from "@/lib/ai/personalities";
 import { TOOL_INSTRUCTIONS } from "@/lib/ai/tools";
 import { getChatHistory, MAX_CHAT_HISTORY_MESSAGES } from "@/lib/ai/chat";
+import { getTranslator } from "@/lib/i18n/backend";
+import { getDateLocale } from "@/lib/i18n/date-locale";
 
 interface RouteParams {
   params: Promise<{ companySlug: string }>;
@@ -27,6 +29,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     // Get current user for context preview
     const currentUser = await getCurrentUser();
+
+    // Language and locale setup
+    const language = company.language || "en";
+    const dateLocale = getDateLocale(language);
 
     // Get company documents
     const documents = await prisma.document.findMany({
@@ -75,7 +81,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
       upcomingAppointments = upcoming.map(
         (a) =>
-          `- ${format(a.startTime, "EEEE, MMM d")} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
+          `- ${format(a.startTime, "EEEE, MMM d", { locale: dateLocale })} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
       );
 
       const recent = await prisma.appointment.findMany({
@@ -91,7 +97,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
       recentAppointments = recent.map(
         (a) =>
-          `- ${format(a.startTime, "MMM d, yyyy")} - ${a.service.name} (${a.status})`
+          `- ${format(a.startTime, "MMM d, yyyy", { locale: dateLocale })} - ${a.service.name} (${a.status})`
       );
     }
 
@@ -133,9 +139,17 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // Build the system prompt (similar to buildSystemPrompt in chat.ts)
     const botName = company.aiBotName || "Assistant";
     const personalityPrompt = getPersonalityPrompt(company.aiPersonality);
-    const today = format(new Date(), "EEEE, MMMM d, yyyy");
+    const today = format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale });
 
-    let prompt = `You are ${botName}, a booking assistant for ${company.name}.
+    // Language instruction for non-English languages
+    const t = getTranslator(language);
+    const languageNames: Record<string, string> = { en: "English", sr: "Serbian" };
+    const languageName = languageNames[language] || "English";
+    const languageInstruction = language !== "en"
+      ? `${t("botChat.languageInstruction", { languageName })}\n\n`
+      : "";
+
+    let prompt = `${languageInstruction}You are ${botName}, a booking assistant for ${company.name}.
 
 ## Bot Identity
 - **Name:** ${botName}
