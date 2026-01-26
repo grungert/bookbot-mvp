@@ -52,6 +52,7 @@ export default async function PricingPage({ params }: PricingPageProps) {
     maxCompanies: plan.maxCompanies,
     extraCompanyPrice: plan.extraCompanyPrice?.toNumber() ?? null,
     maxChatMessagesPerMonth: plan.maxChatMessagesPerMonth,
+    maxChatTokensPerMonth: plan.maxChatTokensPerMonth,
     maxDocumentsPerCompany: plan.maxDocumentsPerCompany,
     customBranding: plan.customBranding,
     prioritySupport: plan.prioritySupport,

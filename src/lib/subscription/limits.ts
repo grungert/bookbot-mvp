@@ -19,6 +19,7 @@ export interface SubscriptionWithPlan {
     maxCompanies: number;
     extraCompanyPrice: number | null;
     maxChatMessagesPerMonth: number;
+    maxChatTokensPerMonth: number;
     maxDocumentsPerCompany: number | null;
     customBranding: boolean;
     prioritySupport: boolean;
@@ -43,6 +44,7 @@ export async function getUserSubscription(
           maxCompanies: true,
           extraCompanyPrice: true,
           maxChatMessagesPerMonth: true,
+          maxChatTokensPerMonth: true,
           maxDocumentsPerCompany: true,
           customBranding: true,
           prioritySupport: true,

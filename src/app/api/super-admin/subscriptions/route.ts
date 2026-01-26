@@ -55,6 +55,7 @@ export async function GET(request: Request) {
             tier: true,
             priceMonthly: true,
             maxChatMessagesPerMonth: true,
+            maxChatTokensPerMonth: true,
             baseCompanies: true,
             maxCompanies: true,
           },
@@ -90,11 +91,12 @@ export async function GET(request: Request) {
       select: {
         userId: true,
         messageCount: true,
+        tokenCount: true,
       },
     });
 
     const chatUsageMap = new Map(
-      chatUsages.map((u) => [u.userId, u.messageCount])
+      chatUsages.map((u) => [u.userId, u.tokenCount])
     );
 
     // Format response
@@ -114,6 +116,7 @@ export async function GET(request: Request) {
         tier: sub.plan.tier,
         priceMonthly: sub.plan.priceMonthly.toNumber(),
         maxChatMessagesPerMonth: sub.plan.maxChatMessagesPerMonth,
+        maxChatTokensPerMonth: sub.plan.maxChatTokensPerMonth,
         baseCompanies: sub.plan.baseCompanies,
         maxCompanies: sub.plan.maxCompanies,
       },

@@ -45,6 +45,7 @@ import {
   BotOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 
 interface Subscription {
   id: string;
@@ -62,6 +63,7 @@ interface Subscription {
     tier: string;
     priceMonthly: number;
     maxChatMessagesPerMonth: number;
+    maxChatTokensPerMonth: number;
     baseCompanies: number;
     maxCompanies: number;
   };
@@ -312,16 +314,16 @@ export default function SubscriptionsPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Chat Usage (Month)
+                Token Usage (Month)
               </CardTitle>
               <MessageSquare className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats.totalChatUsageThisMonth.toLocaleString()}
+                {formatTokenCount(stats.totalChatUsageThisMonth)}
               </div>
               <p className="text-xs text-muted-foreground">
-                Total messages this month
+                Total tokens this month
               </p>
             </CardContent>
           </Card>
@@ -444,7 +446,7 @@ export default function SubscriptionsPage() {
               <TableHead>Status</TableHead>
               <TableHead>Chatbot</TableHead>
               <TableHead>Companies</TableHead>
-              <TableHead>Chat Usage</TableHead>
+              <TableHead>Token Usage</TableHead>
               <TableHead>Trial/Period End</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -459,11 +461,11 @@ export default function SubscriptionsPage() {
             ) : (
               filteredSubscriptions.map((sub) => {
                 const chatUsagePercent =
-                  sub.plan.maxChatMessagesPerMonth === -1
+                  sub.plan.maxChatTokensPerMonth === -1
                     ? 0
                     : Math.round(
                         (sub.chatUsageThisMonth /
-                          sub.plan.maxChatMessagesPerMonth) *
+                          sub.plan.maxChatTokensPerMonth) *
                           100
                       );
 
@@ -524,11 +526,11 @@ export default function SubscriptionsPage() {
                       <div className="flex items-center gap-2">
                         <MessageSquare className="h-4 w-4 text-muted-foreground" />
                         <span>
-                          {sub.chatUsageThisMonth.toLocaleString()}
-                          {sub.plan.maxChatMessagesPerMonth !== -1 && (
+                          {formatTokenCount(sub.chatUsageThisMonth)}
+                          {sub.plan.maxChatTokensPerMonth !== -1 && (
                             <span className="text-muted-foreground">
                               {" "}
-                              / {sub.plan.maxChatMessagesPerMonth.toLocaleString()}
+                              / {formatTokenCount(sub.plan.maxChatTokensPerMonth)}
                             </span>
                           )}
                         </span>

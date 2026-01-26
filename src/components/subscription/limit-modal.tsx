@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 
 export type LimitType = "CHAT_LIMIT" | "DOCUMENT_LIMIT" | "COMPANY_LIMIT";
 
@@ -98,7 +99,7 @@ export function LimitModal({
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t("currentUsage")}</span>
               <span className="font-semibold text-destructive">
-                {currentUsage.toLocaleString()} / {limit.toLocaleString()}
+                {limitType === "CHAT_LIMIT" ? formatTokenCount(currentUsage) : currentUsage.toLocaleString()} / {limitType === "CHAT_LIMIT" ? formatTokenCount(limit) : limit.toLocaleString()}
               </span>
             </div>
             <div className="mt-2 h-2 w-full bg-muted rounded-full overflow-hidden">

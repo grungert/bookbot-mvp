@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 
 interface UsageMeterProps {
   label: string;
@@ -11,6 +12,7 @@ interface UsageMeterProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   color?: string; // Custom color (hex) for the progress bar
+  formatAsTokens?: boolean;
 }
 
 export function UsageMeter({
@@ -22,6 +24,7 @@ export function UsageMeter({
   className,
   size = "md",
   color,
+  formatAsTokens = false,
 }: UsageMeterProps) {
   const percentage = unlimited ? 0 : Math.min(100, Math.round((used / limit) * 100));
   const isWarning = percentage >= 80 && percentage < 100;
@@ -49,10 +52,10 @@ export function UsageMeter({
           style={barColor && isExceeded ? { color: barColor, fontWeight: 500 } : undefined}
         >
           {unlimited ? (
-            <span className="text-muted-foreground">{used} used</span>
+            <span className="text-muted-foreground">{formatAsTokens ? formatTokenCount(used) : used} used</span>
           ) : (
             <>
-              {used.toLocaleString()} / {limit.toLocaleString()}
+              {formatAsTokens ? formatTokenCount(used) : used.toLocaleString()} / {formatAsTokens ? formatTokenCount(limit) : limit.toLocaleString()}
               {showPercentage && (
                 <span className="ml-1 text-xs">({percentage}%)</span>
               )}

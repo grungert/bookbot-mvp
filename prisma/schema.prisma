@@ -388,6 +388,9 @@ model ChatSession {
   isRead      Boolean @default(false)  // Mark as reviewed by admin
   isImportant Boolean @default(false)  // Flag important conversations
 
+  // Booking flow state machine (JSON: BookingState)
+  bookingState Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -411,6 +414,10 @@ model ChatMessage {
   // Channel delivery tracking
   status        String?   // "sent" | "delivered" | "read" | "failed"
   externalMsgId String?   // WhatsApp/Twilio message SID
+
+  // Token usage tracking
+  inputTokens   Int?
+  outputTokens  Int?
 
   createdAt DateTime    @default(now())
 
@@ -468,7 +475,8 @@ model Plan {
   baseCompanies           Int       // Companies included in base price
   maxCompanies            Int       // Max companies allowed (-1 = unlimited)
   extraCompanyPrice       Decimal?  @db.Decimal(10, 2) // Price per extra company
-  maxChatMessagesPerMonth Int       // SHARED across all companies
+  maxChatMessagesPerMonth Int       // SHARED across all companies (legacy, kept for analytics)
+  maxChatTokensPerMonth   Int       @default(50000) // SHARED across all companies (-1 = unlimited)
   maxDocumentsPerCompany  Int?      // Per-company doc limit (-1 = unlimited)
 
   // Trial settings
@@ -531,6 +539,7 @@ model ChatUsage {
   periodStart   DateTime // First day of month
   periodEnd     DateTime // Last day of month
   messageCount  Int      @default(0)
+  tokenCount    Int      @default(0)
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

@@ -51,15 +51,15 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
     },
   });
 
-  const currentUsage = usage?.messageCount ?? 0;
+  const currentUsage = usage?.tokenCount ?? 0;
 
   if (!subscription) {
-    // No subscription - use default limit (50 messages)
+    // No subscription - use default token limit
     return {
-      allowed: currentUsage < 50,
-      reason: currentUsage >= 50 ? "Monthly chat limit reached" : null,
+      allowed: currentUsage < 50000,
+      reason: currentUsage >= 50000 ? "Monthly token limit reached" : null,
       currentUsage,
-      limit: 50,
+      limit: 50000,
       unlimited: false,
       resetsAt: periodEnd,
     };
@@ -75,13 +75,13 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
           ? "Trial period has ended"
           : "Subscription not active",
       currentUsage,
-      limit: subscription.plan.maxChatMessagesPerMonth,
+      limit: subscription.plan.maxChatTokensPerMonth,
       unlimited: false,
       resetsAt: periodEnd,
     };
   }
 
-  const limit = subscription.plan.maxChatMessagesPerMonth;
+  const limit = subscription.plan.maxChatTokensPerMonth;
 
   // Unlimited check (-1 means unlimited)
   if (limit === -1) {
@@ -99,7 +99,7 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
     allowed: currentUsage < limit,
     reason:
       currentUsage >= limit
-        ? "Monthly chat limit reached across all companies"
+        ? "Monthly token limit reached across all companies"
         : null,
     currentUsage,
     limit,
@@ -114,7 +114,8 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
  */
 export async function incrementChatUsage(
   userId: string,
-  count: number = 1
+  count: number = 1,
+  tokenData?: { inputTokens: number; outputTokens: number; totalTokens: number }
 ): Promise<number> {
   const { periodStart, periodEnd } = getCurrentPeriodBoundaries();
 
@@ -129,16 +130,20 @@ export async function incrementChatUsage(
       messageCount: {
         increment: count,
       },
+      tokenCount: {
+        increment: tokenData?.totalTokens ?? 0,
+      },
     },
     create: {
       userId,
       periodStart,
       periodEnd,
       messageCount: count,
+      tokenCount: tokenData?.totalTokens ?? 0,
     },
   });
 
-  return result.messageCount;
+  return result.tokenCount;
 }
 
 /**
@@ -178,9 +183,9 @@ export async function getChatUsageStats(userId: string): Promise<{
     }),
   ]);
 
-  const limit = subscription?.plan.maxChatMessagesPerMonth ?? 50;
+  const limit = subscription?.plan.maxChatTokensPerMonth ?? 50000;
   const unlimited = limit === -1;
-  const used = currentUsage?.messageCount ?? 0;
+  const used = currentUsage?.tokenCount ?? 0;
 
   return {
     currentPeriod: {

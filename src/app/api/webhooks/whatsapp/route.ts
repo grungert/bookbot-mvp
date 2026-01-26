@@ -3,6 +3,10 @@
  *
  * Handles incoming WhatsApp messages via Meta Cloud API webhook.
  * Processes messages through the AI chat engine and sends responses back.
+ *
+ * Booking flow optimization: button/list replies with booking IDs
+ * (service_xxx, date_xxx, time_xxx) bypass the LLM and are handled
+ * directly by the booking state machine.
  */
 
 import { NextResponse } from "next/server";
@@ -26,7 +30,16 @@ import {
   incrementChatUsage,
   checkSubscriptionActive,
 } from "@/lib/subscription";
-import { formatForWhatsApp } from "@/lib/channels/formatter";
+import {
+  formatForWhatsApp,
+  parseWhatsAppSelection,
+} from "@/lib/channels/formatter";
+import {
+  handleBookingSelection,
+  getBookingState,
+  type BookingAction,
+} from "@/lib/ai/booking-flow";
+import type { ToolContext } from "@/lib/ai/tool-handlers";
 import type { ChatUIComponent, RichMessage } from "@/components/chat/types";
 
 /**
@@ -70,6 +83,35 @@ function parseRichMessage(content: string): { text: string; ui?: ChatUIComponent
     return { text: content };
   } catch {
     return { text: content };
+  }
+}
+
+/**
+ * Convert a WhatsApp selection to a BookingAction
+ */
+function selectionToBookingAction(
+  selection: { type: "service" | "date" | "time" | "text"; value: string },
+  content: string
+): BookingAction | null {
+  switch (selection.type) {
+    case "service":
+      return {
+        type: "service",
+        serviceId: selection.value,
+        serviceName: content, // Button text is the service name
+      };
+    case "date":
+      return {
+        type: "date",
+        date: selection.value, // YYYY-MM-DD
+      };
+    case "time":
+      return {
+        type: "time",
+        startTime: selection.value, // ISO datetime
+      };
+    default:
+      return null;
   }
 }
 
@@ -175,7 +217,7 @@ export async function POST(request: Request) {
     if (!chatLimitResult.allowed) {
       console.error("Chat limit exceeded for company:", company.id);
       const errorMessage = formatForWhatsApp(
-        "Sorry, we've reached our message limit for this month. Please try again next month or contact us directly to book.",
+        "Sorry, we've reached our usage limit for this month. Please try again next month or contact us directly to book.",
         undefined
       );
       errorMessage.to = phoneNumber;
@@ -207,6 +249,76 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    // --- Booking selection bypass: handle button/list replies directly (no LLM) ---
+    const messageType = incomingMessage.metadata.messageType || "text";
+    const replyId = incomingMessage.metadata.replyId;
+
+    if (replyId && (messageType === "button_reply" || messageType === "list_reply")) {
+      const selection = parseWhatsAppSelection(messageType, userMessage, replyId);
+
+      if (selection && selection.type !== "text") {
+        const bookingAction = selectionToBookingAction(selection, userMessage);
+
+        if (bookingAction) {
+          // Check if we have an active booking state (or will create one lazily)
+          const bookingState = await getBookingState(sessionId);
+
+          // Only bypass if we have active state OR it's a service selection (which creates state lazily)
+          if (bookingState?.active || bookingAction.type === "service") {
+            // Save user message
+            await saveChatMessage(sessionId, "user", userMessage);
+            if (incomingMessage.metadata.messageId) {
+              await prisma.chatMessage.updateMany({
+                where: { sessionId, role: "user", content: userMessage },
+                data: { externalMsgId: incomingMessage.metadata.messageId, status: "delivered" },
+              });
+            }
+
+            const toolContext: ToolContext = {
+              companyId: company.id,
+              companyName: companyDetails.name,
+              sessionId,
+            };
+
+            // Look up user for the tool context
+            const session = await prisma.chatSession.findUnique({
+              where: { id: sessionId },
+              include: { user: true },
+            });
+            if (session?.user) {
+              toolContext.userId = session.user.id;
+              toolContext.userEmail = session.user.email;
+              toolContext.userName = session.user.name || undefined;
+            }
+
+            const result = await handleBookingSelection(toolContext, sessionId, bookingAction);
+
+            // Save assistant response (0 tokens - no LLM)
+            await saveChatMessage(sessionId, "assistant", result.assistantMessage, 0, 0);
+
+            // Parse and format for WhatsApp
+            const { text, ui } = parseRichMessage(result.assistantMessage);
+            const outgoingMessage = formatForWhatsApp(text, ui);
+            outgoingMessage.to = phoneNumber;
+
+            const sendResult = await whatsappAdapter.send(outgoingMessage, company.id);
+
+            if (sendResult.success && sendResult.messageId) {
+              await prisma.chatMessage.updateMany({
+                where: { sessionId, role: "assistant", content: result.assistantMessage },
+                data: { externalMsgId: sendResult.messageId, status: "sent" },
+              });
+            }
+
+            return NextResponse.json({ success: true });
+          }
+          // No active state and not a service selection — fall through to LLM
+        }
+      }
+    }
+
+    // --- Normal LLM flow ---
 
     // Get chat history
     const history = await getChatHistory(sessionId);
@@ -256,8 +368,11 @@ export async function POST(request: Request) {
       };
     }
 
+    // Load booking state for LLM context
+    const bookingState = await getBookingState(sessionId);
+
     // Generate AI response
-    const response = await chat(
+    const { response, usage } = await chat(
       companyContext,
       {
         apiKey: companyDetails.aiApiKey,
@@ -268,11 +383,12 @@ export async function POST(request: Request) {
       messages,
       userMessage,
       userContext,
-      sessionId
+      sessionId,
+      bookingState
     );
 
-    // Save assistant response
-    await saveChatMessage(sessionId, "assistant", response);
+    // Save assistant response with token usage
+    await saveChatMessage(sessionId, "assistant", response, usage.inputTokens, usage.outputTokens);
 
     // Parse the response for rich content
     const { text, ui } = parseRichMessage(response);
@@ -299,8 +415,8 @@ export async function POST(request: Request) {
       });
     }
 
-    // Increment chat usage
-    await incrementChatUsage(ownerId, 1);
+    // Increment chat usage with token data
+    await incrementChatUsage(ownerId, 1, usage);
 
     return NextResponse.json({ success: true });
   } catch (error) {

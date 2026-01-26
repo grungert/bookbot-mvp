@@ -89,6 +89,7 @@ export async function GET() {
       },
       _sum: {
         messageCount: true,
+        tokenCount: true,
       },
     });
 
@@ -109,7 +110,7 @@ export async function GET() {
       usersWithoutSubscription,
       monthlyRevenue,
       trialsExpiringSoon,
-      totalChatUsageThisMonth: totalChatUsage._sum.messageCount || 0,
+      totalChatUsageThisMonth: totalChatUsage._sum.tokenCount || 0,
       byStatus: formattedStatusCounts,
       byPlanTier: planTierCounts,
     });

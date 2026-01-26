@@ -20,6 +20,7 @@ const plans = [
     maxCompanies: 1,
     extraCompanyPrice: null,
     maxChatMessagesPerMonth: 50,
+    maxChatTokensPerMonth: 50000,
     maxDocumentsPerCompany: 3,
     trialDays: 14,
     customBranding: false,
@@ -34,6 +35,7 @@ const plans = [
     maxCompanies: 10, // Can buy up to 10 total
     extraCompanyPrice: 15, // +$15 per extra company
     maxChatMessagesPerMonth: 1000,
+    maxChatTokensPerMonth: 1000000,
     maxDocumentsPerCompany: 20,
     trialDays: null,
     customBranding: true,
@@ -48,6 +50,7 @@ const plans = [
     maxCompanies: -1,
     extraCompanyPrice: null,
     maxChatMessagesPerMonth: 10000,
+    maxChatTokensPerMonth: 10000000,
     maxDocumentsPerCompany: -1, // Unlimited
     trialDays: null,
     customBranding: true,

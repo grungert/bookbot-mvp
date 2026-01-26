@@ -10,8 +10,10 @@ import type {
   GetAvailableSlotsParams,
   CreateBookingParams,
   SearchAppointmentsParams,
+  UpdateBookingStateParams,
 } from "./tools";
 import type { ChatUIComponent } from "@/components/chat/types";
+import { handleUpdateBookingState } from "./booking-flow";
 
 // Context passed to tool handlers
 export interface ToolContext {
@@ -20,6 +22,7 @@ export interface ToolContext {
   userId?: string;
   userEmail?: string;
   userName?: string;
+  sessionId?: string;
 }
 
 // Result returned from tool handlers
@@ -46,6 +49,15 @@ export async function executeToolAction(
       return handleCreateBooking(context, params);
     case "searchAppointments":
       return handleSearchAppointments(context, params);
+    case "updateBookingState":
+      if (!context.sessionId) {
+        return { success: false, userMessage: "Session not available for booking state update." };
+      }
+      return handleUpdateBookingState(context, context.sessionId, {
+        serviceId: params.serviceId,
+        serviceName: params.serviceName,
+        date: params.date,
+      });
     default:
       return {
         success: false,

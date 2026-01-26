@@ -5,6 +5,13 @@ import { getPersonalityPrompt } from "./personalities";
 import { TOOL_INSTRUCTIONS, type ToolParams } from "./tools";
 import { executeToolAction, type ToolContext, type ToolResult } from "./tool-handlers";
 import { createRichMessageContent } from "@/components/chat/message-parser";
+import { estimateTokens } from "@/lib/document-tokens";
+import type { BookingState } from "./booking-flow";
+
+export interface ChatResult {
+  response: string;
+  usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+}
 
 interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -36,7 +43,7 @@ export interface UserContext {
 }
 
 // Maximum tool loop iterations to prevent infinite loops
-const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOOL_ITERATIONS = 8;
 
 // Maximum chat history messages to include (to avoid token limits)
 // This keeps the last N messages (user + assistant pairs)
@@ -344,10 +351,30 @@ export async function chat(
   messages: ChatMessage[],
   userMessage: string,
   user: UserContext | null,
-  sessionId: string
-): Promise<string> {
+  sessionId: string,
+  bookingState?: BookingState | null
+): Promise<ChatResult> {
   const client = createClient(config);
-  const systemPrompt = await buildSystemPrompt(company, user, config.systemPrompt);
+  let systemPrompt = await buildSystemPrompt(company, user, config.systemPrompt);
+
+  // Inject booking state context when active
+  if (bookingState?.active) {
+    systemPrompt += `
+
+ACTIVE BOOKING STATE:
+${JSON.stringify(bookingState, null, 2)}
+
+The user is currently in the booking flow at step "${bookingState.step}".
+${bookingState.serviceId ? `Selected service: ${bookingState.serviceName} (ID: ${bookingState.serviceId})` : "No service selected yet."}
+${bookingState.date ? `Selected date: ${bookingState.date}` : ""}
+
+IMPORTANT - When the user mentions booking details in text (e.g. "eye exam on January 18" or "tomorrow"):
+- Use the updateBookingState tool to set the extracted fields (serviceId, serviceName, date)
+- The system will automatically show the next step UI
+- Example: User says "eye exam on January 18" → <action>{"tool": "updateBookingState", "serviceId": "ID_OF_EYE_EXAM", "serviceName": "Eye Exam", "date": "2026-01-18"}</action>
+- Example: User says "tomorrow" during date step → <action>{"tool": "updateBookingState", "date": "YYYY-MM-DD"}</action>
+- Match service names to their IDs from the AVAILABLE SERVICES list above`;
+  }
 
   const allMessages: ChatMessage[] = [
     { role: "system", content: systemPrompt },
@@ -362,10 +389,13 @@ export async function chat(
     userId: user?.id,
     userEmail: user?.email,
     userName: user?.name || undefined,
+    sessionId,
   };
 
   let iterations = 0;
   let lastToolResult: ToolResult | null = null;
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
@@ -379,6 +409,10 @@ export async function chat(
       });
 
       const response = completion.choices[0]?.message?.content || "";
+
+      // Accumulate token usage
+      totalInputTokens += completion.usage?.prompt_tokens ?? estimateTokens(allMessages.map(m => m.content).join(''));
+      totalOutputTokens += completion.usage?.completion_tokens ?? estimateTokens(response);
 
       // Check for action block
       const action = parseAction(response);
@@ -402,10 +436,12 @@ export async function chat(
         // Always clean the response - remove any JSON wrapper and action blocks the LLM may have added
         const cleanResponse = removeActionBlock(extractPlainText(response));
 
+        const usage = { inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens };
+
         if (lastToolResult?.ui) {
-          return createRichMessageContent(cleanResponse, lastToolResult.ui);
+          return { response: createRichMessageContent(cleanResponse, lastToolResult.ui), usage };
         }
-        return cleanResponse;
+        return { response: cleanResponse, usage };
       }
 
       // Execute the tool
@@ -437,6 +473,9 @@ Result: ${result.userMessage}
           case "createBooking":
             resultMessage += `\n\nThe booking has been created and confirmation card is displayed. Thank the user and ask if they need anything else.`;
             break;
+          case "updateBookingState":
+            resultMessage += `\n\nThe booking state has been updated and the appropriate UI is displayed. Acknowledge what was set and wait for the user's next selection.`;
+            break;
         }
       }
 
@@ -453,20 +492,27 @@ Result: ${result.userMessage}
   }
 
   // Max iterations reached - return last response or error
-  return "I'm sorry, I encountered an issue processing your request. Please try again.";
+  return {
+    response: "I'm sorry, I encountered an issue processing your request. Please try again.",
+    usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens, totalTokens: totalInputTokens + totalOutputTokens },
+  };
 }
 
 // Save chat message to database
 export async function saveChatMessage(
   sessionId: string,
   role: string,
-  content: string
+  content: string,
+  inputTokens?: number,
+  outputTokens?: number
 ) {
   return prisma.chatMessage.create({
     data: {
       sessionId,
       role,
       content,
+      inputTokens,
+      outputTokens,
     },
   });
 }

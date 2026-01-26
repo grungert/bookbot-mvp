@@ -174,6 +174,48 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     }
   };
 
+  // Send a structured booking action (bypasses LLM)
+  const sendBookingAction = async (
+    displayMessage: string,
+    bookingAction: { type: string; serviceId?: string; serviceName?: string; date?: string; startTime?: string }
+  ) => {
+    if (isLoading) return;
+
+    setMessages((prev) => [...prev, { role: "user", content: displayMessage }]);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`/api/c/${companySlug}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: displayMessage,
+          sessionId,
+          bookingAction,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to process booking action");
+      }
+
+      const data = await response.json();
+      setSessionId(data.sessionId);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.message },
+      ]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: t("errorMessage") },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -183,28 +225,42 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     await sendMessage(userMessage);
   }
 
-  // UI Interaction handlers - these create synthetic user messages
+  // UI Interaction handlers - send structured booking actions (bypasses LLM)
   const handleServiceSelect = useCallback(
     (service: ChatService) => {
-      sendMessage(`I'd like to book ${service.name}`);
+      sendBookingAction(`I'd like to book ${service.name}`, {
+        type: "service",
+        serviceId: service.id,
+        serviceName: service.name,
+      });
     },
-    [sendMessage]
+    [sendBookingAction]
   );
 
   const handleDateSelect = useCallback(
     (date: Date, _serviceId: string, serviceName: string) => {
       const formattedDate = format(date, "MMMM d, yyyy");
-      sendMessage(`I'd like to book ${serviceName} on ${formattedDate}`);
+      const dateISO = format(date, "yyyy-MM-dd");
+      sendBookingAction(`I'd like to book ${serviceName} on ${formattedDate}`, {
+        type: "date",
+        date: dateISO,
+      });
     },
-    [sendMessage]
+    [sendBookingAction]
   );
 
   const handleTimeSelect = useCallback(
     (slot: ChatTimeSlot, _serviceId: string, dateISO: string, serviceName: string) => {
       const formattedDate = format(parseISO(dateISO), "MMMM d, yyyy");
-      sendMessage(`I'd like the ${slot.displayTime} slot for ${serviceName} on ${formattedDate}`);
+      sendBookingAction(
+        `I'd like the ${slot.displayTime} slot for ${serviceName} on ${formattedDate}`,
+        {
+          type: "time",
+          startTime: slot.startTime,
+        }
+      );
     },
-    [sendMessage]
+    [sendBookingAction]
   );
 
   // Callbacks for UI components

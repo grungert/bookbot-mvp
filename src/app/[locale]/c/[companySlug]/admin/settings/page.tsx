@@ -1872,6 +1872,7 @@ export default function SettingsPage() {
                     unlimited={subscriptionData.chatUsage.unlimited}
                     showPercentage={true}
                     color={primaryColor}
+                    formatAsTokens={true}
                   />
                   <p className="text-xs text-muted-foreground">
                     {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}

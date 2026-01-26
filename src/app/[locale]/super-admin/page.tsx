@@ -1,5 +1,6 @@
 import { setRequestLocale } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/routing";
@@ -69,7 +70,7 @@ export default async function SuperAdminDashboard({
     }),
     prisma.chatUsage.aggregate({
       where: { periodStart },
-      _sum: { messageCount: true },
+      _sum: { tokenCount: true },
     }),
   ]);
 
@@ -151,8 +152,8 @@ export default async function SuperAdminDashboard({
       color: needsAttention > 0 ? "text-amber-500" : "text-muted-foreground",
     },
     {
-      title: "Chat Messages",
-      value: (totalChatUsage._sum.messageCount || 0).toLocaleString(),
+      title: "AI Tokens",
+      value: formatTokenCount(totalChatUsage._sum.tokenCount || 0),
       subtitle: "This month",
       icon: MessageSquare,
       color: "text-purple-500",

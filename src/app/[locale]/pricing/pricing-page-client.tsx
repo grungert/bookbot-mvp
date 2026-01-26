@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
 import type { PlanTier, SubscriptionStatus } from "@prisma/client";
 
@@ -31,6 +32,7 @@ interface Plan {
   maxCompanies: number;
   extraCompanyPrice: number | null;
   maxChatMessagesPerMonth: number;
+  maxChatTokensPerMonth: number;
   maxDocumentsPerCompany: number | null;
   customBranding: boolean;
   prioritySupport: boolean;
@@ -98,8 +100,8 @@ export function PricingPageClient({
         }
         return plan.baseCompanies.toString();
       case "chat":
-        if (plan.maxChatMessagesPerMonth === -1) return t("unlimited");
-        return plan.maxChatMessagesPerMonth.toLocaleString();
+        if (plan.maxChatTokensPerMonth === -1) return t("unlimited");
+        return formatTokenCount(plan.maxChatTokensPerMonth);
       case "documents":
         if (plan.maxDocumentsPerCompany === null || plan.maxDocumentsPerCompany === -1)
           return t("unlimited");
@@ -308,10 +310,10 @@ export function PricingPageClient({
                     <li className="flex items-center gap-3 text-sm">
                       <MessageSquare className="h-4 w-4 text-primary" />
                       <span>
-                        {plan.maxChatMessagesPerMonth === -1
+                        {plan.maxChatTokensPerMonth === -1
                           ? t("unlimitedChatMessages")
                           : t("chatMessagesCount", {
-                              count: plan.maxChatMessagesPerMonth,
+                              count: formatTokenCount(plan.maxChatTokensPerMonth),
                             })}
                       </span>
                     </li>

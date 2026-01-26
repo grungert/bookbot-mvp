@@ -16,11 +16,28 @@ import {
   incrementChatUsage,
   checkSubscriptionActive,
 } from "@/lib/subscription";
+import {
+  handleBookingSelection,
+  getBookingState,
+  type BookingAction,
+} from "@/lib/ai/booking-flow";
+import type { ToolContext } from "@/lib/ai/tool-handlers";
 import { z } from "zod";
+
+const bookingActionSchema = z.object({
+  type: z.enum(["service", "date", "time"]),
+  serviceId: z.string().optional(),
+  serviceName: z.string().optional(),
+  date: z.string().optional(),
+  dateISO: z.string().optional(),
+  time: z.string().optional(),
+  startTime: z.string().optional(),
+});
 
 const chatRequestSchema = z.object({
   message: z.string().min(1),
   sessionId: z.string().nullish(), // Allow null, undefined, or string
+  bookingAction: bookingActionSchema.optional(),
 });
 
 interface RouteParams {
@@ -78,7 +95,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (!chatLimitResult.allowed) {
       return NextResponse.json(
         {
-          error: "Monthly chat limit reached across all companies",
+          error: "Monthly token limit reached across all companies",
           code: "CHAT_LIMIT_EXCEEDED",
           currentUsage: chatLimitResult.currentUsage,
           limit: chatLimitResult.limit,
@@ -100,7 +117,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { message, sessionId: existingSessionId } = parsed.data;
+    const { message, sessionId: existingSessionId, bookingAction } = parsed.data;
 
     // Get or create session
     let session;
@@ -117,6 +134,37 @@ export async function POST(request: Request, { params }: RouteParams) {
       session = await getOrCreateChatSession(company.id, currentUser?.id);
     }
 
+    // --- Booking action bypass: handle option clicks directly (no LLM) ---
+    if (bookingAction) {
+      // Save user message (human-readable text for chat history)
+      await saveChatMessage(session.id, "user", message);
+
+      const toolContext: ToolContext = {
+        companyId: company.id,
+        companyName: company.name,
+        userId: currentUser?.id,
+        userEmail: currentUser?.email || undefined,
+        userName: currentUser?.name || undefined,
+        sessionId: session.id,
+      };
+
+      const result = await handleBookingSelection(
+        toolContext,
+        session.id,
+        bookingAction as BookingAction
+      );
+
+      // Save assistant response (0 tokens - no LLM used)
+      await saveChatMessage(session.id, "assistant", result.assistantMessage, 0, 0);
+
+      return NextResponse.json({
+        sessionId: session.id,
+        message: result.assistantMessage,
+      });
+    }
+
+    // --- Normal LLM flow ---
+
     // Get chat history
     const history = await getChatHistory(session.id);
     const messages = history.map((m) => ({
@@ -126,6 +174,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Save user message
     await saveChatMessage(session.id, "user", message);
+
+    // Load booking state for LLM context
+    const bookingState = await getBookingState(session.id);
 
     // Build company context with personality settings
     const companyContext: CompanyContext = {
@@ -148,7 +199,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         : null;
 
     // Generate response with enhanced context
-    const response = await chat(
+    const { response, usage } = await chat(
       companyContext,
       {
         apiKey: company.aiApiKey,
@@ -159,14 +210,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       messages,
       message,
       userContext,
-      session.id
+      session.id,
+      bookingState
     );
 
-    // Save assistant response
-    await saveChatMessage(session.id, "assistant", response);
+    // Save assistant response with token usage
+    await saveChatMessage(session.id, "assistant", response, usage.inputTokens, usage.outputTokens);
 
     // Increment chat usage at user level (owner pays for all company usage)
-    await incrementChatUsage(ownerId, 1);
+    await incrementChatUsage(ownerId, 1, usage);
 
     return NextResponse.json({
       sessionId: session.id,
