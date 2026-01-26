@@ -61,6 +61,7 @@ import {
   LayoutList,
   X,
   RefreshCw,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -79,6 +80,7 @@ interface ChatSession {
   id: string;
   userId: string | null;
   user: ChatUser | null;
+  channel: string;
   messageCount: number;
   isRead: boolean;
   isImportant: boolean;
@@ -117,6 +119,7 @@ interface UserGroup {
   unreadCount: number;
   sessions: Array<{
     id: string;
+    channel: string;
     messageCount: number;
     isRead: boolean;
     isImportant: boolean;
@@ -131,6 +134,7 @@ interface Stats {
   guestSessions: number;
   authenticatedSessions: number;
   unreadSessions: number;
+  whatsappSessions: number;
 }
 
 export default function ConversationsPage() {
@@ -168,6 +172,7 @@ export default function ConversationsPage() {
 
   // Filter state
   const [userType, setUserType] = useState<"all" | "guest" | "authenticated">("all");
+  const [channel, setChannel] = useState<"all" | "web" | "whatsapp">("all");
   const [searchEmail, setSearchEmail] = useState("");
   const [viewMode, setViewMode] = useState<"session" | "user">("session");
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string | null>>(new Set());
@@ -218,6 +223,7 @@ export default function ConversationsPage() {
       setIsLoading(true);
       const queryParams = new URLSearchParams();
       if (userType !== "all") queryParams.set("userType", userType);
+      if (channel !== "all") queryParams.set("channel", channel);
       if (searchEmail) queryParams.set("search", searchEmail);
       queryParams.set("groupBy", viewMode);
 
@@ -258,7 +264,7 @@ export default function ConversationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [companySlug, userType, period, startDate, endDate, searchEmail, viewMode, tCommon]);
+  }, [companySlug, userType, channel, period, startDate, endDate, searchEmail, viewMode, tCommon]);
 
   useEffect(() => {
     loadConversations();
@@ -530,7 +536,7 @@ export default function ConversationsPage() {
   useEffect(() => {
     setCurrentPage(1);
     setExpandedUserIds(new Set());
-  }, [userType, searchEmail, period, startDate, endDate, viewMode]);
+  }, [userType, channel, searchEmail, period, startDate, endDate, viewMode]);
 
   // Selection helpers
   function toggleSelectAll() {
@@ -633,7 +639,7 @@ export default function ConversationsPage() {
           )}
           style={!prefersReducedMotion ? { opacity: 0, animationDelay: "50ms" } : undefined}
         >
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <StatsCard
               title={t("totalSessions")}
               value={stats.totalSessions}
@@ -670,6 +676,15 @@ export default function ConversationsPage() {
               animationIndex={3}
               prefersReducedMotion={prefersReducedMotion}
             />
+            <StatsCard
+              title={t("whatsappSessions")}
+              value={stats.whatsappSessions}
+              icon={Globe}
+              iconBg="bg-emerald-500/10"
+              iconColor="text-emerald-500"
+              animationIndex={4}
+              prefersReducedMotion={prefersReducedMotion}
+            />
           </div>
         </div>
       )}
@@ -700,6 +715,17 @@ export default function ConversationsPage() {
             <SelectItem value="all">{t("allUsers")}</SelectItem>
             <SelectItem value="guest">{t("guestOnly")}</SelectItem>
             <SelectItem value="authenticated">{t("authenticatedOnly")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <Globe className="h-4 w-4 mr-2" />
+            <SelectValue placeholder={t("filterByChannel")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("channelAll")}</SelectItem>
+            <SelectItem value="web">{t("channelWeb")}</SelectItem>
+            <SelectItem value="whatsapp">{t("channelWhatsapp")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
@@ -863,6 +889,15 @@ export default function ConversationsPage() {
                           <span className="text-sm text-muted-foreground">
                             {format(parseISO(session.createdAt), "MMM d, HH:mm")}
                           </span>
+                          {session.channel === "whatsapp" ? (
+                            <Badge variant="outline" className="border-green-500/50 text-green-600 text-xs">
+                              {t("channelWhatsapp")}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {t("channelWeb")}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell></TableCell>
@@ -1030,6 +1065,15 @@ export default function ConversationsPage() {
                           {!session.user && (
                             <Badge variant="secondary" className="ml-2">
                               {t("guest")}
+                            </Badge>
+                          )}
+                          {session.channel === "whatsapp" ? (
+                            <Badge variant="outline" className="ml-2 border-green-500/50 text-green-600">
+                              {t("channelWhatsapp")}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="ml-2">
+                              {t("channelWeb")}
                             </Badge>
                           )}
                         </div>

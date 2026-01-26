@@ -10,6 +10,7 @@ interface RouteParams {
 
 const querySchema = z.object({
   userType: z.enum(["all", "guest", "authenticated"]).optional().default("all"),
+  channel: z.enum(["all", "web", "whatsapp"]).optional().default("all"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   search: z.string().optional(),
@@ -34,6 +35,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse({
       userType: searchParams.get("userType") || "all",
+      channel: searchParams.get("channel") || "all",
       startDate: searchParams.get("startDate") || undefined,
       endDate: searchParams.get("endDate") || undefined,
       search: searchParams.get("search") || undefined,
@@ -49,7 +51,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    const { userType, startDate, endDate, search, isRead, isImportant, groupBy } = parsed.data;
+    const { userType, channel, startDate, endDate, search, isRead, isImportant, groupBy } = parsed.data;
 
     // Build where clause
     const where: Prisma.ChatSessionWhereInput = {
@@ -61,6 +63,11 @@ export async function GET(request: Request, { params }: RouteParams) {
       where.userId = null;
     } else if (userType === "authenticated") {
       where.userId = { not: null };
+    }
+
+    // Filter by channel
+    if (channel !== "all") {
+      where.channel = channel;
     }
 
     // Filter by date range
@@ -144,6 +151,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       where: { companyId: company.id, isRead: false },
     });
 
+    const whatsappSessions = await prisma.chatSession.count({
+      where: { companyId: company.id, channel: "whatsapp" },
+    });
+
     // Format response based on groupBy mode
     if (groupBy === "user") {
       // Group sessions by user
@@ -156,6 +167,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         unreadCount: number;
         sessions: Array<{
           id: string;
+          channel: string;
           messageCount: number;
           isRead: boolean;
           isImportant: boolean;
@@ -170,6 +182,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
         const sessionData = {
           id: session.id,
+          channel: session.channel,
           messageCount: session._count.messages,
           isRead: session.isRead,
           isImportant: session.isImportant,
@@ -212,6 +225,7 @@ export async function GET(request: Request, { params }: RouteParams) {
           guestSessions,
           authenticatedSessions,
           unreadSessions,
+          whatsappSessions,
         },
       });
     }
@@ -221,6 +235,7 @@ export async function GET(request: Request, { params }: RouteParams) {
       id: session.id,
       userId: session.userId,
       user: session.user,
+      channel: session.channel,
       messageCount: session._count.messages,
       isRead: session.isRead,
       isImportant: session.isImportant,
@@ -237,6 +252,7 @@ export async function GET(request: Request, { params }: RouteParams) {
         guestSessions,
         authenticatedSessions,
         unreadSessions,
+        whatsappSessions,
       },
     });
   } catch (error) {
