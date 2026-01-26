@@ -408,7 +408,8 @@
     "welcomeBack": "Dobro dosli nazad! Kako vam mogu pomoci?",
     "loadingHistory": "Ucitavanje razgovora...",
     "newConversation": "Novi razgovor",
-    "errorMessage": "Izvinjavamo se, doslo je do greske. Pokusajte ponovo."
+    "errorMessage": "Izvinjavamo se, doslo je do greske. Pokusajte ponovo.",
+    "loadEarlierMessages": "Ucitaj ranije poruke"
   },
   "admin": {
     "dashboard": "Administraciona tabla",
@@ -1282,6 +1283,19 @@
       "serviceUnavailable": "Izvinite, usluga rezervacija je privremeno nedostupna. Pokušajte ponovo kasnije.",
       "usageLimitReached": "Izvinite, dostigli smo limit korišćenja za ovaj mesec. Pokušajte ponovo sledeći mesec ili nas kontaktirajte direktno za rezervaciju.",
       "textOnlySupported": "Trenutno mogu da obradim samo tekstualne poruke. Molimo upišite vašu poruku."
+    },
+    "chatUI": {
+      "bookingConfirmed": "Rezervacija potvrđena",
+      "service": "Usluga",
+      "date": "Datum",
+      "time": "Vreme",
+      "duration": "Trajanje",
+      "price": "Cena",
+      "minutes": "minuta",
+      "noTimeSlotsAvailable": "Nema dostupnih termina za ovaj datum.",
+      "statusPending": "NA ČEKANJU",
+      "statusConfirmed": "POTVRĐENO",
+      "statusCancelled": "OTKAZANO"
     }
   }
 }

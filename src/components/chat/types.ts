@@ -81,8 +81,10 @@ export type MessageContent = string | RichMessage;
 
 // Chat message with potential rich content
 export interface ChatMessage {
+  id?: string;
   role: "user" | "assistant";
   content: string; // Always stored as string, may contain JSON for rich messages
+  timestamp?: string; // ISO string for display
 }
 
 // Parsed message ready for rendering

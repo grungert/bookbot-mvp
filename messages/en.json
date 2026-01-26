@@ -408,7 +408,8 @@
     "welcomeBack": "Welcome back! How can I help you today?",
     "loadingHistory": "Loading conversation...",
     "newConversation": "New conversation",
-    "errorMessage": "Sorry, something went wrong. Please try again."
+    "errorMessage": "Sorry, something went wrong. Please try again.",
+    "loadEarlierMessages": "Load earlier messages"
   },
   "admin": {
     "dashboard": "Admin Dashboard",
@@ -1280,6 +1281,19 @@
       "serviceUnavailable": "Sorry, the booking service is temporarily unavailable. Please try again later.",
       "usageLimitReached": "Sorry, we've reached our usage limit for this month. Please try again next month or contact us directly to book.",
       "textOnlySupported": "I can only process text messages at the moment. Please type your message instead."
+    },
+    "chatUI": {
+      "bookingConfirmed": "Booking Confirmed",
+      "service": "Service",
+      "date": "Date",
+      "time": "Time",
+      "duration": "Duration",
+      "price": "Price",
+      "minutes": "minutes",
+      "noTimeSlotsAvailable": "No available time slots for this date.",
+      "statusPending": "PENDING",
+      "statusConfirmed": "CONFIRMED",
+      "statusCancelled": "CANCELLED"
     }
   }
 }

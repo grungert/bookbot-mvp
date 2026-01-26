@@ -6,11 +6,33 @@ import { useTranslations } from "next-intl";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, X, Send, Loader2, RotateCcw } from "lucide-react";
+import { MessageSquare, X, Send, Loader2, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatMessageRenderer } from "./chat-message-renderer";
+import { createRichMessageContent } from "./message-parser";
 import { LimitModal, useLimitModal, type LimitType } from "@/components/subscription/limit-modal";
 import type { ChatMessage, ChatService, ChatTimeSlot, ChatUICallbacks } from "./types";
+
+interface InitData {
+  greeting: string | null;
+  services: ChatService[];
+  language?: string;
+}
+
+function buildGreetingMessage(
+  greeting: string | null,
+  services: ChatService[],
+  fallback: string
+): string {
+  const text = greeting || fallback;
+  if (services.length > 0) {
+    return createRichMessageContent(text, {
+      component: "service-selector",
+      props: { services },
+    });
+  }
+  return text;
+}
 
 interface ChatWidgetProps {
   companySlug: string;
@@ -32,11 +54,48 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [hasLoadedHistory, setHasLoadedHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const initDataRef = useRef<InitData | null>(null);
+
+  // Pagination state
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const skipAutoScrollRef = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // Limit modal state
   const { modalState, showLimitModal, setModalOpen } = useLimitModal();
 
   const storageKey = `${STORAGE_KEY_PREFIX}${companySlug}`;
+
+  // Fetch init data (greeting + services) from the server, cached in ref
+  const fetchInitData = useCallback(async (): Promise<InitData | null> => {
+    if (initDataRef.current) return initDataRef.current;
+    try {
+      const res = await fetch(`/api/c/${companySlug}/chat/init`);
+      if (res.ok) {
+        const data: InitData = await res.json();
+        initDataRef.current = data;
+        return data;
+      }
+    } catch (error) {
+      console.error("Failed to fetch chat init data:", error);
+    }
+    return null;
+  }, [companySlug]);
+
+  // Build and set the greeting message from init data (or fallback)
+  const showGreeting = useCallback(async () => {
+    const initData = await fetchInitData();
+    const content = initData
+      ? buildGreetingMessage(initData.greeting, initData.services, t("welcome"))
+      : t("welcome");
+    setMessages([{ role: "assistant", content, timestamp: new Date().toISOString() }]);
+    setHasMoreMessages(false);
+    setNextCursor(null);
+  }, [fetchInitData, t]);
 
   // Load chat history from API
   const loadChatHistory = useCallback(
@@ -44,21 +103,19 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       setIsLoadingHistory(true);
       try {
         const response = await fetch(
-          `/api/c/${companySlug}/chat/history?sessionId=${storedSessionId}`
+          `/api/c/${companySlug}/chat/history?sessionId=${storedSessionId}&limit=30`
         );
 
         if (response.ok) {
           const data = await response.json();
           if (data.messages && data.messages.length > 0) {
-            // Filter out system messages and only keep user/assistant messages
-            const chatMessages = data.messages.filter(
-              (m: ChatMessage) => m.role === "user" || m.role === "assistant"
-            );
             setMessages([
-              { role: "assistant", content: t("welcomeBack") },
-              ...chatMessages,
+              { role: "assistant", content: t("welcomeBack"), timestamp: new Date().toISOString() },
+              ...data.messages,
             ]);
             setSessionId(storedSessionId);
+            setHasMoreMessages(data.pagination?.hasMore ?? false);
+            setNextCursor(data.pagination?.nextCursor ?? null);
             return true;
           }
         }
@@ -72,6 +129,48 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     },
     [companySlug, t]
   );
+
+  // Load more (older) messages
+  const loadMoreMessages = useCallback(async () => {
+    if (!sessionId || !nextCursor || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+
+    try {
+      const response = await fetch(
+        `/api/c/${companySlug}/chat/history?sessionId=${sessionId}&limit=30&cursor=${nextCursor}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.messages && data.messages.length > 0) {
+          skipAutoScrollRef.current = true;
+          setMessages((prev) => {
+            // Insert older messages after the synthetic welcome message (index 0)
+            const welcomeMsg = prev[0];
+            const rest = prev.slice(1);
+            return [welcomeMsg, ...data.messages, ...rest];
+          });
+          setHasMoreMessages(data.pagination?.hasMore ?? false);
+          setNextCursor(data.pagination?.nextCursor ?? null);
+
+          // Preserve scroll position after prepending
+          requestAnimationFrame(() => {
+            if (container) {
+              const newScrollHeight = container.scrollHeight;
+              container.scrollTop = newScrollHeight - prevScrollHeight;
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load more messages:", error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [sessionId, nextCursor, isLoadingMore, companySlug]);
 
   // Initialize session from localStorage on mount
   useEffect(() => {
@@ -90,19 +189,18 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       if (storedSessionId) {
         loadChatHistory(storedSessionId).then((hasHistory) => {
           if (!hasHistory) {
-            // No history found, show welcome message
-            setMessages([{ role: "assistant", content: t("welcome") }]);
-            // Clear invalid session from localStorage
+            // No history found, show greeting with services
             localStorage.removeItem(storageKey);
             setSessionId(null);
+            showGreeting();
           }
         });
       } else {
-        // New user, show welcome message
-        setMessages([{ role: "assistant", content: t("welcome") }]);
+        // New user, show greeting with services
+        showGreeting();
       }
     }
-  }, [isOpen, hasLoadedHistory, storageKey, loadChatHistory, t]);
+  }, [isOpen, hasLoadedHistory, storageKey, loadChatHistory, showGreeting]);
 
   // Save sessionId to localStorage when it changes
   useEffect(() => {
@@ -112,21 +210,38 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   }, [sessionId, storageKey]);
 
   useEffect(() => {
+    if (skipAutoScrollRef.current) {
+      skipAutoScrollRef.current = false;
+      return;
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > 100);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   // Start a new conversation
   const handleNewConversation = () => {
     localStorage.removeItem(storageKey);
     setSessionId(null);
-    setMessages([{ role: "assistant", content: t("welcome") }]);
+    setHasMoreMessages(false);
+    setNextCursor(null);
+    showGreeting();
   };
 
   // Send a message to the backend
   const sendMessage = async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+    setMessages((prev) => [...prev, { role: "user", content: userMessage, timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
     try {
@@ -136,6 +251,9 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
         body: JSON.stringify({
           message: userMessage,
           sessionId,
+          ...(sessionId === null && messages[0]?.role === "assistant"
+            ? { greetingMessage: messages[0].content }
+            : {}),
         }),
       });
 
@@ -162,12 +280,12 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       setSessionId(data.sessionId);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.message },
+        { role: "assistant", content: data.message, timestamp: new Date().toISOString() },
       ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: t("errorMessage") },
+        { role: "assistant", content: t("errorMessage"), timestamp: new Date().toISOString() },
       ]);
     } finally {
       setIsLoading(false);
@@ -181,7 +299,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   ) => {
     if (isLoading) return;
 
-    setMessages((prev) => [...prev, { role: "user", content: displayMessage }]);
+    setMessages((prev) => [...prev, { role: "user", content: displayMessage, timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
     try {
@@ -192,6 +310,9 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
           message: displayMessage,
           sessionId,
           bookingAction,
+          ...(sessionId === null && messages[0]?.role === "assistant"
+            ? { greetingMessage: messages[0].content }
+            : {}),
         }),
       });
 
@@ -204,12 +325,12 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       setSessionId(data.sessionId);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: data.message },
+        { role: "assistant", content: data.message, timestamp: new Date().toISOString() },
       ]);
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: t("errorMessage") },
+        { role: "assistant", content: t("errorMessage"), timestamp: new Date().toISOString() },
       ]);
     } finally {
       setIsLoading(false);
@@ -222,6 +343,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
 
     const userMessage = input.trim();
     setInput("");
+    inputRef.current?.focus();
     await sendMessage(userMessage);
   }
 
@@ -270,6 +392,29 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     onTimeSelect: handleTimeSelect,
   };
 
+  // Load earlier messages button
+  const LoadEarlierButton = () => {
+    if (!hasMoreMessages) return null;
+    return (
+      <div className="flex justify-center mb-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={loadMoreMessages}
+          disabled={isLoadingMore}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          {isLoadingMore ? (
+            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+          ) : (
+            <ChevronUp className="h-3 w-3 mr-1" />
+          )}
+          {t("loadEarlierMessages")}
+        </Button>
+      </div>
+    );
+  };
+
   // Hide on admin pages (but not in embedded mode)
   if (!embedded && pathname.includes('/admin')) {
     return null;
@@ -280,36 +425,52 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     return (
       <div className="h-full w-full flex flex-col bg-card overflow-hidden">
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {isLoadingHistory ? (
-            <div className="flex justify-center items-center h-full">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t("loadingHistory")}
-              </div>
-            </div>
-          ) : (
-            <>
-              {messages.map((message, index) => (
-                <ChatMessageRenderer
-                  key={index}
-                  message={message}
-                  nextMessage={messages[index + 1]}
-                  isLatest={index === messages.length - 1}
-                  callbacks={uiCallbacks}
-                />
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("thinking")}
-                  </div>
+        <div className="flex-1 relative overflow-hidden">
+          <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+            {isLoadingHistory ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t("loadingHistory")}
                 </div>
-              )}
-            </>
+              </div>
+            ) : (
+              <>
+                <LoadEarlierButton />
+                {messages.map((message, index) => (
+                  <ChatMessageRenderer
+                    key={message.id || `synthetic-${index}`}
+                    message={message}
+                    nextMessage={messages[index + 1]}
+                    isLatest={index === messages.length - 1}
+                    callbacks={uiCallbacks}
+                    language={initDataRef.current?.language}
+                  />
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {t("thinking")}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Scroll to bottom */}
+          {showScrollToBottom && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={scrollToBottom}
+              className="absolute bottom-2 right-4 h-8 w-8 rounded-full shadow-md bg-card z-10"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input */}
@@ -318,10 +479,10 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
           className="p-3 border-t flex gap-2 shrink-0 bg-card"
         >
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t("placeholder")}
-            disabled={isLoading}
             className="flex-1"
           />
           <Button
@@ -386,36 +547,52 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {isLoadingHistory ? (
-              <div className="flex justify-center items-center h-full">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("loadingHistory")}
-                </div>
-              </div>
-            ) : (
-              <>
-                {messages.map((message, index) => (
-                  <ChatMessageRenderer
-                    key={index}
-                    message={message}
-                    nextMessage={messages[index + 1]}
-                    isLatest={index === messages.length - 1}
-                    callbacks={uiCallbacks}
-                  />
-                ))}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("thinking")}
-                    </div>
+          <div className="flex-1 relative overflow-hidden">
+            <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+              {isLoadingHistory ? (
+                <div className="flex justify-center items-center h-full">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("loadingHistory")}
                   </div>
-                )}
-              </>
+                </div>
+              ) : (
+                <>
+                  <LoadEarlierButton />
+                  {messages.map((message, index) => (
+                    <ChatMessageRenderer
+                      key={message.id || `synthetic-${index}`}
+                      message={message}
+                      nextMessage={messages[index + 1]}
+                      isLatest={index === messages.length - 1}
+                      callbacks={uiCallbacks}
+                      language={initDataRef.current?.language}
+                    />
+                  ))}
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-muted rounded-lg px-4 py-2 text-sm flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t("thinking")}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Scroll to bottom */}
+            {showScrollToBottom && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={scrollToBottom}
+                className="absolute bottom-2 right-4 h-8 w-8 rounded-full shadow-md bg-card z-10"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </Button>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Input */}
@@ -424,10 +601,10 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
             className="p-3 border-t flex gap-2 shrink-0 bg-card"
           >
             <Input
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={t("placeholder")}
-              disabled={isLoading}
               className="flex-1"
             />
             <Button
