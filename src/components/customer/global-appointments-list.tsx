@@ -14,32 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AppointmentDetailSheet } from "./appointment-detail-sheet";
 import {
   Calendar as CalendarIcon,
   Clock,
   ChevronRight,
   CalendarPlus,
   X,
-  ExternalLink,
-  Banknote,
-  FileText,
-  Loader2,
   Search,
   ArrowUpDown,
 } from "lucide-react";
@@ -129,7 +110,6 @@ export function GlobalAppointmentsList({
   const containerRef = useRef<HTMLDivElement>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -213,22 +193,11 @@ export function GlobalAppointmentsList({
     setSheetOpen(true);
   };
 
-  const handleCancelClick = () => {
-    setCancelDialogOpen(true);
-  };
-
-  const handleConfirmCancel = () => {
+  const handleCancel = (id: string) => {
     if (selectedAppointment) {
-      onCancel(selectedAppointment.id, selectedAppointment.company.slug);
-      setCancelDialogOpen(false);
-      setSheetOpen(false);
+      onCancel(id, selectedAppointment.company.slug);
     }
   };
-
-  const canCancel = selectedAppointment &&
-    !isPast(parseISO(selectedAppointment.startTime)) &&
-    selectedAppointment.status !== "CANCELLED" &&
-    selectedAppointment.status !== "COMPLETED";
 
   // Animation variants
   const itemVariants = {
@@ -426,106 +395,17 @@ export function GlobalAppointmentsList({
       )}
 
       {/* Appointment detail sheet */}
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="bottom" className="h-auto max-h-[85vh] rounded-t-xl">
-          {selectedAppointment && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="text-left">{t("appointmentDetails")}</SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                {/* Company info */}
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Avatar className="h-10 w-10 border-2" style={{ borderColor: selectedAppointment.company.primaryColor || "#3B82F6" }}>
-                    <AvatarImage src={selectedAppointment.company.logoUrl || undefined} alt={selectedAppointment.company.name} />
-                    <AvatarFallback style={{ backgroundColor: hexToRgba(selectedAppointment.company.primaryColor || "#3B82F6", 0.1) }}>
-                      {selectedAppointment.company.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-medium">{selectedAppointment.company.name}</p>
-                    <p className="text-sm text-muted-foreground">{selectedAppointment.service.name}</p>
-                  </div>
-                  <Badge className={cn("text-xs", statusColors[selectedAppointment.status])} variant="outline">
-                    {t(selectedAppointment.status.toLowerCase() as "pending" | "confirmed" | "cancelled" | "completed")}
-                  </Badge>
-                </div>
-
-                {/* Details */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 text-sm">
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(parseISO(selectedAppointment.startTime), "EEEE, MMMM d, yyyy")}</span>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{format(parseISO(selectedAppointment.startTime), "h:mm a")} ({selectedAppointment.service.duration} min)</span>
-                  </div>
-                  {selectedAppointment.service.price > 0 && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <Banknote className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedAppointment.service.price.toLocaleString()} {selectedAppointment.service.currency}</span>
-                    </div>
-                  )}
-                  {selectedAppointment.notes && (
-                    <div className="flex items-start gap-3 text-sm">
-                      <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
-                      <span className="text-muted-foreground">{selectedAppointment.notes}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2 pt-4">
-                  <Link href={`/c/${selectedAppointment.company.slug}/book?service=${selectedAppointment.service.id}`}>
-                    <Button variant="outline" className="w-full gap-2">
-                      <ExternalLink className="h-4 w-4" />
-                      {t("reschedule")}
-                    </Button>
-                  </Link>
-                  {canCancel && (
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={handleCancelClick}
-                      disabled={cancellingId === selectedAppointment.id}
-                    >
-                      {cancellingId === selectedAppointment.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      {t("confirmCancel")}
-                    </Button>
-                  )}
-                  <Button variant="ghost" className="w-full" onClick={() => setSheetOpen(false)}>
-                    {tCommon("close")}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Cancel confirmation dialog */}
-      <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("cancelAppointment")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("cancelConfirmation")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmCancel}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {t("confirmCancel")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AppointmentDetailSheet
+        appointment={selectedAppointment}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onCancel={handleCancel}
+        isCancelling={cancellingId === selectedAppointment?.id}
+        companySlug={selectedAppointment?.company.slug ?? ""}
+        showCompany
+        t={t}
+        tCommon={tCommon}
+      />
     </div>
   );
 }

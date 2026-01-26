@@ -409,7 +409,9 @@
     "loadingHistory": "Ucitavanje razgovora...",
     "newConversation": "Novi razgovor",
     "errorMessage": "Izvinjavamo se, doslo je do greske. Pokusajte ponovo.",
-    "loadEarlierMessages": "Ucitaj ranije poruke"
+    "loadEarlierMessages": "Ucitaj ranije poruke",
+    "confirmYes": "Da",
+    "confirmNo": "Ne"
   },
   "admin": {
     "dashboard": "Administraciona tabla",
@@ -1284,6 +1286,17 @@
       "usageLimitReached": "Izvinite, dostigli smo limit korišćenja za ovaj mesec. Pokušajte ponovo sledeći mesec ili nas kontaktirajte direktno za rezervaciju.",
       "textOnlySupported": "Trenutno mogu da obradim samo tekstualne poruke. Molimo upišite vašu poruku."
     },
+    "appointmentNotFound": "Termin nije pronađen. Proverite podatke o terminu.",
+    "cannotCancelStatus": "Ovaj termin ne može biti otkazan jer je {status}.",
+    "appointmentCancelled": "Vaš termin za {serviceName} dana {date} u {time} je otkazan.",
+    "cannotRescheduleStatus": "Ovaj termin ne može biti promenjen jer je {status}.",
+    "newSlotUnavailable": "Traženi termin nije dostupan. Izaberite drugo vreme.",
+    "appointmentRescheduled": "Vaš termin za {serviceName} je promenjen na {date} u {time}.",
+    "loginRequiredForCancel": "Morate biti prijavljeni da biste otkazali termin. Prijavite se ili kontaktirajte preduzeće direktno.",
+    "loginRequiredForReschedule": "Morate biti prijavljeni da biste promenili termin. Prijavite se ili kontaktirajte preduzeće direktno.",
+    "appointmentNotOwnedByUser": "Možete otkazati ili promeniti samo sopstvene termine.",
+    "invalidNewDateTime": "Format novog datuma i vremena nije ispravan. Unesite ispravan datum i vreme.",
+    "newTimeMustBeFuture": "Novo vreme termina mora biti u budućnosti.",
     "chatUI": {
       "bookingConfirmed": "Rezervacija potvrđena",
       "service": "Usluga",

@@ -10,6 +10,79 @@ import type { OutgoingMessage, ListSection, MessageButton } from "./types";
 import { getTranslator, type TranslatorFn } from "@/lib/i18n/backend";
 
 /**
+ * Sanitize markdown for WhatsApp
+ *
+ * WhatsApp supports: *bold*, _italic_, ~strikethrough~, `monospace`, ```code block```
+ * It does NOT support: tables, ## headers, **double-asterisk bold**, [links](url), ---
+ *
+ * This function converts unsupported markdown to WhatsApp-compatible text.
+ */
+function sanitizeMarkdownForWhatsApp(text: string): string {
+  let result = text;
+
+  // Convert markdown tables to plain text
+  // Detect table blocks: lines starting with |
+  const lines = result.split("\n");
+  const sanitizedLines: string[] = [];
+  let inTable = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Detect table separator rows (e.g., |---|---|---|)
+    if (/^\|[\s\-:|]+\|$/.test(trimmed)) {
+      inTable = true;
+      continue; // Skip separator rows
+    }
+
+    // Detect table data rows (e.g., | col1 | col2 | col3 |)
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      inTable = true;
+      // Extract cell values, trim, and join with " | " but without outer pipes
+      const cells = trimmed
+        .slice(1, -1) // Remove outer pipes
+        .split("|")
+        .map((cell) => cell.trim())
+        .filter((cell) => cell.length > 0);
+
+      // Format as a readable line
+      sanitizedLines.push(cells.join(" · "));
+      continue;
+    }
+
+    // If we were in a table and hit a non-table line, add a blank line
+    if (inTable && trimmed.length > 0) {
+      inTable = false;
+    }
+
+    sanitizedLines.push(line);
+  }
+
+  result = sanitizedLines.join("\n");
+
+  // Convert ## headers to *bold* (WhatsApp bold)
+  result = result.replace(/^#{1,6}\s+(.+)$/gm, "*$1*");
+
+  // Convert **bold** or __bold__ to *bold* (WhatsApp uses single asterisk)
+  result = result.replace(/\*\*(.+?)\*\*/g, "*$1*");
+  result = result.replace(/__(.+?)__/g, "*$1*");
+
+  // Convert ~~strikethrough~~ to ~strikethrough~ (WhatsApp uses single tilde)
+  result = result.replace(/~~(.+?)~~/g, "~$1~");
+
+  // Convert markdown links [text](url) to "text (url)"
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)");
+
+  // Strip horizontal rules (--- or ***)
+  result = result.replace(/^(-{3,}|\*{3,})$/gm, "");
+
+  // Clean up excessive blank lines (max 2 consecutive)
+  result = result.replace(/\n{3,}/g, "\n\n");
+
+  return result.trim();
+}
+
+/**
  * Format currency with proper symbol
  */
 function formatCurrency(amount: number, currency: string): string {
@@ -171,19 +244,15 @@ function formatTimeSlotsForWhatsApp(
       label: slot.displayTime,
     }));
 
-    const slotsText = slots
-      .map((slot, i) => `${i + 1}. ${slot.displayTime}`)
-      .join("\n");
-
     return {
       to: "",
-      content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${slotsText}\n\n${t("botChat.whatsapp.selectTime")}`,
+      content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${t("botChat.whatsapp.selectTime")}`,
       buttons,
       header: t("botChat.whatsapp.selectTimeHeader"),
     };
   }
 
-  // For more slots, use a list or numbered text
+  // For more slots, use an interactive list
   const sections: ListSection[] = [
     {
       title: t("botChat.whatsapp.availableTimesTitle"),
@@ -195,13 +264,9 @@ function formatTimeSlotsForWhatsApp(
     },
   ];
 
-  const slotsText = slots
-    .map((slot, i) => `${i + 1}. ${slot.displayTime}`)
-    .join("\n");
-
   return {
     to: "",
-    content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${slotsText}\n\n${t("botChat.whatsapp.replyWithNumber")}`,
+    content: `${t("botChat.whatsapp.availableTimes", { serviceName, date })}\n\n${t("botChat.whatsapp.selectTime")}`,
     listSections: sections,
     listButtonText: t("botChat.whatsapp.viewTimes"),
   };
@@ -211,7 +276,7 @@ function formatTimeSlotsForWhatsApp(
  * Format booking confirmation card for WhatsApp
  */
 function formatBookingCardForWhatsApp(booking: ChatBookingData, t: TranslatorFn): OutgoingMessage {
-  const statusEmoji = booking.status === "CONFIRMED" ? "✅" : "⏳";
+  const statusEmoji = booking.status === "CONFIRMED" ? "✅" : booking.status === "CANCELLED" ? "❌" : "⏳";
 
   return {
     to: "",
@@ -230,11 +295,14 @@ export function formatForWhatsApp(
 ): OutgoingMessage {
   const t = getTranslator(language);
 
+  // Sanitize markdown in text content for WhatsApp
+  const sanitizedText = sanitizeMarkdownForWhatsApp(textContent);
+
   // No UI component - just return the text
   if (!ui) {
     return {
       to: "",
-      content: textContent,
+      content: sanitizedText,
     };
   }
 
@@ -258,11 +326,21 @@ export function formatForWhatsApp(
     case "booking-card":
       return formatBookingCardForWhatsApp(ui.props, t);
 
+    case "confirmation":
+      return {
+        to: "",
+        content: ui.props.message,
+        buttons: [
+          { id: "confirm_yes", label: ui.props.confirmLabel.substring(0, 20) },
+          { id: "confirm_no", label: ui.props.cancelLabel.substring(0, 20) },
+        ],
+      };
+
     default:
       // Unknown UI component - just return the text
       return {
         to: "",
-        content: textContent,
+        content: sanitizedText,
       };
   }
 }

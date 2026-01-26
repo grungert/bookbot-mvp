@@ -295,7 +295,15 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   // Send a structured booking action (bypasses LLM)
   const sendBookingAction = async (
     displayMessage: string,
-    bookingAction: { type: string; serviceId?: string; serviceName?: string; date?: string; startTime?: string }
+    bookingAction: {
+      type: string;
+      serviceId?: string;
+      serviceName?: string;
+      date?: string;
+      startTime?: string;
+      confirmed?: boolean;
+      action?: Record<string, unknown>;
+    }
   ) => {
     if (isLoading) return;
 
@@ -385,11 +393,27 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     [sendBookingAction]
   );
 
+  const handleConfirmationClick = useCallback(
+    (confirmed: boolean, action?: Record<string, unknown>) => {
+      if (confirmed && action) {
+        sendBookingAction(t("confirmYes") || "Yes", {
+          type: "confirmation",
+          confirmed: true,
+          action,
+        });
+      } else {
+        sendMessage(t("confirmNo") || "No");
+      }
+    },
+    [sendBookingAction, sendMessage, t]
+  );
+
   // Callbacks for UI components
   const uiCallbacks: ChatUICallbacks = {
     onServiceSelect: handleServiceSelect,
     onDateSelect: handleDateSelect,
     onTimeSelect: handleTimeSelect,
+    onConfirmationClick: handleConfirmationClick,
   };
 
   // Load earlier messages button

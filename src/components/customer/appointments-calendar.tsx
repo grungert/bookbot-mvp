@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useCallback, useRef } from "react";
-import { format, parseISO, isSameDay, isPast } from "date-fns";
+import { format, parseISO, isSameDay, isPast, isToday } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";

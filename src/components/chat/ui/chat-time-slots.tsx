@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getTranslator } from "@/lib/i18n/backend";
 import type { ChatTimeSlot } from "../types";
 
 interface ChatTimeSlotsProps {
@@ -15,6 +16,8 @@ interface ChatTimeSlotsProps {
   onSelect?: (slot: ChatTimeSlot, serviceId: string, dateISO: string, serviceName: string) => void;
   disabled?: boolean;
   preSelectedTime?: string; // Pre-selected time for historical messages (e.g., "09:00" or "9:00 AM")
+  language?: string;
+  animate?: boolean;
 }
 
 // Helper to find matching slot by display time
@@ -42,6 +45,7 @@ export function ChatTimeSlots({
   onSelect,
   disabled = false,
   preSelectedTime,
+  language,
 }: ChatTimeSlotsProps) {
   const [selectedTime, setSelectedTime] = useState<string | null>(() => {
     if (disabled && preSelectedTime) {
@@ -56,9 +60,10 @@ export function ChatTimeSlots({
   };
 
   if (slots.length === 0) {
+    const t = getTranslator(language);
     return (
       <div className="mt-2 p-3 text-center text-sm text-muted-foreground bg-muted/50 rounded-lg">
-        No available time slots for this date.
+        {t("botChat.chatUI.noTimeSlotsAvailable")}
       </div>
     );
   }

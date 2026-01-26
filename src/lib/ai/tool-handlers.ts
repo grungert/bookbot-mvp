@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { getAvailableSlots, isSlotAvailable } from "@/lib/utils/slots";
-import { sendBookingConfirmationEmail, sendNewBookingAdminEmail } from "@/lib/email/send";
+import { sendBookingConfirmationEmail, sendNewBookingAdminEmail, sendCancellationEmail, sendAppointmentUpdateEmail } from "@/lib/email/send";
 import { addMinutes, format, parseISO } from "date-fns";
 import type {
   ToolParams,
@@ -11,11 +11,15 @@ import type {
   CreateBookingParams,
   SearchAppointmentsParams,
   UpdateBookingStateParams,
+  CancelAppointmentParams,
+  RescheduleAppointmentParams,
+  RequestConfirmationParams,
 } from "./tools";
 import type { ChatUIComponent } from "@/components/chat/types";
 import { handleUpdateBookingState } from "./booking-flow";
 import { getTranslator } from "@/lib/i18n/backend";
 import { getDateLocale } from "@/lib/i18n/date-locale";
+import { isValidTransition } from "@/lib/utils/appointment-status";
 
 // Context passed to tool handlers
 export interface ToolContext {
@@ -64,6 +68,12 @@ export async function executeToolAction(
         date: params.date,
       });
     }
+    case "cancelAppointment":
+      return handleCancelAppointment(context, params);
+    case "rescheduleAppointment":
+      return handleRescheduleAppointment(context, params);
+    case "requestConfirmation":
+      return handleRequestConfirmation(params);
     default: {
       const t = getTranslator(context.language);
       return {
@@ -571,6 +581,8 @@ async function handleSearchAppointments(
 
   // Format results
   const results = filtered.map((a) => ({
+    id: a.id,
+    serviceId: a.service.id,
     date: format(a.startTime, "EEEE, MMM d, yyyy", { locale: dateLocale }),
     time: format(a.startTime, "HH:mm"),
     service: a.service.name,
@@ -582,5 +594,258 @@ async function handleSearchAppointments(
     success: true,
     data: results,
     userMessage: t("botChat.foundAppointments", { count: results.length }),
+  };
+}
+
+// Find appointment by full or short (suffix) ID
+// The system prompt shows short IDs (last 8 chars) to keep context concise,
+// while searchAppointments returns full IDs. This helper supports both.
+async function findAppointmentById(
+  appointmentId: string,
+  companyId: string,
+  userId: string
+) {
+  // Try exact match first (full ID from searchAppointments)
+  let appointment = await prisma.appointment.findFirst({
+    where: { id: appointmentId, companyId, userId },
+    include: { service: true },
+  });
+
+  // If not found and it looks like a short ID, try suffix match
+  if (!appointment && appointmentId.length < 20) {
+    appointment = await prisma.appointment.findFirst({
+      where: {
+        id: { endsWith: appointmentId },
+        companyId,
+        userId,
+      },
+      include: { service: true },
+    });
+  }
+
+  return appointment;
+}
+
+// Cancel an existing appointment
+async function handleCancelAppointment(
+  context: ToolContext,
+  params: CancelAppointmentParams
+): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+  const dateLocale = getDateLocale(context.language);
+
+  if (!context.userId) {
+    return {
+      success: false,
+      userMessage: t("botChat.loginRequiredForCancel"),
+    };
+  }
+
+  // Find appointment by ID (supports both full and short IDs), verify ownership
+  const appointment = await findAppointmentById(params.appointmentId, context.companyId, context.userId);
+
+  if (!appointment) {
+    return {
+      success: false,
+      userMessage: t("botChat.appointmentNotFound"),
+    };
+  }
+
+  // Check if cancellation is allowed
+  if (!isValidTransition(appointment.status as "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED", "CANCELLED")) {
+    return {
+      success: false,
+      userMessage: t("botChat.cannotCancelStatus", { status: appointment.status }),
+    };
+  }
+
+  // Update appointment
+  await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: {
+      status: "CANCELLED",
+      cancelledBy: "CUSTOMER",
+      cancelledAt: new Date(),
+      cancellationReason: params.reason || null,
+    },
+  });
+
+  // Send cancellation email
+  if (context.userEmail) {
+    try {
+      await sendCancellationEmail({
+        customerEmail: context.userEmail,
+        customerName: context.userName || "Customer",
+        serviceName: appointment.service.name,
+        startTime: appointment.startTime,
+        companyName: context.companyName,
+      });
+    } catch (emailError) {
+      console.error("Failed to send cancellation email:", emailError);
+    }
+  }
+
+  const bookingData = {
+    appointmentId: appointment.id,
+    service: appointment.service.name,
+    date: format(appointment.startTime, "EEEE, MMMM d, yyyy", { locale: dateLocale }),
+    time: format(appointment.startTime, "HH:mm"),
+    duration: `${appointment.service.duration} minutes`,
+    status: "CANCELLED",
+  };
+
+  return {
+    success: true,
+    data: bookingData,
+    userMessage: t("botChat.appointmentCancelled", {
+      serviceName: appointment.service.name,
+      date: format(appointment.startTime, "EEEE, MMMM d", { locale: dateLocale }),
+      time: format(appointment.startTime, "HH:mm"),
+    }),
+    ui: {
+      component: "booking-card",
+      props: bookingData,
+    },
+  };
+}
+
+// Reschedule an existing appointment
+async function handleRescheduleAppointment(
+  context: ToolContext,
+  params: RescheduleAppointmentParams
+): Promise<ToolResult> {
+  const t = getTranslator(context.language);
+  const dateLocale = getDateLocale(context.language);
+
+  if (!context.userId) {
+    return {
+      success: false,
+      userMessage: t("botChat.loginRequiredForReschedule"),
+    };
+  }
+
+  // Find appointment by ID (supports both full and short IDs), verify ownership
+  const appointment = await findAppointmentById(params.appointmentId, context.companyId, context.userId);
+
+  if (!appointment) {
+    return {
+      success: false,
+      userMessage: t("botChat.appointmentNotFound"),
+    };
+  }
+
+  // Only PENDING and CONFIRMED can be rescheduled
+  if (appointment.status !== "PENDING" && appointment.status !== "CONFIRMED") {
+    return {
+      success: false,
+      userMessage: t("botChat.cannotRescheduleStatus", { status: appointment.status }),
+    };
+  }
+
+  // Parse new start time
+  let newStartTime: Date;
+  try {
+    newStartTime = parseISO(params.newStartTime);
+    if (isNaN(newStartTime.getTime())) {
+      throw new Error("Invalid datetime");
+    }
+  } catch {
+    return {
+      success: false,
+      userMessage: t("botChat.invalidNewDateTime"),
+    };
+  }
+
+  // Validate it's in the future
+  if (newStartTime <= new Date()) {
+    return {
+      success: false,
+      userMessage: t("botChat.newTimeMustBeFuture"),
+    };
+  }
+
+  // Check slot availability
+  const available = await isSlotAvailable(
+    context.companyId,
+    newStartTime,
+    appointment.service.duration
+  );
+
+  if (!available) {
+    return {
+      success: false,
+      userMessage: t("botChat.newSlotUnavailable"),
+    };
+  }
+
+  const previousStartTime = appointment.startTime;
+  const newEndTime = addMinutes(newStartTime, appointment.service.duration);
+
+  // Update appointment
+  await prisma.appointment.update({
+    where: { id: appointment.id },
+    data: {
+      startTime: newStartTime,
+      endTime: newEndTime,
+    },
+  });
+
+  // Send update email
+  if (context.userEmail) {
+    try {
+      await sendAppointmentUpdateEmail({
+        customerEmail: context.userEmail,
+        customerName: context.userName || "Customer",
+        serviceName: appointment.service.name,
+        startTime: newStartTime,
+        companyName: context.companyName,
+        previousStartTime,
+      });
+    } catch (emailError) {
+      console.error("Failed to send reschedule email:", emailError);
+    }
+  }
+
+  const bookingData = {
+    appointmentId: appointment.id,
+    service: appointment.service.name,
+    date: format(newStartTime, "EEEE, MMMM d, yyyy", { locale: dateLocale }),
+    time: format(newStartTime, "HH:mm"),
+    duration: `${appointment.service.duration} minutes`,
+    price: `${appointment.service.currency} ${Number(appointment.service.price).toLocaleString()}`,
+    status: appointment.status,
+  };
+
+  return {
+    success: true,
+    data: bookingData,
+    userMessage: t("botChat.appointmentRescheduled", {
+      serviceName: appointment.service.name,
+      date: format(newStartTime, "EEEE, MMMM d", { locale: dateLocale }),
+      time: format(newStartTime, "HH:mm"),
+    }),
+    ui: {
+      component: "booking-card",
+      props: bookingData,
+    },
+  };
+}
+
+// Show confirmation buttons (no server work, just returns UI with embedded action)
+function handleRequestConfirmation(
+  params: RequestConfirmationParams
+): ToolResult {
+  return {
+    success: true,
+    userMessage: params.message,
+    ui: {
+      component: "confirmation",
+      props: {
+        message: params.message,
+        confirmLabel: params.confirmLabel,
+        cancelLabel: params.cancelLabel,
+        action: params.action,
+      },
+    },
   };
 }

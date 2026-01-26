@@ -13,6 +13,7 @@ interface ChatServiceSelectorProps {
   onSelect?: (service: ChatService) => void;
   disabled?: boolean;
   preSelectedServiceName?: string; // Pre-selected service name for historical messages
+  animate?: boolean;
 }
 
 // Helper to find service ID by name

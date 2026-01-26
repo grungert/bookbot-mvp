@@ -25,13 +25,15 @@ import type { ToolContext } from "@/lib/ai/tool-handlers";
 import { z } from "zod";
 
 const bookingActionSchema = z.object({
-  type: z.enum(["service", "date", "time"]),
+  type: z.enum(["service", "date", "time", "confirmation"]),
   serviceId: z.string().optional(),
   serviceName: z.string().optional(),
   date: z.string().optional(),
   dateISO: z.string().optional(),
   time: z.string().optional(),
   startTime: z.string().optional(),
+  confirmed: z.boolean().optional(),
+  action: z.record(z.string(), z.unknown()).optional(),
 });
 
 const chatRequestSchema = z.object({

@@ -137,7 +137,7 @@ async function getUserUpcomingAppointments(
   return appointments
     .map(
       (a) =>
-        `- ${format(a.startTime, "EEEE, MMM d", { locale: dateLocale })} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
+        `- [ID: ${a.id.slice(-8)}] ${format(a.startTime, "EEEE, MMM d", { locale: dateLocale })} at ${format(a.startTime, "HH:mm")} - ${a.service.name} (${a.status})`
     )
     .join("\n");
 }
@@ -196,7 +196,9 @@ async function buildSystemPrompt(
   const botName = company.botName || "Assistant";
   const personalityPrompt = getPersonalityPrompt(company.personality);
   const dateLocale = getDateLocale(company.language);
-  const today = format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale });
+  const now = new Date();
+  const today = format(now, "EEEE, MMMM d, yyyy", { locale: dateLocale });
+  const currentTime = format(now, "HH:mm");
 
   // Language instruction for non-English languages
   const language = company.language || "en";
@@ -214,7 +216,7 @@ YOUR IDENTITY:
 - ${personalityPrompt}
 ${company.greeting ? `- Default greeting: "${company.greeting}"` : ""}
 
-TODAY'S DATE: ${today}
+CURRENT DATE AND TIME: ${today}, ${currentTime}
 
 AVAILABLE SERVICES:
 ${services}
@@ -252,7 +254,12 @@ BOOKING RULES:
 2. For guests, collect name and email first
 3. Check upcoming appointments before booking to avoid conflicts
 4. Use getAvailableSlots to check times before suggesting availability
-5. Be helpful and guide users through the booking process`;
+5. Be helpful and guide users through the booking process
+6. NEVER show internal IDs (service IDs, booking IDs, session IDs, or any system identifiers) to the user. Only use human-readable names, dates, and times in your responses
+7. Users must be identified to cancel or reschedule. On web chat they must be logged in. On WhatsApp they are identified by phone number.
+8. Use requestConfirmation to show confirmation buttons before cancelling or rescheduling. The system executes the action automatically when the user clicks confirm. Do NOT ask for confirmation again after showing buttons.
+9. For rescheduling, show available time slots first using getAvailableSlots, then use requestConfirmation with the rescheduleAppointment action.
+10. Use the appointment IDs from UPCOMING APPOINTMENTS or searchAppointments results.`;
 
   // Add knowledge base if available
   if (documents) {
@@ -494,6 +501,15 @@ Result: ${result.userMessage}
             break;
           case "updateBookingState":
             resultMessage += `\n\nThe booking state has been updated and the appropriate UI is displayed. Acknowledge what was set and wait for the user's next selection.`;
+            break;
+          case "cancelAppointment":
+            resultMessage += `\n\nThe appointment has been cancelled and the updated card is displayed. Acknowledge the cancellation and ask if they need anything else.`;
+            break;
+          case "rescheduleAppointment":
+            resultMessage += `\n\nThe appointment has been rescheduled and the updated card is displayed. Confirm the new date/time and ask if they need anything else.`;
+            break;
+          case "requestConfirmation":
+            resultMessage += `\n\nConfirmation buttons are displayed. Wait for the user to click. The confirm action will execute automatically when clicked. Do NOT ask for confirmation again.`;
             break;
         }
       }

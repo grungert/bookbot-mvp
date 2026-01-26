@@ -409,7 +409,9 @@
     "loadingHistory": "Loading conversation...",
     "newConversation": "New conversation",
     "errorMessage": "Sorry, something went wrong. Please try again.",
-    "loadEarlierMessages": "Load earlier messages"
+    "loadEarlierMessages": "Load earlier messages",
+    "confirmYes": "Yes",
+    "confirmNo": "No"
   },
   "admin": {
     "dashboard": "Admin Dashboard",
@@ -1282,6 +1284,17 @@
       "usageLimitReached": "Sorry, we've reached our usage limit for this month. Please try again next month or contact us directly to book.",
       "textOnlySupported": "I can only process text messages at the moment. Please type your message instead."
     },
+    "appointmentNotFound": "Appointment not found. Please check the appointment details.",
+    "cannotCancelStatus": "This appointment cannot be cancelled because it is {status}.",
+    "appointmentCancelled": "Your appointment for {serviceName} on {date} at {time} has been cancelled.",
+    "cannotRescheduleStatus": "This appointment cannot be rescheduled because it is {status}.",
+    "newSlotUnavailable": "The requested time slot is not available. Please choose a different time.",
+    "appointmentRescheduled": "Your appointment for {serviceName} has been rescheduled to {date} at {time}.",
+    "loginRequiredForCancel": "You need to be logged in to cancel appointments. Please log in or contact the business directly.",
+    "loginRequiredForReschedule": "You need to be logged in to reschedule appointments. Please log in or contact the business directly.",
+    "appointmentNotOwnedByUser": "You can only cancel or reschedule your own appointments.",
+    "invalidNewDateTime": "The new date and time format is invalid. Please provide a valid date and time.",
+    "newTimeMustBeFuture": "The new appointment time must be in the future.",
     "chatUI": {
       "bookingConfirmed": "Booking Confirmed",
       "service": "Service",

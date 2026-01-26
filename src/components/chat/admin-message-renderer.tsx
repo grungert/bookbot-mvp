@@ -7,12 +7,14 @@ import { ChatServiceSelector } from "./ui/chat-service-selector";
 import { ChatDatePicker } from "./ui/chat-date-picker";
 import { ChatTimeSlots } from "./ui/chat-time-slots";
 import { ChatBookingCard } from "./ui/chat-booking-card";
+import { ChatConfirmationButtons } from "./ui/chat-confirmation-buttons";
 import type { ChatMessage } from "./types";
 
 interface AdminMessageRendererProps {
   message: ChatMessage;
   nextMessage?: ChatMessage; // Next message in conversation for extracting selections
   timestamp?: string;
+  language?: string;
 }
 
 /**
@@ -23,6 +25,7 @@ export function AdminMessageRenderer({
   message,
   nextMessage,
   timestamp,
+  language,
 }: AdminMessageRendererProps) {
   const parsed = parseMessage(message);
   const isUser = parsed.role === "user";
@@ -85,11 +88,20 @@ export function AdminMessageRenderer({
                 slots={parsed.ui.props.slots}
                 disabled={true}
                 preSelectedTime={selectionContext.preSelectedTime}
+                language={language}
               />
             )}
 
             {parsed.ui.component === "booking-card" && (
-              <ChatBookingCard booking={parsed.ui.props} />
+              <ChatBookingCard booking={parsed.ui.props} language={language} />
+            )}
+
+            {parsed.ui.component === "confirmation" && (
+              <ChatConfirmationButtons
+                confirmLabel={parsed.ui.props.confirmLabel}
+                cancelLabel={parsed.ui.props.cancelLabel}
+                disabled={true}
+              />
             )}
           </div>
         )}

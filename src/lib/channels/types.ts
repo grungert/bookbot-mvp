@@ -31,7 +31,7 @@ export interface IncomingMessage {
     /** User's profile picture URL if available */
     profilePicture?: string;
     /** Message type (text, button_reply, etc.) */
-    messageType?: "text" | "button_reply" | "list_reply" | "image" | "document";
+    messageType?: "text" | "button_reply" | "list_reply" | "image" | "document" | "unsupported";
     /** For button/list replies, the original button/list ID */
     replyId?: string;
     /** Raw payload for debugging */

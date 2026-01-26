@@ -10,6 +10,7 @@ import { ChatServiceSelector } from "./ui/chat-service-selector";
 import { ChatDatePicker } from "./ui/chat-date-picker";
 import { ChatTimeSlots } from "./ui/chat-time-slots";
 import { ChatBookingCard } from "./ui/chat-booking-card";
+import { ChatConfirmationButtons } from "./ui/chat-confirmation-buttons";
 import type { ChatMessage, ChatUICallbacks, ChatService, ChatTimeSlot } from "./types";
 
 function formatSmartTime(isoString: string): string {
@@ -167,6 +168,7 @@ export function ChatMessageRenderer({
                 }
                 disabled={!isInteractive}
                 preSelectedServiceName={selectionContext.preSelectedServiceName}
+                animate={isLatest}
               />
             )}
 
@@ -183,6 +185,7 @@ export function ChatMessageRenderer({
                 }
                 disabled={!isInteractive}
                 preSelectedDate={selectionContext.preSelectedDate}
+                animate={isLatest}
               />
             )}
 
@@ -202,12 +205,27 @@ export function ChatMessageRenderer({
                 disabled={!isInteractive}
                 preSelectedTime={selectionContext.preSelectedTime}
                 language={language}
+                animate={isLatest}
               />
             )}
 
             {parsed.ui.component === "booking-card" && (
-              <ChatBookingCard booking={parsed.ui.props} language={language} />
+              <ChatBookingCard booking={parsed.ui.props} language={language} animate={isLatest} />
             )}
+
+            {parsed.ui.component === "confirmation" && (() => {
+              const confirmProps = parsed.ui!.props as { confirmLabel: string; cancelLabel: string; action: Record<string, unknown> };
+              return (
+                <ChatConfirmationButtons
+                  confirmLabel={confirmProps.confirmLabel}
+                  cancelLabel={confirmProps.cancelLabel}
+                  onConfirm={isInteractive ? () => callbacks?.onConfirmationClick?.(true, confirmProps.action) : undefined}
+                  onCancel={isInteractive ? () => callbacks?.onConfirmationClick?.(false) : undefined}
+                  disabled={!isInteractive}
+                  animate={isLatest}
+                />
+              );
+            })()}
 
             {/* Note: Unknown components are filtered out by the message parser */}
           </div>

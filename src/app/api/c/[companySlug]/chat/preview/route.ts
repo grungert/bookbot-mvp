@@ -139,7 +139,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
     // Build the system prompt (similar to buildSystemPrompt in chat.ts)
     const botName = company.aiBotName || "Assistant";
     const personalityPrompt = getPersonalityPrompt(company.aiPersonality);
-    const today = format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale });
+    const now = new Date();
+    const today = format(now, "EEEE, MMMM d, yyyy", { locale: dateLocale });
+    const currentTime = format(now, "HH:mm");
 
     // Language instruction for non-English languages
     const t = getTranslator(language);
@@ -156,8 +158,8 @@ export async function GET(_request: Request, { params }: RouteParams) {
 - **Personality:** ${personalityPrompt}
 ${company.aiGreeting ? `- **Default greeting:** "${company.aiGreeting}"` : ""}
 
-## Today's Date
-${today}
+## Current Date and Time
+${today}, ${currentTime}
 
 ## Available Services
 ${
@@ -196,7 +198,8 @@ ${TOOL_INSTRUCTIONS.trim()}
 2. For guests, collect name and email first
 3. Check upcoming appointments before booking to avoid conflicts
 4. Use getAvailableSlots to check times before suggesting availability
-5. Be helpful and guide users through the booking process`;
+5. Be helpful and guide users through the booking process
+6. NEVER show internal IDs (service IDs, booking IDs, session IDs, or any system identifiers) to the user. Only use human-readable names, dates, and times in your responses`;
 
     // Add knowledge base if available
     if (documents.length > 0) {

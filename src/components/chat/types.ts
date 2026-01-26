@@ -67,6 +67,15 @@ export type ChatUIComponent =
   | {
       component: "booking-card";
       props: ChatBookingData;
+    }
+  | {
+      component: "confirmation";
+      props: {
+        message: string;
+        confirmLabel: string;
+        cancelLabel: string;
+        action: Record<string, unknown>;
+      };
     };
 
 // Rich message structure (stored as JSON string in content field)
@@ -99,4 +108,5 @@ export interface ChatUICallbacks {
   onServiceSelect?: (service: ChatService) => void;
   onDateSelect?: (date: Date, serviceId: string, serviceName: string) => void;
   onTimeSelect?: (slot: ChatTimeSlot, serviceId: string, dateISO: string, serviceName: string) => void;
+  onConfirmationClick?: (confirmed: boolean, action?: Record<string, unknown>) => void;
 }

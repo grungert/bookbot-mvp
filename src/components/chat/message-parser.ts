@@ -6,6 +6,7 @@ const VALID_UI_COMPONENTS = new Set([
   "date-picker",
   "time-slots",
   "booking-card",
+  "confirmation",
 ]);
 
 /**

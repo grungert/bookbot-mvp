@@ -142,6 +142,11 @@
   .stagger-3 { animation-delay: 150ms; }
   .stagger-4 { animation-delay: 200ms; }
   .stagger-5 { animation-delay: 250ms; }
+  .stagger-6 { animation-delay: 300ms; }
+  .stagger-7 { animation-delay: 350ms; }
+  .stagger-8 { animation-delay: 400ms; }
+  .stagger-9 { animation-delay: 450ms; }
+  .stagger-10 { animation-delay: 500ms; }
 
   /* Animation fill mode to keep final state */
   .animate-fill-forwards {

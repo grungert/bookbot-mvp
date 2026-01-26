@@ -11,6 +11,7 @@ interface ChatDatePickerProps {
   onSelect?: (date: Date, serviceId: string, serviceName: string) => void;
   disabled?: boolean;
   preSelectedDate?: Date; // Pre-selected date for historical messages
+  animate?: boolean;
 }
 
 export function ChatDatePicker({

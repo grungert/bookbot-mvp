@@ -188,13 +188,7 @@ export async function findCompanyByPhoneNumberId(
     return companyByField;
   }
 
-  // Final fallback: find any WhatsApp-enabled company
-  const defaultCompany = await prisma.company.findFirst({
-    where: { whatsappEnabled: true },
-    select: { id: true, slug: true },
-  });
-
-  return defaultCompany;
+  return null;
 }
 
 /**
@@ -400,6 +394,7 @@ export const whatsappAdapter: ChannelAdapter = {
             default:
               // Unsupported message type
               content = `[${message.type} message]`;
+              messageType = "unsupported";
           }
 
           return {
@@ -493,6 +488,61 @@ export const whatsappAdapter: ChannelAdapter = {
 };
 
 /**
+ * Send a typing indicator (and mark message as read) via WhatsApp Cloud API.
+ * Fire-and-forget: errors are logged but never thrown.
+ */
+export async function sendTypingIndicator(
+  companyId: string,
+  messageId: string
+): Promise<void> {
+  try {
+    // Resolve credentials: company-specific first, then global fallback
+    let phoneNumberId: string | null = null;
+    let accessToken: string | null = null;
+
+    const companyCredentials = await getCompanyCredentials(companyId);
+    if (companyCredentials) {
+      phoneNumberId = companyCredentials.phoneNumberId;
+      accessToken = companyCredentials.accessToken;
+    } else {
+      const settings = await getGlobalSettings();
+      phoneNumberId = settings.phoneNumberId;
+      accessToken = settings.accessToken;
+    }
+
+    if (!phoneNumberId || !accessToken) {
+      console.warn("sendTypingIndicator: missing WhatsApp credentials, skipping");
+      return;
+    }
+
+    const url = `${WHATSAPP_API_BASE}/${phoneNumberId}/messages`;
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+        typing_indicator: {
+          type: "text",
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.warn("sendTypingIndicator: API error", data);
+    }
+  } catch (error) {
+    console.warn("sendTypingIndicator: failed", error);
+  }
+}
+
+/**
  * Update message status based on webhook status update
  */
 export async function handleWhatsAppStatusUpdate(
@@ -510,8 +560,21 @@ export async function handleWhatsAppStatusUpdate(
 }
 
 /**
- * Check if a phone number has an active session for a company
+ * Find a user by phone number, trying both with and without '+' prefix
+ * to handle WhatsApp format (no '+') vs user-entered format (with '+').
  */
+async function findUserByPhone(phoneNumber: string) {
+  const variants = [phoneNumber];
+  if (phoneNumber.startsWith("+")) {
+    variants.push(phoneNumber.slice(1));
+  } else {
+    variants.push(`+${phoneNumber}`);
+  }
+  return prisma.user.findFirst({
+    where: { phone: { in: variants } },
+  });
+}
+
 export async function findOrCreateWhatsAppSession(
   companyId: string,
   phoneNumber: string,
@@ -531,6 +594,17 @@ export async function findOrCreateWhatsAppSession(
   });
 
   if (existingSession) {
+    // If the session has no linked user, try to link now
+    if (!existingSession.userId) {
+      const user = await findUserByPhone(phoneNumber);
+      if (user) {
+        await prisma.chatSession.update({
+          where: { id: existingSession.id },
+          data: { updatedAt: new Date(), userId: user.id },
+        });
+        return { sessionId: existingSession.id, isNew: false };
+      }
+    }
     // Update the session's updatedAt
     await prisma.chatSession.update({
       where: { id: existingSession.id },
@@ -539,21 +613,14 @@ export async function findOrCreateWhatsAppSession(
     return { sessionId: existingSession.id, isNew: false };
   }
 
-  // Try to find or create user by phone number
-  let userId: string | undefined;
-  const existingUser = await prisma.user.findFirst({
-    where: { phone: phoneNumber },
-  });
-
-  if (existingUser) {
-    userId = existingUser.id;
-  }
+  // Try to find user by phone number (with +/without + normalization)
+  const existingUser = await findUserByPhone(phoneNumber);
 
   // Create new session
   const newSession = await prisma.chatSession.create({
     data: {
       companyId,
-      userId,
+      userId: existingUser?.id,
       channel: "whatsapp",
       phoneNumber,
     },

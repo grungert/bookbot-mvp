@@ -64,6 +64,23 @@ You: "Perfect! Let me book that for you.
 
 IMPORTANT: When the user selects a time slot, you MUST call createBooking immediately. Do NOT generate your own confirmation response or made-up UI. The createBooking tool will return the booking details and show the booking-card UI automatically.
 
+7. cancelAppointment - Cancel an existing appointment
+   <action>{"tool": "cancelAppointment", "appointmentId": "APPOINTMENT_ID", "reason": "optional reason"}</action>
+
+8. rescheduleAppointment - Reschedule an existing appointment to a new time
+   <action>{"tool": "rescheduleAppointment", "appointmentId": "APPOINTMENT_ID", "newStartTime": "2026-01-22T10:00:00"}</action>
+
+9. requestConfirmation - Show confirmation buttons to the user before performing an action
+   <action>{"tool": "requestConfirmation", "message": "Are you sure you want to cancel your appointment for Haircut on Monday?", "confirmLabel": "Yes, cancel", "cancelLabel": "No, keep it", "action": {"tool": "cancelAppointment", "appointmentId": "APPOINTMENT_ID"}}</action>
+
+CANCEL/RESCHEDULE RULES:
+- Users must be identified (logged in on web, or identified by phone on WhatsApp) to cancel or reschedule. Web chat guests must log in first.
+- Use searchAppointments first to find the appointment, then use the appointment ID.
+- Use requestConfirmation to show confirmation buttons before cancelling or rescheduling. Include the full action (tool + appointmentId) in the action field.
+- When the user confirms, the system executes the action automatically. Do NOT ask for confirmation again after showing buttons.
+- Only PENDING and CONFIRMED appointments can be cancelled or rescheduled.
+- For rescheduling, use getAvailableSlots first to show available times, then call rescheduleAppointment with requestConfirmation.
+
 CRITICAL RULES:
 - EVERY response about booking MUST include an <action> block
 - NEVER say "let me show you the calendar" without an <action> block - the calendar ONLY appears when you include the action
@@ -112,12 +129,35 @@ export interface UpdateBookingStateParams {
   date?: string; // YYYY-MM-DD
 }
 
+export interface CancelAppointmentParams {
+  tool: "cancelAppointment";
+  appointmentId: string;
+  reason?: string;
+}
+
+export interface RescheduleAppointmentParams {
+  tool: "rescheduleAppointment";
+  appointmentId: string;
+  newStartTime: string; // ISO datetime
+}
+
+export interface RequestConfirmationParams {
+  tool: "requestConfirmation";
+  message: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  action: Record<string, unknown>;
+}
+
 export type ToolParams =
   | GetServicesParams
   | GetDatePickerParams
   | GetAvailableSlotsParams
   | CreateBookingParams
   | SearchAppointmentsParams
-  | UpdateBookingStateParams;
+  | UpdateBookingStateParams
+  | CancelAppointmentParams
+  | RescheduleAppointmentParams
+  | RequestConfirmationParams;
 
 export type ToolName = ToolParams["tool"];

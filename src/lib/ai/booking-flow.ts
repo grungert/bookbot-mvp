@@ -32,13 +32,15 @@ export interface BookingState {
 
 // Booking action sent from client (web chat or WhatsApp)
 export interface BookingAction {
-  type: "service" | "date" | "time";
+  type: "service" | "date" | "time" | "confirmation";
   serviceId?: string;
   serviceName?: string;
   date?: string; // YYYY-MM-DD
   dateISO?: string; // YYYY-MM-DD (alias)
   time?: string; // ISO datetime
   startTime?: string; // ISO datetime (alias)
+  confirmed?: boolean;
+  action?: Record<string, unknown>;
 }
 
 // Result from handling a booking selection
@@ -211,6 +213,19 @@ export async function handleBookingSelection(
 
         await saveBookingState(sessionId, state);
       }
+      break;
+    }
+
+    case "confirmation": {
+      if (!action.confirmed || !action.action) {
+        return {
+          assistantMessage: t("botChat.unknownBookingAction"),
+          usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+        };
+      }
+
+      // Execute the embedded action directly (cancel/reschedule)
+      result = await executeToolAction(context, action.action as unknown as import("./tools").ToolParams);
       break;
     }
 
