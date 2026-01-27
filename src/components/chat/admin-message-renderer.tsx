@@ -1,5 +1,8 @@
 "use client";
 
+import { memo } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { parseMessage } from "./message-parser";
 import { extractSelectionFromNextMessage } from "./selection-extractor";
@@ -9,6 +12,48 @@ import { ChatTimeSlots } from "./ui/chat-time-slots";
 import { ChatBookingCard } from "./ui/chat-booking-card";
 import { ChatConfirmationButtons } from "./ui/chat-confirmation-buttons";
 import type { ChatMessage } from "./types";
+
+const AdminChatMarkdown = memo(function AdminChatMarkdown({ text }: { text: string }) {
+  return (
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+        em: ({ children }) => <em>{children}</em>,
+        ul: ({ children }) => <ul className="list-disc pl-4 mb-1 last:mb-0 space-y-0.5">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal pl-4 mb-1 last:mb-0 space-y-0.5">{children}</ol>,
+        li: ({ children }) => <li>{children}</li>,
+        a: ({ href, children }) => (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:opacity-80">
+            {children}
+          </a>
+        ),
+        code: ({ children }) => (
+          <code className="bg-background/50 rounded px-1 py-0.5 text-xs font-mono">{children}</code>
+        ),
+        h1: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+        h2: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+        h3: ({ children }) => <p className="font-semibold mb-1">{children}</p>,
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-1 last:mb-0 rounded border border-muted-foreground/20">
+            <table className="w-full text-xs">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-background/50">{children}</thead>,
+        tbody: ({ children }) => <tbody>{children}</tbody>,
+        tr: ({ children }) => <tr className="border-b border-muted-foreground/10 last:border-0">{children}</tr>,
+        th: ({ children }) => <th className="px-2 py-1 text-left font-semibold whitespace-nowrap">{children}</th>,
+        td: ({ children }) => <td className="px-2 py-1 whitespace-nowrap">{children}</td>,
+        pre: ({ children }) => <>{children}</>,
+        blockquote: ({ children }) => <div className="border-l-2 border-muted-foreground/30 pl-2 mb-1 last:mb-0">{children}</div>,
+        hr: () => <hr className="my-1 border-muted-foreground/20" />,
+      }}
+    >
+      {text}
+    </Markdown>
+  );
+});
 
 interface AdminMessageRendererProps {
   message: ChatMessage;
@@ -44,8 +89,12 @@ export function AdminMessageRenderer({
         )}
       >
         {/* Text content */}
-        <div className="px-4 py-2">
-          <p className="text-sm whitespace-pre-wrap">{parsed.text}</p>
+        <div className="px-4 py-2 text-sm">
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{parsed.text}</p>
+          ) : (
+            <AdminChatMarkdown text={parsed.text} />
+          )}
           {timestamp && (
             <p
               className={cn(
