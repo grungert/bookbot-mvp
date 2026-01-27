@@ -146,6 +146,13 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
         at_risk: t("segmentAtRisk"),
         churned: t("segmentChurned"),
       }}
+      bookingChannelLabels={{
+        title: t("bookingsByChannel"),
+        website: t("sourceWebsite"),
+        bot: t("sourceBot"),
+        whatsapp: t("sourceWhatsapp"),
+        admin: t("sourceAdmin"),
+      }}
     />
   );
 }

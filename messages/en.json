@@ -955,7 +955,12 @@
     "segmentLoyal": "Loyal",
     "segmentVip": "VIP",
     "segmentAtRisk": "At Risk",
-    "segmentChurned": "Churned"
+    "segmentChurned": "Churned",
+    "bookingsByChannel": "Bookings by Channel",
+    "sourceWebsite": "Website",
+    "sourceBot": "Bot",
+    "sourceWhatsapp": "WhatsApp",
+    "sourceAdmin": "Admin"
   },
   "profile": {
     "title": "Profile",

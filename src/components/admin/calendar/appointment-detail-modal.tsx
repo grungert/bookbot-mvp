@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useTranslations, useLocale } from "next-intl";
-import { format, parseISO, setHours, setMinutes, startOfDay } from "date-fns";
+import { format, parseISO, setHours, setMinutes, startOfDay, formatDistanceToNow } from "date-fns";
 import { srLatn, enUS } from "date-fns/locale";
 import {
   Sheet,
@@ -48,6 +48,10 @@ import {
   Save,
   X,
   MessageSquare,
+  Globe,
+  Bot,
+  ShieldCheck,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Appointment } from "./appointment-card";
@@ -434,28 +438,82 @@ export function AppointmentDetailModal({
               )}
             </div>
 
+            {/* Booking Info */}
+            <div className="p-6 border-t">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                {t("bookedVia") || "Booked via"}
+              </Label>
+              <div className="mt-3 space-y-3">
+                {/* Source channel */}
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const channel = appointment.bookingChannel;
+                    let Icon = Globe;
+                    let iconColor = "text-blue-600";
+                    let label = t("sourceWebsite");
+                    switch (channel) {
+                      case "bot":
+                        Icon = Bot; iconColor = "text-purple-600"; label = t("sourceBot"); break;
+                      case "whatsapp":
+                        Icon = MessageSquare; iconColor = "text-green-600"; label = t("sourceWhatsapp"); break;
+                      case "admin":
+                        Icon = ShieldCheck; iconColor = "text-orange-600"; label = t("sourceAdmin"); break;
+                    }
+                    return (
+                      <>
+                        <div className={cn("p-2 rounded-lg bg-muted", iconColor)}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">{label}</div>
+                          {appointment.createdAt && (
+                            <div className="text-xs text-muted-foreground">
+                              {format(parseISO(appointment.createdAt), "MMM d, yyyy HH:mm", { locale: dateLocale })}
+                              {" · "}
+                              {formatDistanceToNow(parseISO(appointment.createdAt), { addSuffix: true, locale: dateLocale })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* Status history */}
+                {appointment.statusLog && appointment.statusLog.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                      {tCommon("status")} log
+                    </div>
+                    <div className="space-y-1.5">
+                      {appointment.statusLog.map((entry, i) => {
+                        const statusLabel = tAppointments(`status${entry.status.charAt(0)}${entry.status.slice(1).toLowerCase()}`);
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="font-medium">{statusLabel}</span>
+                            <span className="text-muted-foreground">
+                              {entry.changedBy === "admin" ? `(${t("sourceAdmin")})` : ""}
+                            </span>
+                            <span className="text-muted-foreground ml-auto">
+                              {formatDistanceToNow(parseISO(entry.changedAt), { addSuffix: true, locale: dateLocale })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Notifications */}
-            {(appointment.notificationLog || appointment.bookingChannel) && (
+            {appointment.notificationLog && (
               <div className="p-6 border-t">
                 <Label className="text-xs text-muted-foreground uppercase tracking-wide">
                   {t("notificationStatus") || "Notifications"}
                 </Label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {appointment.bookingChannel && (
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                      {t("bookedVia") || "Booked via"}:{" "}
-                      {(() => {
-                        switch (appointment.bookingChannel) {
-                          case "bot": return t("sourceBot");
-                          case "whatsapp": return t("sourceWhatsapp");
-                          case "admin": return t("sourceAdmin");
-                          case "website":
-                          case "web":
-                          default: return t("sourceWebsite");
-                        }
-                      })()}
-                    </span>
-                  )}
                   {appointment.notificationLog?.email && (
                     <span
                       className={cn(

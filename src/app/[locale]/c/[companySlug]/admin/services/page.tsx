@@ -665,14 +665,14 @@ export default function ServicesPage() {
             placeholder={t("searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-white"
           />
         </div>
         <Select
           value={discountFilter}
           onValueChange={(value: "all" | "with_discount" | "no_discount") => setDiscountFilter(value)}
         >
-          <SelectTrigger className="w-full sm:w-[160px]">
+          <SelectTrigger className="w-full sm:w-[160px] bg-white">
             <SelectValue placeholder={t("filterByDiscount")} />
           </SelectTrigger>
           <SelectContent>

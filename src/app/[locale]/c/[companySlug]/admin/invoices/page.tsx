@@ -809,13 +809,13 @@ export default function InvoicesPage() {
             placeholder={t("searchInvoiceNumber")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-white"
           />
         </div>
 
         {/* Customer Filter */}
         <Select value={selectedCustomerId || "all"} onValueChange={(value) => setSelectedCustomerId(value === "all" ? "" : value)}>
-          <SelectTrigger className="w-full sm:w-[160px]">
+          <SelectTrigger className="w-full sm:w-[160px] bg-white">
             <SelectValue placeholder={t("allCustomers")} />
           </SelectTrigger>
           <SelectContent>
@@ -832,7 +832,7 @@ export default function InvoicesPage() {
         <Select value={currentStatusValue} onValueChange={handleStatusChange}>
           <SelectTrigger
             className={cn(
-              "w-full sm:w-[160px] bg-card/80 backdrop-blur-sm transition-colors",
+              "w-full sm:w-[160px] bg-white backdrop-blur-sm transition-colors",
               currentStatusValue === "all" && "text-primary border-primary/30 hover:border-primary/50",
               currentStatusValue === "DRAFT" && "text-gray-700 border-gray-500/50 hover:border-gray-500/70",
               currentStatusValue === "SENT" && "text-blue-700 border-blue-500/50 hover:border-blue-500/70",

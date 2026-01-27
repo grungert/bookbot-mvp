@@ -17,6 +17,7 @@ import {
   type RecentConversation,
 } from "./recent-activity";
 import { CustomerSegmentsChart } from "./customer-segments-chart";
+import { BookingChannelsChart } from "./booking-channels-chart";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import type { DashboardPeriod } from "@/lib/db/tenant";
@@ -55,6 +56,12 @@ interface DashboardContentProps {
     }>;
     chatActivityTrendData: Array<{ date: string; sessions: number; messages: number }>;
     firstPendingAppointmentId: string | null;
+    bookingChannelStats: {
+      website: number;
+      bot: number;
+      whatsapp: number;
+      admin: number;
+    };
   };
   todaySummary: {
     appointmentsToday: number;
@@ -161,6 +168,13 @@ interface DashboardContentProps {
     at_risk: string;
     churned: string;
   };
+  bookingChannelLabels: {
+    title: string;
+    website: string;
+    bot: string;
+    whatsapp: string;
+    admin: string;
+  };
   currency?: string;
   primaryColor?: string;
 }
@@ -179,6 +193,7 @@ export function DashboardContent({
   translations,
   statusLabels,
   segmentLabels,
+  bookingChannelLabels,
   currency = "RSD",
   primaryColor,
 }: DashboardContentProps) {
@@ -512,6 +527,18 @@ export function DashboardContent({
             vip: segmentLabels.vip,
             at_risk: segmentLabels.at_risk,
             churned: segmentLabels.churned,
+          }}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+        <BookingChannelsChart
+          data={stats.bookingChannelStats}
+          title={bookingChannelLabels.title}
+          noDataMessage={translations.noData}
+          labels={{
+            website: bookingChannelLabels.website,
+            bot: bookingChannelLabels.bot,
+            whatsapp: bookingChannelLabels.whatsapp,
+            admin: bookingChannelLabels.admin,
           }}
           prefersReducedMotion={prefersReducedMotion}
         />

@@ -955,7 +955,12 @@
     "segmentLoyal": "Lojalni",
     "segmentVip": "VIP",
     "segmentAtRisk": "Rizicni",
-    "segmentChurned": "Izgubljeni"
+    "segmentChurned": "Izgubljeni",
+    "bookingsByChannel": "Rezervacije po kanalu",
+    "sourceWebsite": "Sajt",
+    "sourceBot": "Bot",
+    "sourceWhatsapp": "WhatsApp",
+    "sourceAdmin": "Admin"
   },
   "profile": {
     "title": "Profil",

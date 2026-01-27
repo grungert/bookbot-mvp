@@ -547,6 +547,9 @@ export async function getCompanyDashboardStats(
 
     // First pending appointment
     firstPendingAppointment,
+
+    // Booking channel breakdown
+    bookingChannelGroups,
   ] = await Promise.all([
     // Appointments grouped by status for current period (includes future)
     prisma.appointment.groupBy({
@@ -607,7 +610,7 @@ export async function getCompanyDashboardStats(
 
     // Daily revenue for area chart
     prisma.$queryRaw<Array<{ date: Date; total: number }>>`
-      SELECT DATE_TRUNC('day', "createdAt") as date, COALESCE(SUM(total), 0) as total
+      SELECT DATE_TRUNC('day', "createdAt") as date, COALESCE(SUM(total)::double precision, 0) as total
       FROM "Invoice"
       WHERE "companyId" = ${companyId}
         AND status = 'PAID'
@@ -738,6 +741,16 @@ export async function getCompanyDashboardStats(
       orderBy: { startTime: "asc" },
       select: { id: true },
     }),
+
+    // Booking channel breakdown
+    prisma.appointment.groupBy({
+      by: ["bookingChannel"],
+      _count: true,
+      where: {
+        companyId,
+        startTime: { gte: periodStart, lte: periodEnd },
+      },
+    }),
   ]);
 
   // Calculate trends (percentage change)
@@ -805,6 +818,24 @@ export async function getCompanyDashboardStats(
     now
   );
 
+  // Normalize booking channel counts
+  const bookingChannelStats = { website: 0, bot: 0, whatsapp: 0, admin: 0 };
+  bookingChannelGroups.forEach((item) => {
+    const channel = item.bookingChannel;
+    if (channel === null || channel === "web" || channel === "website") {
+      bookingChannelStats.website += item._count;
+    } else if (channel === "bot") {
+      bookingChannelStats.bot += item._count;
+    } else if (channel === "whatsapp") {
+      bookingChannelStats.whatsapp += item._count;
+    } else if (channel === "admin") {
+      bookingChannelStats.admin += item._count;
+    } else {
+      // Unknown channels fall into website
+      bookingChannelStats.website += item._count;
+    }
+  });
+
   return {
     // Summary stats
     totalAppointments: currentAppointmentCount,
@@ -835,6 +866,9 @@ export async function getCompanyDashboardStats(
 
     // First pending appointment ID for deep-linking
     firstPendingAppointmentId: firstPendingAppointment?.id ?? null,
+
+    // Booking channel breakdown
+    bookingChannelStats,
   };
 }
 
@@ -852,17 +886,21 @@ function formatTrendData(
     dateMap.set(dateStr, item.value);
   });
 
-  // Fill in all dates
+  // Fill in all dates — use UTC to stay consistent with toISOString()
   const result: Array<{ date: string; value: number }> = [];
   const current = new Date(startDate);
+  current.setUTCHours(0, 0, 0, 0);
 
-  while (current <= endDate) {
+  const end = new Date(endDate);
+  end.setUTCHours(23, 59, 59, 999);
+
+  while (current <= end) {
     const dateStr = current.toISOString().split("T")[0];
     result.push({
       date: dateStr,
       value: dateMap.get(dateStr) || 0,
     });
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return result;
@@ -882,11 +920,15 @@ function formatChatActivityTrendData(
     dateMap.set(dateStr, { sessions: item.sessions, messages: item.messages });
   });
 
-  // Fill in all dates
+  // Fill in all dates — use UTC to stay consistent with toISOString()
   const result: Array<{ date: string; sessions: number; messages: number }> = [];
   const current = new Date(startDate);
+  current.setUTCHours(0, 0, 0, 0);
 
-  while (current <= endDate) {
+  const end = new Date(endDate);
+  end.setUTCHours(23, 59, 59, 999);
+
+  while (current <= end) {
     const dateStr = current.toISOString().split("T")[0];
     const values = dateMap.get(dateStr) || { sessions: 0, messages: 0 };
     result.push({
@@ -894,7 +936,7 @@ function formatChatActivityTrendData(
       sessions: values.sessions,
       messages: values.messages,
     });
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return result;

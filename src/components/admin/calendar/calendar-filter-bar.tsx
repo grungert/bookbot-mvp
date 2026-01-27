@@ -148,7 +148,7 @@ export function CalendarFilterBar({
         <Select value={currentStatusValue} onValueChange={handleStatusChange}>
           <SelectTrigger
             className={cn(
-              "w-[180px] bg-card/80 backdrop-blur-sm transition-colors",
+              "w-[180px] bg-white backdrop-blur-sm transition-colors",
               currentStatusStyle.text,
               currentStatusStyle.border
             )}
@@ -222,7 +222,7 @@ export function CalendarFilterBar({
               placeholder={tAppointments("searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => onSearchChange?.(e.target.value)}
-              className="pl-9 w-[200px] lg:w-[280px] h-9"
+              className="pl-9 w-[200px] lg:w-[280px] h-9 bg-white"
             />
           </div>
         )}

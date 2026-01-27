@@ -703,11 +703,11 @@ export default function ConversationsPage() {
             placeholder={t("searchByEmail")}
             value={searchEmail}
             onChange={(e) => setSearchEmail(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-white"
           />
         </div>
         <Select value={userType} onValueChange={(v) => setUserType(v as typeof userType)}>
-          <SelectTrigger className="w-full sm:w-[120px]">
+          <SelectTrigger className="w-full sm:w-[120px] bg-white">
             <Users className="h-4 w-4 mr-2" />
             <SelectValue placeholder={t("filterByUserType")} />
           </SelectTrigger>
@@ -718,7 +718,7 @@ export default function ConversationsPage() {
           </SelectContent>
         </Select>
         <Select value={channel} onValueChange={(v) => setChannel(v as typeof channel)}>
-          <SelectTrigger className="w-full sm:w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px] bg-white">
             <Globe className="h-4 w-4 mr-2" />
             <SelectValue placeholder={t("filterByChannel")} />
           </SelectTrigger>
@@ -729,7 +729,7 @@ export default function ConversationsPage() {
           </SelectContent>
         </Select>
         <Select value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
-          <SelectTrigger className="w-full sm:w-[140px]">
+          <SelectTrigger className="w-full sm:w-[140px] bg-white">
             <LayoutList className="h-4 w-4 mr-2" />
             <SelectValue placeholder={t("viewMode")} />
           </SelectTrigger>
