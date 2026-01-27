@@ -232,6 +232,18 @@ export async function POST(request: Request, { params }: RouteParams) {
           }
 
           // Create the appointment
+          // Detect if the caller is an admin (has company membership)
+          const isAdmin = sessionUser
+            ? !!(await tx.companyMembership.findUnique({
+                where: {
+                  userId_companyId: {
+                    userId: sessionUser.id,
+                    companyId: company.id,
+                  },
+                },
+              })) || sessionUser.role === "SUPER_ADMIN"
+            : false;
+
           return tx.appointment.create({
             data: {
               companyId: company.id,
@@ -241,7 +253,7 @@ export async function POST(request: Request, { params }: RouteParams) {
               endTime: appointmentEnd,
               status: "PENDING",
               notes,
-              bookingChannel: "web",
+              bookingChannel: isAdmin ? "admin" : "website",
             },
             include: {
               service: true,

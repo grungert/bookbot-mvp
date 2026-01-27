@@ -135,7 +135,12 @@
     "emailFailed": "Email neuspesno",
     "whatsappSent": "WhatsApp poslat",
     "whatsappFailed": "WhatsApp neuspesno",
-    "bookedVia": "Rezervisano preko"
+    "bookedVia": "Rezervisano preko",
+    "sourceWebsite": "Veb sajt",
+    "sourceBot": "Chat Bot",
+    "sourceWhatsapp": "WhatsApp",
+    "sourceAdmin": "Admin",
+    "created": "Kreirano"
   },
   "booking": {
     "title": "Zakazivanje termina",

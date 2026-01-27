@@ -157,7 +157,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         userName: currentUser?.name || undefined,
         sessionId: session.id,
         language: company.language || "en",
-        channel: "web",
+        channel: "bot",
       };
 
       const result = await handleBookingSelection(
@@ -225,7 +225,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       userContext,
       session.id,
       bookingState,
-      "web"
+      "bot"
     );
 
     // Save assistant response with token usage

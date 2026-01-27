@@ -224,6 +224,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       updateData.cancelledAt = new Date();
     }
 
+    // Track all status changes in statusLog
+    if (parsed.data.status) {
+      const existingLog = (appointment.statusLog as Array<{ status: string; changedAt: string; changedBy: string }>) || [];
+      updateData.statusLog = [
+        ...existingLog,
+        {
+          status: parsed.data.status,
+          changedAt: new Date().toISOString(),
+          changedBy: isAdmin ? "admin" : "customer",
+        },
+      ];
+    }
+
     const updated = await prisma.appointment.update({
       where: { id: appointmentId },
       data: updateData,

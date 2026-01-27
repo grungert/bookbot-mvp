@@ -135,7 +135,12 @@
     "emailFailed": "Email failed",
     "whatsappSent": "WhatsApp sent",
     "whatsappFailed": "WhatsApp failed",
-    "bookedVia": "Booked via"
+    "bookedVia": "Booked via",
+    "sourceWebsite": "Website",
+    "sourceBot": "Chat Bot",
+    "sourceWhatsapp": "WhatsApp",
+    "sourceAdmin": "Admin",
+    "created": "Created"
   },
   "booking": {
     "title": "Book an Appointment",

@@ -15,6 +15,7 @@ export interface Appointment {
   id: string;
   startTime: string;
   endTime: string;
+  createdAt?: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   notes: string | null;
   bookingChannel?: string | null;
@@ -22,6 +23,7 @@ export interface Appointment {
     email?: { success: boolean; sentAt?: string };
     whatsapp?: { success: boolean; sentAt?: string; messageId?: string };
   } | null;
+  statusLog?: Array<{ status: string; changedAt: string; changedBy: string }> | null;
   service: {
     id?: string;
     name: string;

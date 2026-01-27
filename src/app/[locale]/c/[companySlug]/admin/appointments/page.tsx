@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { format, parseISO, startOfDay, endOfDay, isWithinInterval, subDays } from "date-fns";
+import { format, parseISO, startOfDay, endOfDay, isWithinInterval, subDays, formatDistanceToNow } from "date-fns";
 import { srLatn, enUS } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Mail, MessageSquare } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Mail, MessageSquare, Globe, Bot, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   CalendarHeader,
@@ -100,7 +100,7 @@ export default function AppointmentsPage() {
 
   // Search and sort state
   const [searchQuery, setSearchQuery] = useState("");
-  type SortField = "date" | "service" | "customer" | "status";
+  type SortField = "date" | "service" | "customer" | "status" | "created";
   type SortDirection = "asc" | "desc";
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -379,6 +379,9 @@ export default function AppointmentsPage() {
             comparison = (statusOrder[a.status as keyof typeof statusOrder] || 0) -
                         (statusOrder[b.status as keyof typeof statusOrder] || 0);
             break;
+          case "created":
+            comparison = new Date(a.createdAt || a.startTime).getTime() - new Date(b.createdAt || b.startTime).getTime();
+            break;
         }
 
         return sortDirection === "asc" ? comparison : -comparison;
@@ -498,6 +501,21 @@ export default function AppointmentsPage() {
         {t(`status${status.charAt(0)}${status.slice(1).toLowerCase()}`)}
       </Badge>
     );
+  }
+
+  function getChannelIcon(channel: string | null | undefined) {
+    switch (channel) {
+      case "bot":
+        return { icon: Bot, color: "text-purple-600", label: tCalendar("sourceBot") };
+      case "whatsapp":
+        return { icon: MessageSquare, color: "text-green-600", label: tCalendar("sourceWhatsapp") };
+      case "admin":
+        return { icon: ShieldCheck, color: "text-orange-600", label: tCalendar("sourceAdmin") };
+      case "website":
+      case "web":
+      default:
+        return { icon: Globe, color: "text-blue-600", label: tCalendar("sourceWebsite") };
+    }
   }
 
   const handleRefresh = async () => {
@@ -708,6 +726,23 @@ export default function AppointmentsPage() {
                         )}
                       </button>
                     </TableHead>
+                    <TableHead className="hidden lg:table-cell">
+                      <button
+                        onClick={() => handleSort("created")}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors"
+                      >
+                        {tCalendar("created")}
+                        {sortField === "created" ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">{tCommon("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -716,7 +751,7 @@ export default function AppointmentsPage() {
                     <React.Fragment key={dateKey}>
                       {/* Date Group Header */}
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
-                        <TableCell colSpan={6} className="py-2">
+                        <TableCell colSpan={7} className="py-2">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-sm">
                               {format(new Date(dateKey), "EEEE, MMMM d, yyyy", { locale: dateLocale })}
@@ -799,6 +834,25 @@ export default function AppointmentsPage() {
                                 </span>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {apt.createdAt && (() => {
+                              const ch = getChannelIcon(apt.bookingChannel);
+                              const Icon = ch.icon;
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <span title={ch.label}>
+                                    <Icon className={cn("h-4 w-4 shrink-0", ch.color)} />
+                                  </span>
+                                  <div className="text-sm">
+                                    <div>{format(parseISO(apt.createdAt), "MMM d, yyyy", { locale: dateLocale })}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {formatDistanceToNow(parseISO(apt.createdAt), { addSuffix: true, locale: dateLocale })}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             {apt.status === "PENDING" && (

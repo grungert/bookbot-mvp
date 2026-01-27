@@ -443,7 +443,17 @@ export function AppointmentDetailModal({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {appointment.bookingChannel && (
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                      {t("bookedVia") || "Booked via"}: {appointment.bookingChannel}
+                      {t("bookedVia") || "Booked via"}:{" "}
+                      {(() => {
+                        switch (appointment.bookingChannel) {
+                          case "bot": return t("sourceBot");
+                          case "whatsapp": return t("sourceWhatsapp");
+                          case "admin": return t("sourceAdmin");
+                          case "website":
+                          case "web":
+                          default: return t("sourceWebsite");
+                        }
+                      })()}
                     </span>
                   )}
                   {appointment.notificationLog?.email && (

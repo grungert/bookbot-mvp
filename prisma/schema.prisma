@@ -288,6 +288,7 @@ model Appointment {
   bookingChannel     String?   // "web" | "whatsapp" | null for legacy
   chatSessionId      String?   // Link to the ChatSession that created the booking
   notificationLog    Json?     // { email?: {sentAt, success}, whatsapp?: {sentAt, success, messageId} }
+  statusLog          Json?     // [{ status, changedAt, changedBy }] — admin status change history
 
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt

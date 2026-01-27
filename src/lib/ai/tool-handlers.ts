@@ -425,7 +425,7 @@ async function handleCreateBooking(
       endTime,
       status: "PENDING",
       notes: params.notes,
-      bookingChannel: context.channel || "web",
+      bookingChannel: context.channel || "website",
       chatSessionId: context.sessionId || null,
     },
     include: {
