@@ -250,7 +250,10 @@ export function BookingFlow({
   // Scroll time slots into view when they load
   useEffect(() => {
     if (selectedDate && !isLoadingSlots && slots.length > 0 && timeSlotsRef.current) {
-      timeSlotsRef.current.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth" });
+      const el = timeSlotsRef.current;
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "end" });
+      });
     }
   }, [selectedDate, isLoadingSlots, slots.length, prefersReducedMotion]);
 

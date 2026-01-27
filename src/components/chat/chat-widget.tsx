@@ -214,7 +214,11 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       skipAutoScrollRef.current = false;
       return;
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
   }, [messages]);
 
   const handleScroll = useCallback(() => {
@@ -225,7 +229,10 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    }
   }, []);
 
   // Start a new conversation
@@ -237,10 +244,24 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
     showGreeting();
   };
 
+  // Blur any focused element inside the chat scroll area so the browser
+  // doesn't fight our scroll-to-bottom with its own focus-scroll behaviour.
+  const blurChatFocus = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (
+      container &&
+      document.activeElement instanceof HTMLElement &&
+      container.contains(document.activeElement)
+    ) {
+      document.activeElement.blur();
+    }
+  }, []);
+
   // Send a message to the backend
   const sendMessage = async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
+    blurChatFocus();
     setMessages((prev) => [...prev, { role: "user", content: userMessage, timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
@@ -307,6 +328,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   ) => {
     if (isLoading) return;
 
+    blurChatFocus();
     setMessages((prev) => [...prev, { role: "user", content: displayMessage, timestamp: new Date().toISOString() }]);
     setIsLoading(true);
 
@@ -450,7 +472,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       <div className="h-full w-full flex flex-col bg-card overflow-hidden">
         {/* Messages */}
         <div className="flex-1 relative overflow-hidden">
-          <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+          <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4 [overflow-anchor:none]">
             {isLoadingHistory ? (
               <div className="flex justify-center items-center h-full">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -572,7 +594,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
 
           {/* Messages */}
           <div className="flex-1 relative overflow-hidden">
-            <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4">
+            <div ref={scrollContainerRef} onScroll={handleScroll} className="absolute inset-0 overflow-y-auto p-4 space-y-4 [overflow-anchor:none]">
               {isLoadingHistory ? (
                 <div className="flex justify-center items-center h-full">
                   <div className="flex items-center gap-2 text-muted-foreground">
