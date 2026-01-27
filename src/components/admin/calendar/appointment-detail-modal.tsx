@@ -47,6 +47,7 @@ import {
   CalendarIcon,
   Save,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Appointment } from "./appointment-card";
@@ -432,6 +433,52 @@ export function AppointmentDetailModal({
                 </p>
               )}
             </div>
+
+            {/* Notifications */}
+            {(appointment.notificationLog || appointment.bookingChannel) && (
+              <div className="p-6 border-t">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">
+                  {t("notificationStatus") || "Notifications"}
+                </Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {appointment.bookingChannel && (
+                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                      {t("bookedVia") || "Booked via"}: {appointment.bookingChannel}
+                    </span>
+                  )}
+                  {appointment.notificationLog?.email && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full",
+                        appointment.notificationLog.email.success
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      )}
+                    >
+                      <Mail className="h-3 w-3" />
+                      {appointment.notificationLog.email.success
+                        ? (t("emailSent") || "Email sent")
+                        : (t("emailFailed") || "Email failed")}
+                    </span>
+                  )}
+                  {appointment.notificationLog?.whatsapp && (
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full",
+                        appointment.notificationLog.whatsapp.success
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      )}
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      {appointment.notificationLog.whatsapp.success
+                        ? (t("whatsappSent") || "WhatsApp sent")
+                        : (t("whatsappFailed") || "WhatsApp failed")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions Footer */}

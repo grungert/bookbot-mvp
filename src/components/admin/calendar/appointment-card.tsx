@@ -17,6 +17,11 @@ export interface Appointment {
   endTime: string;
   status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
   notes: string | null;
+  bookingChannel?: string | null;
+  notificationLog?: {
+    email?: { success: boolean; sentAt?: string };
+    whatsapp?: { success: boolean; sentAt?: string; messageId?: string };
+  } | null;
   service: {
     id?: string;
     name: string;

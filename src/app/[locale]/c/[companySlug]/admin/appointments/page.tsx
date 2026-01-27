@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Mail, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   CalendarHeader,
@@ -785,7 +785,21 @@ export default function AppointmentsPage() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>{getStatusBadge(apt.status)}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              {getStatusBadge(apt.status)}
+                              {apt.notificationLog?.whatsapp?.success && (
+                                <span title={tCalendar("whatsappSent")}>
+                                  <MessageSquare className="h-3.5 w-3.5 text-green-600" />
+                                </span>
+                              )}
+                              {apt.notificationLog?.email?.success && (
+                                <span title={tCalendar("emailSent")}>
+                                  <Mail className="h-3.5 w-3.5 text-blue-600" />
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             {apt.status === "PENDING" && (
                               <div className="flex justify-end gap-2">

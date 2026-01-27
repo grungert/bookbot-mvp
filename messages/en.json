@@ -129,7 +129,13 @@
     "start": "Start",
     "end": "End",
     "cancellationReason": "Reason for cancellation (optional)",
-    "cancellationReasonPlaceholder": "e.g., Customer requested to reschedule..."
+    "cancellationReasonPlaceholder": "e.g., Customer requested to reschedule...",
+    "notificationStatus": "Notifications",
+    "emailSent": "Email sent",
+    "emailFailed": "Email failed",
+    "whatsappSent": "WhatsApp sent",
+    "whatsappFailed": "WhatsApp failed",
+    "bookedVia": "Booked via"
   },
   "booking": {
     "title": "Book an Appointment",
@@ -687,7 +693,11 @@
       "testPhoneHint": "Include country code without + (e.g., 381641234567). Must be registered in Meta > WhatsApp > Getting Started.",
       "testPhoneRequired": "Phone number is required",
       "testMessageSent": "Test message sent!",
-      "messageSentSuccess": "Message sent successfully!"
+      "messageSentSuccess": "Message sent successfully!",
+      "notifications": "Booking Notifications",
+      "notificationsHint": "Configure automatic notifications when booking status changes",
+      "autoNotify": "Auto-notify on status change",
+      "autoNotifyHint": "Send email and WhatsApp notifications when you confirm or cancel bookings"
     },
     "invoicesSection": {
       "title": "Subscription Invoices",
@@ -1308,6 +1318,12 @@
       "statusPending": "PENDING",
       "statusConfirmed": "CONFIRMED",
       "statusCancelled": "CANCELLED"
+    }
+  },
+  "notifications": {
+    "whatsapp": {
+      "confirmed": "Your appointment for {service} on {date} at {time} has been confirmed. ✅",
+      "cancelled": "Your appointment for {service} on {date} at {time} has been cancelled."
     }
   }
 }

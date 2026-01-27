@@ -241,6 +241,7 @@ export async function POST(request: Request, { params }: RouteParams) {
               endTime: appointmentEnd,
               status: "PENDING",
               notes,
+              bookingChannel: "web",
             },
             include: {
               service: true,

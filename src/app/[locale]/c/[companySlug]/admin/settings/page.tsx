@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle, Bell } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
@@ -109,6 +109,7 @@ interface CompanySettings {
   whatsappScope: string;
   hasWhatsappAccessToken: boolean;
   hasWhatsappAppSecret: boolean;
+  notifyOnStatusChange: boolean;
 }
 
 type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "channels" | "subscription" | "invoices";
@@ -228,6 +229,7 @@ export default function SettingsPage() {
   const [whatsappAppSecret, setWhatsappAppSecret] = useState("");
   const [hasExistingWhatsappSecret, setHasExistingWhatsappSecret] = useState(false);
   const [whatsappScope, setWhatsappScope] = useState<"company" | "all">("company");
+  const [notifyOnStatusChange, setNotifyOnStatusChange] = useState(true);
   const [showWhatsappToken, setShowWhatsappToken] = useState(false);
   const [showWhatsappSecret, setShowWhatsappSecret] = useState(false);
   const [isTestingWhatsapp, setIsTestingWhatsapp] = useState(false);
@@ -469,6 +471,7 @@ export default function SettingsPage() {
       setWhatsappAppSecret(settings.whatsappAppSecret || "");
       setHasExistingWhatsappSecret(settings.hasWhatsappAppSecret);
       setWhatsappScope((settings.whatsappScope as "company" | "all") || "company");
+      setNotifyOnStatusChange(settings.notifyOnStatusChange ?? true);
     } catch (error) {
       console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
@@ -513,6 +516,7 @@ export default function SettingsPage() {
         whatsappAutoReply: whatsappAutoReply || null,
         whatsappPhoneNumberId: whatsappPhoneNumberId || null,
         whatsappScope,
+        notifyOnStatusChange,
       };
 
       // Only include API key if it's been changed (not masked)
@@ -1667,6 +1671,37 @@ export default function SettingsPage() {
               {t("whatsapp.viewDocs") || "View Documentation"}
               <ExternalLink className="h-4 w-4" />
             </a>
+          </div>
+        </div>
+
+        {/* Booking Notifications */}
+        <div className="rounded-xl border bg-card p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <Bell className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold">{t("whatsapp.notifications") || "Booking Notifications"}</h3>
+              <p className="text-xs text-muted-foreground">{t("whatsapp.notificationsHint") || "Configure automatic notifications when booking status changes"}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="flex items-center gap-3">
+              <Check className={cn("h-5 w-5", notifyOnStatusChange ? "text-green-600" : "text-muted-foreground")} />
+              <div>
+                <div className="font-medium text-sm">{t("whatsapp.autoNotify") || "Auto-notify on status change"}</div>
+                <div className="text-xs text-muted-foreground">{t("whatsapp.autoNotifyHint") || "Send email and WhatsApp notifications when you confirm or cancel bookings"}</div>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant={notifyOnStatusChange ? "default" : "outline"}
+              size="sm"
+              onClick={() => setNotifyOnStatusChange(!notifyOnStatusChange)}
+            >
+              {notifyOnStatusChange ? (t("whatsapp.enabled") || "Enabled") : (t("whatsapp.disabled") || "Disabled")}
+            </Button>
           </div>
         </div>
       </div>

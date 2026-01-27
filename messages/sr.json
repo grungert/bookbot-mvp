@@ -129,7 +129,13 @@
     "start": "Pocetak",
     "end": "Kraj",
     "cancellationReason": "Razlog otkazivanja (opciono)",
-    "cancellationReasonPlaceholder": "npr. Klijent je zatrazio promenu termina..."
+    "cancellationReasonPlaceholder": "npr. Klijent je zatrazio promenu termina...",
+    "notificationStatus": "Obavestenja",
+    "emailSent": "Email poslat",
+    "emailFailed": "Email neuspesno",
+    "whatsappSent": "WhatsApp poslat",
+    "whatsappFailed": "WhatsApp neuspesno",
+    "bookedVia": "Rezervisano preko"
   },
   "booking": {
     "title": "Zakazivanje termina",
@@ -687,7 +693,11 @@
       "testPhoneHint": "Ukljucite pozivni broj drzave bez + (npr. 381641234567). Mora biti registrovan u Meta > WhatsApp > Getting Started.",
       "testPhoneRequired": "Broj telefona je obavezan",
       "testMessageSent": "Test poruka poslata!",
-      "messageSentSuccess": "Poruka uspesno poslata!"
+      "messageSentSuccess": "Poruka uspesno poslata!",
+      "notifications": "Obavestenja o rezervacijama",
+      "notificationsHint": "Konfigurisi automatska obavestenja kada se promeni status rezervacije",
+      "autoNotify": "Automatsko obavestavanje o promeni statusa",
+      "autoNotifyHint": "Posalji email i WhatsApp obavestenja kada potvrdis ili otkazes rezervacije"
     },
     "invoicesSection": {
       "title": "Fakture pretplate",
@@ -1310,6 +1320,12 @@
       "statusPending": "NA ČEKANJU",
       "statusConfirmed": "POTVRĐENO",
       "statusCancelled": "OTKAZANO"
+    }
+  },
+  "notifications": {
+    "whatsapp": {
+      "confirmed": "Vas termin za {service} dana {date} u {time} je potvrdjen. ✅",
+      "cancelled": "Vas termin za {service} dana {date} u {time} je otkazan."
     }
   }
 }

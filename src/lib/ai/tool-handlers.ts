@@ -31,6 +31,7 @@ export interface ToolContext {
   userName?: string;
   sessionId?: string;
   language?: string;
+  channel?: string;
 }
 
 // Result returned from tool handlers
@@ -424,6 +425,8 @@ async function handleCreateBooking(
       endTime,
       status: "PENDING",
       notes: params.notes,
+      bookingChannel: context.channel || "web",
+      chatSessionId: context.sessionId || null,
     },
     include: {
       service: true,

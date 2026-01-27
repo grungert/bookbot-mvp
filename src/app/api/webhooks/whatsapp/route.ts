@@ -314,6 +314,7 @@ export async function POST(request: Request) {
               companySlug: companyDetails.slug,
               sessionId,
               language,
+              channel: "whatsapp",
             };
 
             if (sessionWithUser?.user) {
@@ -406,7 +407,8 @@ export async function POST(request: Request) {
       userMessage,
       userContext,
       sessionId,
-      bookingState
+      bookingState,
+      "whatsapp"
     );
 
     // Save assistant response with token usage

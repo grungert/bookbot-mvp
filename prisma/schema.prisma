@@ -108,6 +108,7 @@ model Company {
   businessEmail   String?   // Business contact email
   notificationEmails String[] @default([]) // Email addresses for booking notifications
   taxRate         Decimal?  @db.Decimal(5, 2) @default(20.00)  // Configurable tax %
+  notifyOnStatusChange Boolean @default(true) // Auto-notify customers on confirm/cancel
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -283,6 +284,11 @@ model Appointment {
   // Reminder tracking
   reminderSentAt     DateTime?
 
+  // Booking channel tracking
+  bookingChannel     String?   // "web" | "whatsapp" | null for legacy
+  chatSessionId      String?   // Link to the ChatSession that created the booking
+  notificationLog    Json?     // { email?: {sentAt, success}, whatsapp?: {sentAt, success, messageId} }
+
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -293,6 +299,7 @@ model Appointment {
   @@index([userId])
   @@index([serviceId])
   @@index([startTime])
+  @@index([chatSessionId])
 }
 
 // Invoice

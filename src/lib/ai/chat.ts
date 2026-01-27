@@ -376,7 +376,8 @@ export async function chat(
   userMessage: string,
   user: UserContext | null,
   sessionId: string,
-  bookingState?: BookingState | null
+  bookingState?: BookingState | null,
+  channel?: string
 ): Promise<ChatResult> {
   const client = createClient(config);
   let systemPrompt = await buildSystemPrompt(company, user, config.systemPrompt);
@@ -416,6 +417,7 @@ IMPORTANT - When the user mentions booking details in text (e.g. "eye exam on Ja
     userName: user?.name || undefined,
     sessionId,
     language: company.language || "en",
+    channel,
   };
 
   let iterations = 0;

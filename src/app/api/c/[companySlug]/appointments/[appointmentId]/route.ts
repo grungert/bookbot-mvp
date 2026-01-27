@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getCompanyBySlug } from "@/lib/db/tenant";
-import { sendCancellationEmail, sendAppointmentUpdateEmail } from "@/lib/email/send";
+import { sendAppointmentUpdateEmail } from "@/lib/email/send";
+import { sendStatusChangeNotifications } from "@/lib/notifications/appointment-notifications";
 import { createInvoiceForAppointment } from "@/lib/invoices";
 import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
 import { updateCustomerMetrics } from "@/lib/db/customer-metrics";
@@ -250,15 +251,25 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       },
     });
 
-    // Send cancellation email if status changed to CANCELLED
-    if (parsed.data.status === "CANCELLED" && updated.user?.email) {
-      await sendCancellationEmail({
-        customerEmail: updated.user.email,
-        customerName: updated.user.name || "Customer",
+    // Send notifications when status changes to CONFIRMED or CANCELLED
+    if (
+      (parsed.data.status === "CONFIRMED" || parsed.data.status === "CANCELLED") &&
+      company.notifyOnStatusChange
+    ) {
+      sendStatusChangeNotifications({
+        appointmentId: updated.id,
+        companyId: company.id,
+        companyName: company.name,
+        companyLanguage: company.language,
+        status: parsed.data.status as "CONFIRMED" | "CANCELLED",
+        customerEmail: updated.user?.email,
+        customerName: updated.user?.name || "Customer",
         serviceName: updated.service.name,
         startTime: updated.startTime,
-        companyName: company.name,
-      });
+        duration: updated.service.duration,
+        bookingChannel: appointment.bookingChannel,
+        chatSessionId: appointment.chatSessionId,
+      }).catch(console.error);
     }
 
     // Send update notification email if appointment details changed (not status)

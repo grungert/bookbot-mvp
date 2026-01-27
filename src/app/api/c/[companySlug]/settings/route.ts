@@ -40,6 +40,7 @@ const updateSettingsSchema = z.object({
   whatsappPhoneNumberId: z.string().nullable().optional(),
   whatsappAppSecret: z.string().nullable().optional(),
   whatsappScope: z.enum(["company", "all"]).optional(),
+  notifyOnStatusChange: z.boolean().optional(),
 });
 
 interface RouteParams {
@@ -104,6 +105,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       whatsappAppSecret: company.whatsappAppSecret ? maskValue(safeDecrypt(company.whatsappAppSecret)) : null,
       hasWhatsappAccessToken: !!company.whatsappAccessToken,
       hasWhatsappAppSecret: !!company.whatsappAppSecret,
+      // Notification Settings
+      notifyOnStatusChange: company.notifyOnStatusChange,
     };
 
     return NextResponse.json(settings);
@@ -210,6 +213,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (data.whatsappAutoReply !== undefined) updateData.whatsappAutoReply = data.whatsappAutoReply;
     if (data.whatsappPhoneNumberId !== undefined) updateData.whatsappPhoneNumberId = data.whatsappPhoneNumberId;
     if (data.whatsappScope !== undefined) updateData.whatsappScope = data.whatsappScope;
+    if (data.notifyOnStatusChange !== undefined) updateData.notifyOnStatusChange = data.notifyOnStatusChange;
 
     // Encrypt WhatsApp credentials before saving (only if new value provided, not masked)
     if (data.whatsappAccessToken !== undefined && data.whatsappAccessToken !== null && !data.whatsappAccessToken.startsWith("****")) {
@@ -321,6 +325,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       whatsappAppSecret: updatedCompany.whatsappAppSecret ? maskValue(safeDecrypt(updatedCompany.whatsappAppSecret)) : null,
       hasWhatsappAccessToken: !!updatedCompany.whatsappAccessToken,
       hasWhatsappAppSecret: !!updatedCompany.whatsappAppSecret,
+      // Notification Settings
+      notifyOnStatusChange: updatedCompany.notifyOnStatusChange,
     };
 
     return NextResponse.json(settings);
