@@ -187,6 +187,8 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       const storedSessionId = localStorage.getItem(storageKey);
 
       if (storedSessionId) {
+        // Fetch init data (language, services) in parallel with history
+        fetchInitData();
         loadChatHistory(storedSessionId).then((hasHistory) => {
           if (!hasHistory) {
             // No history found, show greeting with services
@@ -200,7 +202,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
         showGreeting();
       }
     }
-  }, [isOpen, hasLoadedHistory, storageKey, loadChatHistory, showGreeting]);
+  }, [isOpen, hasLoadedHistory, storageKey, loadChatHistory, showGreeting, fetchInitData]);
 
   // Save sessionId to localStorage when it changes
   useEffect(() => {
