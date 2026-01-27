@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth";
 import { getAvailableSlots, isSlotAvailable } from "@/lib/utils/slots";
 import { sendBookingConfirmationEmail, sendNewBookingAdminEmail, sendCancellationEmail, sendAppointmentUpdateEmail } from "@/lib/email/send";
-import { addMinutes, format, parseISO } from "date-fns";
+import { addDays, addMinutes, format, parseISO, startOfDay } from "date-fns";
 import type {
   ToolParams,
   GetServicesParams,
@@ -20,6 +20,34 @@ import { handleUpdateBookingState } from "./booking-flow";
 import { getTranslator } from "@/lib/i18n/backend";
 import { getDateLocale } from "@/lib/i18n/date-locale";
 import { isValidTransition } from "@/lib/utils/appointment-status";
+
+// Scan upcoming days and return the next `count` dates that have at least one free slot.
+// Stops after checking `maxScanDays` calendar days from today.
+async function getNextAvailableDays(
+  companyId: string,
+  serviceDuration: number,
+  language?: string,
+  count: number = 7,
+  maxScanDays: number = 21
+): Promise<Array<{ date: string; label: string }>> {
+  const locale = language === "sr" ? "sr-Latn" : "en-US";
+  const fmtOpts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+  const results: Array<{ date: string; label: string }> = [];
+  const today = startOfDay(new Date());
+
+  for (let i = 0; i < maxScanDays && results.length < count; i++) {
+    const candidate = addDays(today, i);
+    const slots = await getAvailableSlots(companyId, candidate, serviceDuration);
+    if (slots.length > 0) {
+      results.push({
+        date: format(candidate, "yyyy-MM-dd"),
+        label: candidate.toLocaleDateString(locale, fmtOpts),
+      });
+    }
+  }
+
+  return results;
+}
 
 // Context passed to tool handlers
 export interface ToolContext {
@@ -175,7 +203,7 @@ async function handleGetDatePicker(
     };
   }
 
-  // Get closed days
+  // Get closed days (for web calendar)
   const allWorkingHours = await prisma.workingHours.findMany({
     where: { companyId: context.companyId },
     select: { dayOfWeek: true, isOpen: true },
@@ -183,6 +211,13 @@ async function handleGetDatePicker(
   const closedDays = allWorkingHours
     .filter((wh) => !wh.isOpen)
     .map((wh) => wh.dayOfWeek);
+
+  // Pre-compute next available days with free slots (for WhatsApp list)
+  const openDays = await getNextAvailableDays(
+    context.companyId,
+    service.duration,
+    context.language
+  );
 
   return {
     success: true,
@@ -197,6 +232,7 @@ async function handleGetDatePicker(
         serviceId: service.id,
         serviceName: service.name,
         closedDays,
+        openDays,
       },
     },
   };
@@ -255,10 +291,31 @@ async function handleGetAvailableSlots(
   });
 
   if (!workingHours || !workingHours.isOpen) {
+    // Get closed days + open days so the user gets an interactive picker re-prompt
+    const allWH = await prisma.workingHours.findMany({
+      where: { companyId: context.companyId },
+      select: { dayOfWeek: true, isOpen: true },
+    });
+    const closedDays = allWH.filter((wh) => !wh.isOpen).map((wh) => wh.dayOfWeek);
+    const openDays = await getNextAvailableDays(
+      context.companyId,
+      service.duration,
+      context.language
+    );
+
     return {
       success: true,
       data: { closed: true, dayOfWeek: dayName },
       userMessage: t("botChat.businessClosed", { dayName }),
+      ui: {
+        component: "date-picker",
+        props: {
+          serviceId: service.id,
+          serviceName: service.name,
+          closedDays,
+          openDays,
+        },
+      },
     };
   }
 
@@ -266,7 +323,7 @@ async function handleGetAvailableSlots(
   const slots = await getAvailableSlots(context.companyId, date, service.duration);
 
   if (slots.length === 0) {
-    // Get closed days for the date picker UI
+    // Get closed days + open days for the date picker re-prompt
     const allWorkingHours = await prisma.workingHours.findMany({
       where: { companyId: context.companyId },
       select: { dayOfWeek: true, isOpen: true },
@@ -274,6 +331,11 @@ async function handleGetAvailableSlots(
     const closedDays = allWorkingHours
       .filter((wh) => !wh.isOpen)
       .map((wh) => wh.dayOfWeek);
+    const openDays = await getNextAvailableDays(
+      context.companyId,
+      service.duration,
+      context.language
+    );
 
     const formattedDate = format(date, "EEEE, MMMM d, yyyy", { locale: dateLocale });
     return {
@@ -286,6 +348,7 @@ async function handleGetAvailableSlots(
           serviceId: service.id,
           serviceName: service.name,
           closedDays,
+          openDays,
         },
       },
     };

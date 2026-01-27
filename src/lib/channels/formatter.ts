@@ -188,9 +188,50 @@ function formatServicesForWhatsApp(services: ChatService[], t: TranslatorFn): Ou
 
 /**
  * Format date picker UI for WhatsApp
- * Since WhatsApp doesn't have a date picker, we offer common date options
+ * When openDays are provided (pre-verified dates with free slots), render a list message.
+ * Otherwise fall back to the 3-button approach for legacy/web callers.
  */
-function formatDatePickerForWhatsApp(serviceName: string, t: TranslatorFn, language?: string): OutgoingMessage {
+function formatDatePickerForWhatsApp(
+  serviceName: string,
+  t: TranslatorFn,
+  language?: string,
+  openDays?: Array<{ date: string; label: string }>
+): OutgoingMessage {
+  // If we have pre-verified open days, use a WhatsApp list message (supports up to 10 items)
+  if (openDays && openDays.length > 0) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split("T")[0];
+
+    const sections: ListSection[] = [
+      {
+        title: t("botChat.whatsapp.availableDatesTitle"),
+        items: openDays.slice(0, 10).map((day) => {
+          let description = "";
+          if (day.date === todayStr) {
+            description = t("botChat.whatsapp.todayLabel");
+          } else if (day.date === tomorrowStr) {
+            description = t("botChat.whatsapp.tomorrowLabel");
+          }
+          return {
+            id: `date_${day.date}`,
+            title: day.label.substring(0, 24),
+            description: description.substring(0, 72),
+          };
+        }),
+      },
+    ];
+
+    return {
+      to: "",
+      content: `${t("botChat.whatsapp.selectedService", { serviceName })}\n\n${t("botChat.whatsapp.selectDate")}\n\n${t("botChat.whatsapp.orTypeDate")}`,
+      listSections: sections,
+      listButtonText: t("botChat.whatsapp.viewDates"),
+    };
+  }
+
+  // Fallback: 3 buttons (today / tomorrow / day after) when openDays not available
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -312,7 +353,7 @@ export function formatForWhatsApp(
       return formatServicesForWhatsApp(ui.props.services, t);
 
     case "date-picker":
-      return formatDatePickerForWhatsApp(ui.props.serviceName, t, language);
+      return formatDatePickerForWhatsApp(ui.props.serviceName, t, language, ui.props.openDays);
 
     case "time-slots":
       return formatTimeSlotsForWhatsApp(

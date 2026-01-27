@@ -52,6 +52,7 @@ export type ChatUIComponent =
         serviceId: string;
         serviceName: string;
         closedDays: number[]; // 0 = Sunday, 1 = Monday, etc.
+        openDays?: Array<{ date: string; label: string }>; // Pre-verified dates with free slots (for WhatsApp)
       };
     }
   | {
