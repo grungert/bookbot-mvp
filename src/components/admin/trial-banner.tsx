@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Clock, AlertTriangle, Crown } from "lucide-react";
@@ -24,6 +25,9 @@ export function TrialBanner({
   const t = useTranslations("subscription");
   const [mounted, setMounted] = useState(false);
   const { isCollapsed } = useSidebar();
+  const params = useParams();
+  const companySlug = params.companySlug as string;
+  const upgradeHref = `/c/${companySlug}/admin/settings?upgrade=true#subscription`;
 
   useEffect(() => {
     setMounted(true);
@@ -42,29 +46,34 @@ export function TrialBanner({
   // Trial expired - show urgent banner
   if (status === "TRIAL_EXPIRED") {
     return (
-      <div className="bg-destructive/15 border-b border-destructive/20 px-4 py-3">
-        <div className={bannerContentClass}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-destructive/20">
-              <AlertTriangle className="h-4 w-4 text-destructive" />
+      <>
+        <div className="bg-destructive/15 border-b border-destructive/20 px-4 py-3">
+          <div className={bannerContentClass}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-destructive/20">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+              </div>
+              <div>
+                <p className="font-medium text-destructive">
+                  {t("trialExpired")}
+                </p>
+                <p className="text-sm text-destructive/80">
+                  {t("trialExpiredDescription")}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-destructive">
-                {t("trialExpired")}
-              </p>
-              <p className="text-sm text-destructive/80">
-                {t("trialExpiredDescription")}
-              </p>
-            </div>
+            <Link href={upgradeHref}>
+              <Button
+                size="sm"
+                variant="destructive"
+              >
+                <Crown className="h-4 w-4 mr-2" />
+                {t("upgradePlan")}
+              </Button>
+            </Link>
           </div>
-          <Link href="/pricing">
-            <Button size="sm" variant="destructive">
-              <Crown className="h-4 w-4 mr-2" />
-              {t("upgradePlan")}
-            </Button>
-          </Link>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -102,29 +111,34 @@ export function TrialBanner({
   // Cancelled - show info
   if (status === "CANCELLED") {
     return (
-      <div className="bg-muted border-b px-4 py-3">
-        <div className={bannerContentClass}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-muted-foreground/20">
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+      <>
+        <div className="bg-muted border-b px-4 py-3">
+          <div className={bannerContentClass}>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-muted-foreground/20">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-muted-foreground">
+                  {t("subscriptionCancelled")}
+                </p>
+                <p className="text-sm text-muted-foreground/80">
+                  {t("subscriptionCancelledDescription")}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-muted-foreground">
-                {t("subscriptionCancelled")}
-              </p>
-              <p className="text-sm text-muted-foreground/80">
-                {t("subscriptionCancelledDescription")}
-              </p>
-            </div>
+            <Link href={upgradeHref}>
+              <Button
+                size="sm"
+                variant="secondary"
+              >
+                <Crown className="h-4 w-4 mr-2" />
+                {t("resubscribe")}
+              </Button>
+            </Link>
           </div>
-          <Link href="/pricing">
-            <Button size="sm" variant="secondary">
-              <Crown className="h-4 w-4 mr-2" />
-              {t("resubscribe")}
-            </Button>
-          </Link>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -140,69 +154,71 @@ export function TrialBanner({
       : null;
 
     return (
-      <div
-        className={cn(
-          "border-b px-4 py-3",
-          isUrgent
-            ? "bg-amber-500/15 border-amber-500/20"
-            : "bg-primary/5 border-primary/10"
-        )}
-      >
-        <div className={bannerContentClass}>
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                "p-2 rounded-full",
-                isUrgent ? "bg-amber-500/20" : "bg-primary/10"
-              )}
-            >
-              <Clock
+      <>
+        <div
+          className={cn(
+            "border-b px-4 py-3",
+            isUrgent
+              ? "bg-amber-500/15 border-amber-500/20"
+              : "bg-primary/5 border-primary/10"
+          )}
+        >
+          <div className={bannerContentClass}>
+            <div className="flex items-center gap-3">
+              <div
                 className={cn(
-                  "h-4 w-4",
-                  isUrgent ? "text-amber-600" : "text-primary"
-                )}
-              />
-            </div>
-            <div>
-              <p
-                className={cn(
-                  "font-medium",
-                  isUrgent
-                    ? "text-amber-700 dark:text-amber-500"
-                    : "text-primary"
+                  "p-2 rounded-full",
+                  isUrgent ? "bg-amber-500/20" : "bg-primary/10"
                 )}
               >
-                {t("trialBannerTitle")} - {t("trialDaysRemaining", { days: daysRemaining })}
-              </p>
-              <p
+                <Clock
+                  className={cn(
+                    "h-4 w-4",
+                    isUrgent ? "text-amber-600" : "text-primary"
+                  )}
+                />
+              </div>
+              <div>
+                <p
+                  className={cn(
+                    "font-medium",
+                    isUrgent
+                      ? "text-amber-700 dark:text-amber-500"
+                      : "text-primary"
+                  )}
+                >
+                  {t("trialBannerTitle")} - {t("trialDaysRemaining", { days: daysRemaining })}
+                </p>
+                <p
+                  className={cn(
+                    "text-sm",
+                    isUrgent
+                      ? "text-amber-600/80 dark:text-amber-500/80"
+                      : "text-primary/70"
+                  )}
+                >
+                  {formattedEndDate
+                    ? t("trialBannerDescription", { date: formattedEndDate })
+                    : t("trialFreeDescription")}
+                </p>
+              </div>
+            </div>
+            <Link href={upgradeHref}>
+              <Button
+                size="sm"
                 className={cn(
-                  "text-sm",
                   isUrgent
-                    ? "text-amber-600/80 dark:text-amber-500/80"
-                    : "text-primary/70"
+                    ? "bg-amber-600 hover:bg-amber-700 text-white"
+                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
                 )}
               >
-                {formattedEndDate
-                  ? t("trialBannerDescription", { date: formattedEndDate })
-                  : t("trialFreeDescription")}
-              </p>
-            </div>
+                <Crown className="h-4 w-4 mr-2" />
+                {t("upgradePlan")}
+              </Button>
+            </Link>
           </div>
-          <Link href="/pricing">
-            <Button
-              size="sm"
-              className={cn(
-                isUrgent
-                  ? "bg-amber-600 hover:bg-amber-700 text-white"
-                  : "bg-primary hover:bg-primary/90 text-primary-foreground"
-              )}
-            >
-              <Crown className="h-4 w-4 mr-2" />
-              {t("upgradePlan")}
-            </Button>
-          </Link>
         </div>
-      </div>
+      </>
     );
   }
 

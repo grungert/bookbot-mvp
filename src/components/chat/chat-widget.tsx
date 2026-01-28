@@ -17,6 +17,7 @@ interface InitData {
   greeting: string | null;
   services: ChatService[];
   language?: string;
+  chatAvailable?: boolean;
 }
 
 function buildGreetingMessage(
@@ -65,6 +66,9 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
   const skipAutoScrollRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
+  // Chat availability (hidden when tokens exhausted or subscription inactive)
+  const [isChatUnavailable, setIsChatUnavailable] = useState(false);
+
   // Limit modal state
   const { modalState, showLimitModal, setModalOpen } = useLimitModal();
 
@@ -78,6 +82,9 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
       if (res.ok) {
         const data: InitData = await res.json();
         initDataRef.current = data;
+        if (data.chatAvailable === false) {
+          setIsChatUnavailable(true);
+        }
         return data;
       }
     } catch (error) {
@@ -465,6 +472,11 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
 
   // Hide on admin pages (but not in embedded mode)
   if (!embedded && pathname.includes('/admin')) {
+    return null;
+  }
+
+  // Hide when chat is unavailable (tokens exhausted or subscription inactive)
+  if (isChatUnavailable) {
     return null;
   }
 

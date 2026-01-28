@@ -29,6 +29,8 @@ export interface ChatLimitResult {
   reason: string | null;
   currentUsage: number;
   limit: number;
+  bonusTokens: number;
+  effectiveLimit: number;
   unlimited: boolean;
   resetsAt: Date;
 }
@@ -60,6 +62,8 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
       reason: currentUsage >= 50000 ? "Monthly token limit reached" : null,
       currentUsage,
       limit: 50000,
+      bonusTokens: 0,
+      effectiveLimit: 50000,
       unlimited: false,
       resetsAt: periodEnd,
     };
@@ -76,12 +80,15 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
           : "Subscription not active",
       currentUsage,
       limit: subscription.plan.maxChatTokensPerMonth,
+      bonusTokens: subscription.bonusTokenBalance,
+      effectiveLimit: subscription.plan.maxChatTokensPerMonth + subscription.bonusTokenBalance,
       unlimited: false,
       resetsAt: periodEnd,
     };
   }
 
   const limit = subscription.plan.maxChatTokensPerMonth;
+  const bonusTokens = subscription.bonusTokenBalance;
 
   // Unlimited check (-1 means unlimited)
   if (limit === -1) {
@@ -90,19 +97,25 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
       reason: null,
       currentUsage,
       limit: -1,
+      bonusTokens,
+      effectiveLimit: -1,
       unlimited: true,
       resetsAt: periodEnd,
     };
   }
 
+  const effectiveLimit = limit + bonusTokens;
+
   return {
-    allowed: currentUsage < limit,
+    allowed: currentUsage < effectiveLimit,
     reason:
-      currentUsage >= limit
+      currentUsage >= effectiveLimit
         ? "Monthly token limit reached across all companies"
         : null,
     currentUsage,
     limit,
+    bonusTokens,
+    effectiveLimit,
     unlimited: false,
     resetsAt: periodEnd,
   };
@@ -111,11 +124,13 @@ export async function checkChatLimit(userId: string): Promise<ChatLimitResult> {
 /**
  * Increment chat usage for a user
  * Uses atomic upsert to handle concurrent requests
+ * When planLimit is provided, deducts from bonusTokenBalance once plan limit is exceeded
  */
 export async function incrementChatUsage(
   userId: string,
   count: number = 1,
-  tokenData?: { inputTokens: number; outputTokens: number; totalTokens: number }
+  tokenData?: { inputTokens: number; outputTokens: number; totalTokens: number },
+  planLimit?: number
 ): Promise<number> {
   const { periodStart, periodEnd } = getCurrentPeriodBoundaries();
 
@@ -143,6 +158,23 @@ export async function incrementChatUsage(
     },
   });
 
+  // Deduct bonus tokens if plan limit is exceeded
+  if (planLimit !== undefined && planLimit > 0 && tokenData?.totalTokens) {
+    const tokensJustUsed = tokenData.totalTokens;
+    const newTokenCount = result.tokenCount;
+    const previousOverage = Math.max(0, (newTokenCount - tokensJustUsed) - planLimit);
+    const currentOverage = Math.max(0, newTokenCount - planLimit);
+    const bonusConsumed = currentOverage - previousOverage;
+
+    if (bonusConsumed > 0) {
+      await prisma.$executeRaw`
+        UPDATE "UserSubscription"
+        SET "bonusTokenBalance" = GREATEST(0, "bonusTokenBalance" - ${bonusConsumed})
+        WHERE "userId" = ${userId}
+      `;
+    }
+  }
+
   return result.tokenCount;
 }
 
@@ -155,6 +187,8 @@ export async function getChatUsageStats(userId: string): Promise<{
     end: Date;
     used: number;
     limit: number;
+    bonusTokenBalance: number;
+    effectiveLimit: number;
     unlimited: boolean;
     percentUsed: number;
   };
@@ -184,7 +218,9 @@ export async function getChatUsageStats(userId: string): Promise<{
   ]);
 
   const limit = subscription?.plan.maxChatTokensPerMonth ?? 50000;
+  const bonusTokenBalance = subscription?.bonusTokenBalance ?? 0;
   const unlimited = limit === -1;
+  const effectiveLimit = unlimited ? -1 : limit + bonusTokenBalance;
   const used = currentUsage?.tokenCount ?? 0;
 
   return {
@@ -193,8 +229,10 @@ export async function getChatUsageStats(userId: string): Promise<{
       end: periodEnd,
       used,
       limit,
+      bonusTokenBalance,
+      effectiveLimit,
       unlimited,
-      percentUsed: unlimited ? 0 : Math.round((used / limit) * 100),
+      percentUsed: unlimited ? 0 : Math.round((used / effectiveLimit) * 100),
     },
     history: history.map((h) => ({
       periodStart: h.periodStart,

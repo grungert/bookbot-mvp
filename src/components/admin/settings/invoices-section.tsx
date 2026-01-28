@@ -31,13 +31,13 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/routing";
-import { ChevronLeft, ChevronRight, Calendar, Loader2, ExternalLink, CreditCard, RefreshCw, Download, CheckCircle, Clock, Building2, Mail, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, Loader2, ExternalLink, CreditCard, RefreshCw, Download, CheckCircle, Clock, Building2, Mail, FileText, Coins } from "lucide-react";
 import { jsPDF } from "jspdf";
 
 interface SubscriptionInvoice {
   id: string;
   invoiceNumber: string;
-  planTier: string;
+  planTier: string | null;
   planDescription: string;
   includeChatbot: boolean;
   extraCompanyCount: number;
@@ -52,6 +52,8 @@ interface SubscriptionInvoice {
   autoRenew: boolean;
   nextBillingDate: string | null;
   adminNotes?: string | null;
+  isOneTime?: boolean;
+  tokenAmount?: number;
 }
 
 interface SubscriptionInfo {
@@ -631,10 +633,22 @@ export function InvoicesSection({ companySlug, primaryColor }: InvoicesSectionPr
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex flex-col gap-1">
-                                    {getPlanBadge(invoice.planTier)}
+                                    {invoice.isOneTime ? (
+                                      <Badge variant="outline" className="font-medium text-xs bg-amber-100 text-amber-700 border-amber-200">
+                                        <Coins className="h-3 w-3 mr-1" />
+                                        TOKEN
+                                      </Badge>
+                                    ) : invoice.planTier ? (
+                                      getPlanBadge(invoice.planTier)
+                                    ) : null}
                                     <span className="text-xs text-muted-foreground">
-                                      {invoice.includeChatbot && invoice.planTier === "PRO" && "+ Chatbot"}
-                                      {invoice.extraCompanyCount > 0 && ` +${invoice.extraCompanyCount} co.`}
+                                      {invoice.isOneTime
+                                        ? invoice.planDescription
+                                        : <>
+                                            {invoice.includeChatbot && invoice.planTier === "PRO" && "+ Chatbot"}
+                                            {invoice.extraCompanyCount > 0 && ` +${invoice.extraCompanyCount} co.`}
+                                          </>
+                                      }
                                     </span>
                                   </div>
                                 </TableCell>
@@ -646,7 +660,9 @@ export function InvoicesSection({ companySlug, primaryColor }: InvoicesSectionPr
                                     <span className="font-medium text-sm">
                                       €{invoice.totalMonthlyPrice.toFixed(2)}
                                     </span>
-                                    <span className="text-xs text-muted-foreground">/month</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {invoice.isOneTime ? t("oneTime") : "/month"}
+                                    </span>
                                   </div>
                                 </TableCell>
                                 <TableCell>{getStatusBadge(invoice.status)}</TableCell>
@@ -794,7 +810,14 @@ export function InvoicesSection({ companySlug, primaryColor }: InvoicesSectionPr
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm">{t("plan")}</span>
-                      {getPlanBadge(selectedInvoice.planTier)}
+                      {selectedInvoice.isOneTime ? (
+                        <Badge variant="outline" className="font-medium text-xs bg-amber-100 text-amber-700 border-amber-200">
+                          <Coins className="h-3 w-3 mr-1" />
+                          TOKEN
+                        </Badge>
+                      ) : selectedInvoice.planTier ? (
+                        getPlanBadge(selectedInvoice.planTier)
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -831,7 +854,9 @@ export function InvoicesSection({ companySlug, primaryColor }: InvoicesSectionPr
                   <Separator />
 
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold">{t("totalMonthly")}</span>
+                    <span className="font-semibold">
+                      {selectedInvoice.isOneTime ? t("total") : t("totalMonthly")}
+                    </span>
                     <span className="font-bold text-lg">€{selectedInvoice.totalMonthlyPrice.toFixed(2)}</span>
                   </div>
                 </div>

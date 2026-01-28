@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { AlertTriangle, MessageSquare, FileText, Building2, Crown, HelpCircle } from "lucide-react";
+import { AlertTriangle, MessageSquare, FileText, Building2, Crown, HelpCircle, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +25,7 @@ interface LimitModalProps {
   limit: number;
   resetsAt?: Date | null;
   onUpgrade?: () => void;
+  onBuyTokens?: () => void;
 }
 
 const limitConfig: Record<
@@ -64,6 +65,7 @@ export function LimitModal({
   limit,
   resetsAt,
   onUpgrade,
+  onBuyTokens,
 }: LimitModalProps) {
   const t = useTranslations("subscription");
   const tCommon = useTranslations("common");
@@ -123,6 +125,12 @@ export function LimitModal({
             <Crown className="h-4 w-4 mr-2" />
             {t("upgradePlan")}
           </Button>
+          {limitType === "CHAT_LIMIT" && onBuyTokens && (
+            <Button variant="outline" onClick={onBuyTokens} className="w-full">
+              <Coins className="h-4 w-4 mr-2" />
+              {t("buyTokens")}
+            </Button>
+          )}
           <Link href="/contact" className="w-full">
             <Button variant="outline" className="w-full">
               <HelpCircle className="h-4 w-4 mr-2" />

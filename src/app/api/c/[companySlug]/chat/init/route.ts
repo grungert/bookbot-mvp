@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCompanyBySlug } from "@/lib/db/tenant";
+import {
+  getCompanyOwnerId,
+  checkChatLimit,
+  checkSubscriptionActive,
+} from "@/lib/subscription";
 
 interface RouteParams {
   params: Promise<{ companySlug: string }>;
@@ -19,6 +24,23 @@ export async function GET(_request: Request, { params }: RouteParams) {
         { error: "Company not found" },
         { status: 404 }
       );
+    }
+
+    // Check chat availability (subscription + token limits)
+    let chatAvailable = true;
+
+    const ownerId = await getCompanyOwnerId(company.id);
+    if (!ownerId) {
+      chatAvailable = false;
+    } else {
+      const [subStatus, limitResult] = await Promise.all([
+        checkSubscriptionActive(ownerId),
+        checkChatLimit(ownerId),
+      ]);
+
+      if (!subStatus.active || !limitResult.allowed) {
+        chatAvailable = false;
+      }
     }
 
     // Fetch active services with the same fields as handleGetServices in tool-handlers.ts
@@ -63,10 +85,11 @@ export async function GET(_request: Request, { params }: RouteParams) {
         greeting: company.aiGreeting || null,
         services: uiServices,
         language: company.language || "en",
+        chatAvailable,
       },
       {
         headers: {
-          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
         },
       }
     );

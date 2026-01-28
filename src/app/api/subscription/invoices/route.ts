@@ -22,26 +22,37 @@ export async function GET() {
       );
     }
 
-    // Get all upgrade requests for this user (approved ones are "paid" invoices)
-    const upgradeRequests = await prisma.upgradeRequest.findMany({
-      where: {
-        userId: user.id,
-        status: {
-          in: ["APPROVED", "PENDING"],
+    // Get all upgrade requests and token purchases for this user
+    const [upgradeRequests, tokenPurchases, subscription] = await Promise.all([
+      prisma.upgradeRequest.findMany({
+        where: {
+          userId: user.id,
+          status: {
+            in: ["APPROVED", "PENDING"],
+          },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
-
-    // Get user's subscription for autorenew info
-    const subscription = await prisma.userSubscription.findUnique({
-      where: { userId: user.id },
-      include: {
-        plan: true,
-      },
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      prisma.tokenPurchase.findMany({
+        where: {
+          userId: user.id,
+          status: {
+            in: ["APPROVED", "PENDING"],
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      }),
+      prisma.userSubscription.findUnique({
+        where: { userId: user.id },
+        include: {
+          plan: true,
+        },
+      }),
+    ]);
 
     // Fetch bank settings for invoice display
     const bankSettings: Record<string, string> = {};
@@ -102,8 +113,46 @@ export async function GET() {
       };
     });
 
+    // Transform token purchases into invoice format
+    const tokenInvoices = tokenPurchases.map((purchase, index) => {
+      const invoiceNumber = `TOK-${purchase.createdAt.getFullYear()}${String(purchase.createdAt.getMonth() + 1).padStart(2, "0")}-${String(tokenPurchases.length - index).padStart(4, "0")}`;
+
+      const formatTokens = (amount: number) => {
+        if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}M`;
+        if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
+        return String(amount);
+      };
+
+      return {
+        id: purchase.id,
+        invoiceNumber,
+        planTier: null,
+        planDescription: `${purchase.packName} — ${formatTokens(purchase.tokenAmount)} tokens`,
+        includeChatbot: false,
+        extraCompanyCount: 0,
+        basePrice: purchase.priceEurCents / 100,
+        chatbotPrice: 0,
+        extraCompaniesPrice: 0,
+        totalMonthlyPrice: purchase.priceEurCents / 100,
+        currency: "EUR",
+        status: purchase.status === "APPROVED" ? "PAID" : "PENDING",
+        issueDate: purchase.createdAt.toISOString(),
+        paidAt: purchase.status === "APPROVED" ? purchase.handledAt?.toISOString() : null,
+        autoRenew: false,
+        nextBillingDate: null,
+        adminNotes: purchase.adminNotes,
+        isOneTime: true,
+        tokenAmount: purchase.tokenAmount,
+      };
+    });
+
+    // Merge and sort all invoices by date (newest first)
+    const allInvoices = [...invoices, ...tokenInvoices].sort(
+      (a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()
+    );
+
     return NextResponse.json({
-      invoices,
+      invoices: allInvoices,
       subscription: subscription ? {
         status: subscription.status,
         planTier: subscription.plan.tier,

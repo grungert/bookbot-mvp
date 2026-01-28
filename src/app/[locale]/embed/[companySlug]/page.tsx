@@ -5,6 +5,7 @@ import { ChatWidget } from "@/components/chat/chat-widget";
 import { prisma } from "@/lib/prisma";
 import { getUserSubscription } from "@/lib/subscription/limits";
 import { getTrialStatus } from "@/lib/subscription/trial";
+import { checkChatLimit } from "@/lib/subscription/usage";
 
 interface EmbedPageProps {
   params: Promise<{ locale: string; companySlug: string }>;
@@ -41,6 +42,15 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
         subscription.plan.tier === "BUSINESS" ||
         subscription.hasChatbot === true ||
         (subscription.status === "TRIALING" && trialStatus.isExpired === false);
+    }
+  }
+
+  // Also check token limit — hide widget if tokens exhausted
+  let isChatAvailable = hasChatbotAccess;
+  if (hasChatbotAccess && ownerMembership) {
+    const limitResult = await checkChatLimit(ownerMembership.userId);
+    if (!limitResult.allowed) {
+      isChatAvailable = false;
     }
   }
 
@@ -151,7 +161,7 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
       </footer>
 
       {/* The actual chat widget */}
-      {hasChatbotAccess && (
+      {isChatAvailable && (
         <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
       )}
     </div>

@@ -741,7 +741,9 @@
       "paymentDetails": "Podaci za uplatu",
       "bankName": "Banka",
       "accountName": "Naziv racuna",
-      "downloadPDF": "Preuzmi PDF"
+      "downloadPDF": "Preuzmi PDF",
+      "tokenPackInvoice": "Paket tokena",
+      "oneTime": "jednokratno"
     }
   },
   "landing": {
@@ -1048,7 +1050,16 @@
     "documentsUnlimited": "{count} dokumenata (neograniceno)",
     "documentsUsed": "{used} / {limit} dokumenata",
     "servicesCount": "{count, plural, =0 {Nema usluga} =1 {1 usluga} other {# usluga}}",
-    "extraCompanySlot": "+€{price}/mesečno po dodatnoj kompaniji"
+    "extraCompanySlot": "+€{price}/mesečno po dodatnoj kompaniji",
+    "buyTokens": "Kupi tokene",
+    "bonusTokensRemaining": "bonus tokena preostalo",
+    "pendingTokenPurchase": "Kupovina tokena na čekanju",
+    "pendingTokenPurchaseDescription": "Vaša kupovina tokena čeka potvrdu uplate. Molimo izvršite bankovni transfer.",
+    "pack": "Paket",
+    "tokens": "Tokeni",
+    "price": "Cena",
+    "cancelPurchase": "Otkaži kupovinu",
+    "purchaseCancelled": "Kupovina tokena otkazana"
   },
   "pricing": {
     "pageTitle": "Cene",
@@ -1340,6 +1351,33 @@
     "whatsapp": {
       "confirmed": "Vas termin za {service} dana {date} u {time} je potvrdjen. ✅",
       "cancelled": "Vas termin za {service} dana {date} u {time} je otkazan."
-    }
+    },
+    "usageWarning80": "Upozorenje: Vas chatbot za \"{company}\" je iskoristio 80% mesecnog limita tokena ({used}/{limit}). Razmislite o nadogradnji plana da biste izbegli prekid.",
+    "usageLimitReached100": "Dostignuto ogranicenje tokena: Vas chatbot za \"{company}\" je dostigao mesecno ogranicenje tokena. Chat widget je sada onemogucen za klijente. Nadogradite plan ili sacekajte resetovanje limita pocetkom sledeceg meseca."
+  },
+  "tokenPurchase": {
+    "buyTokens": "Kupi tokene",
+    "selectPack": "Izaberi paket tokena",
+    "selectPackDescription": "Izaberite paket tokena za kupovinu dodatnih AI tokena",
+    "currentBalance": "Trenutni balans",
+    "bonusTokens": "Bonus tokeni",
+    "tokens": "tokena",
+    "summary": "Rezime",
+    "confirmPurchase": "Potvrdi kupovinu",
+    "bankTransferNote": "Izvršite bankovni transfer sa referencom ispod. Vaši tokeni će biti odobreni nakon potvrde administratora.",
+    "requestSubmitted": "Zahtev za kupovinu poslat",
+    "requestSubmittedDescription": "Poslali smo vam email sa detaljima za bankovni transfer. Vaši tokeni će biti odobreni nakon potvrde uplate.",
+    "pendingPurchase": "Kupovina tokena na čekanju",
+    "pendingPurchaseDescription": "Vaš zahtev za kupovinu tokena se obrađuje. Molimo izvršite bankovni transfer ako to već niste uradili.",
+    "cancelPurchase": "Otkaži kupovinu",
+    "purchaseCancelled": "Kupovina tokena otkazana",
+    "existingPendingPurchase": "Već imate zahtev za kupovinu tokena na čekanju",
+    "purchaseApproved": "Kupovina tokena odobrena",
+    "purchaseRejected": "Kupovina tokena odbijena",
+    "oneTimePayment": "Jednokratna uplata",
+    "paymentReference": "Referenca plaćanja",
+    "pack": "Paket",
+    "price": "Cena",
+    "copied": "Kopirano u clipboard"
   }
 }

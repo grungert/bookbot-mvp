@@ -21,6 +21,7 @@ import {
   getBookingState,
   type BookingAction,
 } from "@/lib/ai/booking-flow";
+import { checkAndNotifyUsageThresholds } from "@/lib/notifications/usage-notifications";
 import type { ToolContext } from "@/lib/ai/tool-handlers";
 import { z } from "zod";
 
@@ -232,7 +233,18 @@ export async function POST(request: Request, { params }: RouteParams) {
     await saveChatMessage(session.id, "assistant", response, usage.inputTokens, usage.outputTokens);
 
     // Increment chat usage at user level (owner pays for all company usage)
-    await incrementChatUsage(ownerId, 1, usage);
+    const newTokenCount = await incrementChatUsage(ownerId, 1, usage, chatLimitResult.limit > 0 ? chatLimitResult.limit : undefined);
+
+    // Fire-and-forget: check if usage threshold crossed and notify admin
+    if (!chatLimitResult.unlimited) {
+      checkAndNotifyUsageThresholds({
+        userId: ownerId,
+        companyId: company.id,
+        companyName: company.name,
+        currentTokens: newTokenCount,
+        limit: chatLimitResult.limit,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({
       sessionId: session.id,

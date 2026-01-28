@@ -505,27 +505,8 @@
   background-color: var(--background) !important;
 }
 
-.md-editor-wrapper .w-md-editor-text-input,
-.md-editor-wrapper .w-md-editor-text-pre {
-  font-family: var(--font-mono), ui-monospace, monospace !important;
-  font-size: 14px !important;
-  line-height: 1.5 !important;
-  padding: 16px !important;
-}
-
-/* Fix cursor alignment in textarea */
-.md-editor-wrapper .w-md-editor-text {
-  line-height: 1.5 !important;
-}
-
-.md-editor-wrapper .w-md-editor-text-pre > code {
-  font-family: inherit !important;
-  font-size: inherit !important;
-  line-height: inherit !important;
-}
-
 .md-editor-wrapper .w-md-editor-text-input {
-  -webkit-text-fill-color: inherit !important;
+  -webkit-text-fill-color: transparent !important;
   caret-color: var(--foreground) !important;
 }
 

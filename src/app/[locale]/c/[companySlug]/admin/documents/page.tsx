@@ -1038,6 +1038,7 @@ export default function DocumentsPage() {
               <Label htmlFor="content">{t("documentContent")}</Label>
               <div className="md-editor-wrapper">
                 <MDEditor
+                  key={editingDocument?.id || "new"}
                   value={content}
                   onChange={(value) => {
                     setContent(value || "");

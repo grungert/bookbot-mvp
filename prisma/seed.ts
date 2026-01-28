@@ -149,6 +149,34 @@ async function main() {
     }
   }
 
+  // Seed default token packs
+  console.log("Seeding token packs...");
+
+  const tokenPacks = [
+    { name: "Starter Pack", tokenAmount: 500_000, priceEurCents: 500, sortOrder: 1 },
+    { name: "Growth Pack", tokenAmount: 1_000_000, priceEurCents: 900, sortOrder: 2 },
+    { name: "Power Pack", tokenAmount: 5_000_000, priceEurCents: 3900, sortOrder: 3 },
+  ];
+
+  for (const pack of tokenPacks) {
+    const existing = await prisma.tokenPack.findFirst({
+      where: { name: pack.name },
+    });
+
+    if (existing) {
+      await prisma.tokenPack.update({
+        where: { id: existing.id },
+        data: pack,
+      });
+      console.log(`Updated token pack: ${pack.name}`);
+    } else {
+      await prisma.tokenPack.create({
+        data: pack,
+      });
+      console.log(`Created token pack: ${pack.name}`);
+    }
+  }
+
   console.log("Seeding complete!");
 }
 

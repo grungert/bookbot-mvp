@@ -9,6 +9,10 @@ import { UpgradeRejectedEmail } from "./templates/upgrade-rejected";
 import { InvoiceSentEmail } from "./templates/invoice-sent";
 import { InvoicePaidEmail } from "./templates/invoice-paid";
 import { NewBookingAdminEmail } from "./templates/new-booking-admin";
+import { TokenPurchaseUserEmail } from "./templates/token-purchase-user";
+import { TokenPurchaseAdminEmail } from "./templates/token-purchase-admin";
+import { TokenPurchaseApprovedEmail } from "./templates/token-purchase-approved";
+import { TokenPurchaseRejectedEmail } from "./templates/token-purchase-rejected";
 import { format } from "date-fns";
 import prisma from "@/lib/prisma";
 
@@ -515,6 +519,182 @@ export async function sendNewBookingAdminEmail(data: NewBookingAdminEmailData) {
     return { success: true };
   } catch (error) {
     console.error("[EMAIL] Failed to send new booking admin email:", error);
+    return { success: false, error };
+  }
+}
+
+// Token Purchase Emails
+
+interface TokenPurchaseUserEmailData {
+  userEmail: string;
+  userName: string;
+  packName: string;
+  tokenAmount: number;
+  priceEurCents: number;
+  paymentReference: string;
+}
+
+export async function sendTokenPurchaseUserEmail(data: TokenPurchaseUserEmailData) {
+  const {
+    userEmail,
+    userName,
+    packName,
+    tokenAmount,
+    priceEurCents,
+    paymentReference,
+  } = data;
+
+  try {
+    const resend = getResend();
+    const bankSettings = await getBankSettings();
+
+    console.log("[EMAIL] Sending token purchase user email to:", userEmail);
+
+    const result = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: `Token Purchase Request Received - BookBot`,
+      react: TokenPurchaseUserEmail({
+        userName,
+        packName,
+        tokenAmount,
+        priceEurCents,
+        paymentReference,
+        bankName: bankSettings.bankName,
+        bankAccountName: bankSettings.bankAccountName,
+        bankIban: bankSettings.bankIban,
+        bankBic: bankSettings.bankBic,
+      }),
+    });
+    console.log("[EMAIL] Token purchase user email result:", JSON.stringify(result));
+    return { success: true };
+  } catch (error) {
+    console.error("[EMAIL] Failed to send token purchase user email:", error);
+    return { success: false, error };
+  }
+}
+
+interface TokenPurchaseAdminEmailData {
+  userName: string;
+  userEmail: string;
+  packName: string;
+  tokenAmount: number;
+  priceEurCents: number;
+  paymentReference: string;
+  purchaseId: string;
+}
+
+export async function sendTokenPurchaseAdminEmail(data: TokenPurchaseAdminEmailData) {
+  const {
+    userName,
+    userEmail,
+    packName,
+    tokenAmount,
+    priceEurCents,
+    paymentReference,
+    purchaseId,
+  } = data;
+
+  const adminEmail = process.env.SUPER_ADMIN_EMAIL;
+  if (!adminEmail) {
+    console.warn("SUPER_ADMIN_EMAIL not set, skipping admin notification");
+    return { success: false, error: "Admin email not configured" };
+  }
+
+  const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
+  const adminPanelUrl = `${baseUrl}/en/super-admin/token-purchases`;
+
+  try {
+    const resend = getResend();
+    console.log("[EMAIL] Sending token purchase admin email to:", adminEmail);
+
+    const result = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: adminEmail,
+      subject: `New Token Purchase Request - ${userName || userEmail}`,
+      react: TokenPurchaseAdminEmail({
+        userName,
+        userEmail,
+        packName,
+        tokenAmount,
+        priceEurCents,
+        paymentReference,
+        purchaseId,
+        adminPanelUrl,
+      }),
+    });
+    console.log("[EMAIL] Token purchase admin email result:", JSON.stringify(result));
+    return { success: true };
+  } catch (error) {
+    console.error("[EMAIL] Failed to send token purchase admin email:", error);
+    return { success: false, error };
+  }
+}
+
+interface TokenPurchaseApprovedEmailData {
+  userEmail: string;
+  userName: string;
+  packName: string;
+  tokenAmount: number;
+  adminNotes?: string;
+}
+
+export async function sendTokenPurchaseApprovedEmail(data: TokenPurchaseApprovedEmailData) {
+  const { userEmail, userName, packName, tokenAmount, adminNotes } = data;
+
+  try {
+    const resend = getResend();
+    console.log("[EMAIL] Sending token purchase approved email to:", userEmail);
+
+    const result = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: `Token Purchase Approved - BookBot`,
+      react: TokenPurchaseApprovedEmail({
+        userName,
+        packName,
+        tokenAmount,
+        adminNotes,
+      }),
+    });
+    console.log("[EMAIL] Token purchase approved email result:", JSON.stringify(result));
+    return { success: true };
+  } catch (error) {
+    console.error("[EMAIL] Failed to send token purchase approved email:", error);
+    return { success: false, error };
+  }
+}
+
+interface TokenPurchaseRejectedEmailData {
+  userEmail: string;
+  userName: string;
+  packName: string;
+  tokenAmount: number;
+  adminNotes?: string;
+}
+
+export async function sendTokenPurchaseRejectedEmail(data: TokenPurchaseRejectedEmailData) {
+  const { userEmail, userName, packName, tokenAmount, adminNotes } = data;
+
+  try {
+    const resend = getResend();
+    console.log("[EMAIL] Sending token purchase rejected email to:", userEmail);
+
+    const result = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: userEmail,
+      subject: `Token Purchase Update - BookBot`,
+      react: TokenPurchaseRejectedEmail({
+        userName,
+        packName,
+        tokenAmount,
+        adminNotes,
+      }),
+    });
+    console.log("[EMAIL] Token purchase rejected email result:", JSON.stringify(result));
+    return { success: true };
+  } catch (error) {
+    console.error("[EMAIL] Failed to send token purchase rejected email:", error);
     return { success: false, error };
   }
 }

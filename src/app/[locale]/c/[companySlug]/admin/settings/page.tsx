@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle, Bell } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle, Bell, Coins } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
+import { BuyTokensModal } from "@/components/subscription/buy-tokens-modal";
 import { CreateCompanyModal } from "@/components/admin/create-company-modal";
 import { InvoicesSection } from "@/components/admin/settings/invoices-section";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { BOT_PERSONALITIES, type PersonalityKey } from "@/lib/ai/personalities";
 import { cn } from "@/lib/utils";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 import { generateThemePalette } from "@/lib/utils/colors";
 
 // Token display component for Custom Instructions (defined outside to prevent re-render issues)
@@ -138,6 +140,8 @@ interface SubscriptionData {
   chatUsage: {
     used: number;
     limit: number;
+    bonusTokens: number;
+    effectiveLimit: number;
     unlimited: boolean;
     resetsAt: string;
   };
@@ -186,6 +190,7 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showBuyTokensModal, setShowBuyTokensModal] = useState(false);
   const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [pendingUpgradeRequest, setPendingUpgradeRequest] = useState<{
@@ -196,6 +201,14 @@ export default function SettingsPage() {
     createdAt: string;
   } | null>(null);
   const [isCancellingRequest, setIsCancellingRequest] = useState(false);
+  const [pendingTokenPurchase, setPendingTokenPurchase] = useState<{
+    id: string;
+    packName: string;
+    tokenAmount: number;
+    priceEurCents: number;
+    createdAt: string;
+  } | null>(null);
+  const [isCancellingTokenPurchase, setIsCancellingTokenPurchase] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -301,11 +314,17 @@ export default function SettingsPage() {
     }
   };
 
-  // Read hash on mount
+  const searchParams = useSearchParams();
+
+  // Read hash on mount + auto-open upgrade modal if ?upgrade=true
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     if (hash && tabConfig.some(tab => tab.id === hash)) {
       setActiveTab(hash as SettingsTab);
+    }
+    if (searchParams.get("upgrade") === "true") {
+      setActiveTab("subscription");
+      setShowUpgradeModal(true);
     }
   }, []);
 
@@ -360,10 +379,11 @@ export default function SettingsPage() {
     }
   }, []);
 
-  // Load pending upgrade request when subscription tab is active
+  // Load pending upgrade request and token purchase when subscription tab is active
   useEffect(() => {
     if (activeTab === "subscription") {
       loadPendingUpgradeRequest();
+      loadPendingTokenPurchase();
     }
   }, [activeTab]);
 
@@ -421,6 +441,45 @@ export default function SettingsPage() {
       toast.error(tCommon("error"));
     } finally {
       setIsCancellingRequest(false);
+    }
+  }
+
+  async function loadPendingTokenPurchase() {
+    try {
+      const response = await fetch("/api/subscription/token-purchase");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasPendingPurchase && data.purchase) {
+          setPendingTokenPurchase(data.purchase);
+        } else {
+          setPendingTokenPurchase(null);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading pending token purchase:", error);
+    }
+  }
+
+  async function handleCancelTokenPurchase() {
+    if (!pendingTokenPurchase) return;
+
+    setIsCancellingTokenPurchase(true);
+    try {
+      const response = await fetch("/api/subscription/token-purchase", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to cancel token purchase");
+      }
+
+      setPendingTokenPurchase(null);
+      toast.success(tSub("purchaseCancelled"));
+    } catch (error) {
+      console.error("Error cancelling token purchase:", error);
+      toast.error(tCommon("error"));
+    } finally {
+      setIsCancellingTokenPurchase(false);
     }
   }
 
@@ -1792,6 +1851,53 @@ export default function SettingsPage() {
       );
     };
 
+    // Pending Token Purchase Banner
+    const PendingTokenPurchaseBanner = () => {
+      if (!pendingTokenPurchase) return null;
+
+      return (
+        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-4 mb-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+              <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-semibold text-amber-800 dark:text-amber-200">
+                {tSub("pendingTokenPurchase")}
+              </h4>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                {tSub("pendingTokenPurchaseDescription")}
+              </p>
+              <div className="mt-3 text-sm space-y-1">
+                <div className="flex gap-4">
+                  <span className="text-amber-600 dark:text-amber-400">{tSub("pack")}:</span>
+                  <span className="font-medium text-amber-800 dark:text-amber-200">{pendingTokenPurchase.packName}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-amber-600 dark:text-amber-400">{tSub("tokens")}:</span>
+                  <span className="font-medium text-amber-800 dark:text-amber-200">{formatTokenCount(pendingTokenPurchase.tokenAmount)}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-amber-600 dark:text-amber-400">{tSub("price")}:</span>
+                  <span className="font-bold text-amber-800 dark:text-amber-200">€{(pendingTokenPurchase.priceEurCents / 100).toFixed(2)}</span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-400 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                onClick={handleCancelTokenPurchase}
+                disabled={isCancellingTokenPurchase}
+              >
+                {isCancellingTokenPurchase && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {tSub("cancelPurchase")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     if (!subscriptionData) {
       return (
         <div className="rounded-xl border bg-card p-8 text-center">
@@ -1823,6 +1929,7 @@ export default function SettingsPage() {
       <div className="space-y-4">
         {/* Pending Upgrade Banner */}
         <PendingUpgradeBanner />
+        <PendingTokenPurchaseBanner />
 
         {/* Current Plan */}
         <div className="rounded-xl border bg-card p-4">
@@ -1907,15 +2014,32 @@ export default function SettingsPage() {
                   <UsageMeter
                     label=""
                     used={subscriptionData.chatUsage.used}
-                    limit={subscriptionData.chatUsage.limit}
+                    limit={subscriptionData.chatUsage.effectiveLimit || subscriptionData.chatUsage.limit}
                     unlimited={subscriptionData.chatUsage.unlimited}
                     showPercentage={true}
                     color={primaryColor}
                     formatAsTokens={true}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}
-                  </p>
+                  {subscriptionData.chatUsage.bonusTokens > 0 && (
+                    <p className="text-xs font-medium flex items-center gap-1" style={{ color: primaryColor }}>
+                      <Coins className="h-3 w-3" />
+                      + {formatTokenCount(subscriptionData.chatUsage.bonusTokens)} {tSub("bonusTokensRemaining")}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground flex-1">
+                      {tSub("resetsOn", { date: formatDate(subscriptionData.chatUsage.resetsAt) })}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 text-xs px-2"
+                      onClick={() => setShowBuyTokensModal(true)}
+                    >
+                      <Coins className="h-3 w-3 mr-1" />
+                      {tSub("buyTokens")}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Knowledge Base (Documents) */}
@@ -2176,6 +2300,16 @@ export default function SettingsPage() {
           hasChatbot={subscriptionData.features.aiChatbot}
           currentCompanyCount={subscriptionData.companySlots.used}
           primaryColor={primaryColor}
+        />
+
+        {/* Buy Tokens Modal */}
+        <BuyTokensModal
+          open={showBuyTokensModal}
+          onOpenChange={setShowBuyTokensModal}
+          onSuccess={() => {
+            loadPendingTokenPurchase();
+            loadSubscriptionData();
+          }}
         />
 
         {/* Create Company Modal */}

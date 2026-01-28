@@ -118,6 +118,8 @@ export async function GET(request: Request, context: RouteContext) {
       chatUsage: {
         used: chatUsage.currentPeriod.used,
         limit: chatUsage.currentPeriod.limit,
+        bonusTokens: chatUsage.currentPeriod.bonusTokenBalance,
+        effectiveLimit: chatUsage.currentPeriod.effectiveLimit,
         unlimited: chatUsage.currentPeriod.unlimited,
         resetsAt: chatUsage.currentPeriod.end.toISOString(),
       },

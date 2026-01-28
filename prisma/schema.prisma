@@ -59,6 +59,13 @@ enum UpgradeRequestStatus {
   CANCELLED
 }
 
+enum TokenPurchaseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
 // Company (Tenant)
 model Company {
   id           String   @id @default(cuid())
@@ -172,6 +179,7 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
   upgradeRequests         UpgradeRequest[]
+  tokenPurchases          TokenPurchase[]
 }
 
 // NextAuth.js Account model
@@ -522,6 +530,9 @@ model UserSubscription {
   // Chatbot addon (for PRO plan - included in BUSINESS)
   hasChatbot         Boolean            @default(false)
 
+  // Bonus token balance from purchased token packs (persists until consumed)
+  bonusTokenBalance  Int                @default(0)
+
   // Trial tracking
   trialEndsAt        DateTime?
 
@@ -549,6 +560,10 @@ model ChatUsage {
   periodEnd     DateTime // Last day of month
   messageCount  Int      @default(0)
   tokenCount    Int      @default(0)
+
+  // Notification tracking per billing period
+  notifiedAt80  Boolean  @default(false) // 80% warning sent
+  notifiedAt100 Boolean  @default(false) // 100% limit notification sent
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -659,6 +674,41 @@ model SystemSettings {
   description String?
   updatedAt   DateTime @updatedAt
   updatedBy   String?
+}
+
+// Token Pack - purchasable token bundles
+model TokenPack {
+  id            String   @id @default(cuid())
+  name          String
+  tokenAmount   Int
+  priceEurCents Int
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  purchases     TokenPurchase[]
+}
+
+// Token Purchase - user purchase of a token pack
+model TokenPurchase {
+  id               String              @id @default(cuid())
+  userId           String
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenPackId      String?
+  tokenPack        TokenPack?          @relation(fields: [tokenPackId], references: [id])
+  tokenAmount      Int
+  priceEurCents    Int
+  packName         String
+  status           TokenPurchaseStatus @default(PENDING)
+  paymentReference String              @unique
+  handledBy        String?
+  handledAt        DateTime?
+  adminNotes       String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 // WhatsApp Phone Number to Company Mapping

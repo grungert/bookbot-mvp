@@ -8,6 +8,7 @@ import { generateThemePalette } from "@/lib/utils/colors";
 import { prisma } from "@/lib/prisma";
 import { getUserSubscription } from "@/lib/subscription/limits";
 import { getTrialStatus } from "@/lib/subscription/trial";
+import { checkChatLimit } from "@/lib/subscription/usage";
 
 interface CompanyLayoutProps {
   children: React.ReactNode;
@@ -72,6 +73,15 @@ export default async function CompanyLayout({
     }
   }
 
+  // Also check token limit — hide widget if tokens exhausted
+  let isChatAvailable = hasChatbotAccess;
+  if (hasChatbotAccess && ownerMembership) {
+    const limitResult = await checkChatLimit(ownerMembership.userId);
+    if (!limitResult.allowed) {
+      isChatAvailable = false;
+    }
+  }
+
   return (
     <div
       className="min-h-screen"
@@ -95,7 +105,7 @@ export default async function CompanyLayout({
         appointmentCount={appointmentCount}
       />
       {children}
-      {hasChatbotAccess && (
+      {isChatAvailable && (
         <ChatWidget companySlug={companySlug} primaryColor={company.primaryColor} />
       )}
     </div>

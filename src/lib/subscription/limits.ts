@@ -8,6 +8,7 @@ export interface SubscriptionWithPlan {
   status: SubscriptionStatus;
   extraCompanySlots: number;
   hasChatbot: boolean;
+  bonusTokenBalance: number;
   trialEndsAt: Date | null;
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
@@ -57,6 +58,7 @@ export async function getUserSubscription(
 
   return {
     ...subscription,
+    bonusTokenBalance: subscription.bonusTokenBalance ?? 0,
     plan: {
       ...subscription.plan,
       extraCompanyPrice: subscription.plan.extraCompanyPrice?.toNumber() ?? null,

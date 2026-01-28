@@ -43,6 +43,7 @@ import {
 import type { ToolContext } from "@/lib/ai/tool-handlers";
 import type { ChatUIComponent, RichMessage } from "@/components/chat/types";
 import { getTranslator } from "@/lib/i18n/backend";
+import { checkAndNotifyUsageThresholds } from "@/lib/notifications/usage-notifications";
 
 /**
  * GET - Handle webhook verification challenge from Meta
@@ -436,7 +437,18 @@ export async function POST(request: Request) {
     }
 
     // Increment chat usage with token data
-    await incrementChatUsage(ownerId, 1, usage);
+    const newTokenCount = await incrementChatUsage(ownerId, 1, usage, chatLimitResult.limit > 0 ? chatLimitResult.limit : undefined);
+
+    // Fire-and-forget: check if usage threshold crossed and notify admin
+    if (!chatLimitResult.unlimited) {
+      checkAndNotifyUsageThresholds({
+        userId: ownerId,
+        companyId: company.id,
+        companyName: companyDetails!.name,
+        currentTokens: newTokenCount,
+        limit: chatLimitResult.limit,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

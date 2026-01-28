@@ -249,6 +249,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       data: updateData,
     });
 
+    // Cascade currency change to all services
+    if (data.currency !== undefined) {
+      await prisma.service.updateMany({
+        where: { companyId: company.id },
+        data: { currency: data.currency },
+      });
+    }
+
     // Manage WhatsAppPhoneMapping based on the phone number ID
     if (data.whatsappPhoneNumberId !== undefined) {
       if (data.whatsappPhoneNumberId) {

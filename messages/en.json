@@ -741,7 +741,9 @@
       "paymentDetails": "Payment Details",
       "bankName": "Bank",
       "accountName": "Account Name",
-      "downloadPDF": "Download PDF"
+      "downloadPDF": "Download PDF",
+      "tokenPackInvoice": "Token Pack",
+      "oneTime": "one-time"
     }
   },
   "landing": {
@@ -1048,7 +1050,16 @@
     "documentsUnlimited": "{count} documents (unlimited)",
     "documentsUsed": "{used} / {limit} documents",
     "servicesCount": "{count, plural, =0 {No services} =1 {1 service} other {# services}}",
-    "extraCompanySlot": "+€{price}/month per extra company"
+    "extraCompanySlot": "+€{price}/month per extra company",
+    "buyTokens": "Buy Tokens",
+    "bonusTokensRemaining": "bonus tokens remaining",
+    "pendingTokenPurchase": "Pending Token Purchase",
+    "pendingTokenPurchaseDescription": "Your token purchase is awaiting payment confirmation. Please complete the bank transfer.",
+    "pack": "Pack",
+    "tokens": "Tokens",
+    "price": "Price",
+    "cancelPurchase": "Cancel Purchase",
+    "purchaseCancelled": "Token purchase cancelled"
   },
   "pricing": {
     "pageTitle": "Pricing",
@@ -1338,6 +1349,33 @@
     "whatsapp": {
       "confirmed": "Your appointment for {service} on {date} at {time} has been confirmed. ✅",
       "cancelled": "Your appointment for {service} on {date} at {time} has been cancelled."
-    }
+    },
+    "usageWarning80": "Usage Alert: Your chatbot for \"{company}\" has used 80% of the monthly token limit ({used}/{limit}). Consider upgrading your plan to avoid interruption.",
+    "usageLimitReached100": "Token Limit Reached: Your chatbot for \"{company}\" has reached its monthly token limit. The chat widget is now disabled for customers. Upgrade your plan or wait for the limit to reset at the start of next month."
+  },
+  "tokenPurchase": {
+    "buyTokens": "Buy Tokens",
+    "selectPack": "Select Token Pack",
+    "selectPackDescription": "Choose a token pack to purchase additional AI tokens",
+    "currentBalance": "Current Balance",
+    "bonusTokens": "Bonus Tokens",
+    "tokens": "tokens",
+    "summary": "Summary",
+    "confirmPurchase": "Confirm Purchase",
+    "bankTransferNote": "Complete the bank transfer with the reference below. Your tokens will be credited after admin approval.",
+    "requestSubmitted": "Purchase Request Submitted",
+    "requestSubmittedDescription": "We've sent you an email with bank transfer details. Your tokens will be credited once payment is confirmed.",
+    "pendingPurchase": "Pending Token Purchase",
+    "pendingPurchaseDescription": "Your token purchase request is being processed. Please complete the bank transfer if you haven't already.",
+    "cancelPurchase": "Cancel Purchase",
+    "purchaseCancelled": "Token purchase cancelled",
+    "existingPendingPurchase": "You already have a pending token purchase request",
+    "purchaseApproved": "Token purchase approved",
+    "purchaseRejected": "Token purchase rejected",
+    "oneTimePayment": "One-time payment",
+    "paymentReference": "Payment Reference",
+    "pack": "Pack",
+    "price": "Price",
+    "copied": "Copied to clipboard"
   }
 }
