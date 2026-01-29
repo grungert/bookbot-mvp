@@ -133,14 +133,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       });
 
-      // Send approval email
-      await sendTokenPurchaseApprovedEmail({
-        userEmail: purchase.user.email || "",
-        userName: purchase.user.name || purchase.user.email || "User",
-        packName: purchase.packName,
-        tokenAmount: purchase.tokenAmount,
-        adminNotes: adminNotes || undefined,
-      });
+      // Send approval email (non-blocking - don't fail the approval if email fails)
+      try {
+        await sendTokenPurchaseApprovedEmail({
+          userEmail: purchase.user.email || "",
+          userName: purchase.user.name || purchase.user.email || "User",
+          packName: purchase.packName,
+          tokenAmount: purchase.tokenAmount,
+          adminNotes: adminNotes || undefined,
+        });
+      } catch (emailError) {
+        console.error("Failed to send token purchase approval email:", emailError);
+        // Continue - email failure shouldn't block the approval
+      }
 
       return NextResponse.json({
         success: true,
@@ -158,14 +163,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       });
 
-      // Send rejection email
-      await sendTokenPurchaseRejectedEmail({
-        userEmail: purchase.user.email || "",
-        userName: purchase.user.name || purchase.user.email || "User",
-        packName: purchase.packName,
-        tokenAmount: purchase.tokenAmount,
-        adminNotes: adminNotes || undefined,
-      });
+      // Send rejection email (non-blocking - don't fail the rejection if email fails)
+      try {
+        await sendTokenPurchaseRejectedEmail({
+          userEmail: purchase.user.email || "",
+          userName: purchase.user.name || purchase.user.email || "User",
+          packName: purchase.packName,
+          tokenAmount: purchase.tokenAmount,
+          adminNotes: adminNotes || undefined,
+        });
+      } catch (emailError) {
+        console.error("Failed to send token purchase rejection email:", emailError);
+        // Continue - email failure shouldn't block the rejection
+      }
 
       return NextResponse.json({
         success: true,

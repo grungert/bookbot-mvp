@@ -44,6 +44,8 @@ import {
   Bot,
   BotOff,
   Coins,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { formatTokenCount } from "@/lib/utils/format-tokens";
@@ -109,6 +111,13 @@ const tierColors: Record<string, string> = {
   BUSINESS: "bg-indigo-500/20 text-indigo-700 dark:text-indigo-400",
 };
 
+interface Pagination {
+  page: number;
+  limit: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -117,6 +126,12 @@ export default function SubscriptionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [chatbotFilter, setChatbotFilter] = useState<string>("all");
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 50,
+    totalCount: 0,
+    totalPages: 0,
+  });
 
   // Edit dialog state
   const [editingSubscription, setEditingSubscription] =
@@ -133,19 +148,20 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [pagination.page]);
 
   async function loadData() {
     setIsLoading(true);
     try {
       const [subsResponse, statsResponse] = await Promise.all([
-        fetch("/api/super-admin/subscriptions"),
+        fetch(`/api/super-admin/subscriptions?page=${pagination.page}&limit=${pagination.limit}`),
         fetch("/api/super-admin/subscriptions/stats"),
       ]);
 
       if (subsResponse.ok) {
         const data = await subsResponse.json();
-        setSubscriptions(data);
+        setSubscriptions(data.subscriptions);
+        setPagination(data.pagination);
       }
 
       if (statsResponse.ok) {
@@ -273,7 +289,7 @@ export default function SubscriptionsPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${stats.monthlyRevenue.toFixed(2)}
+                €{stats.monthlyRevenue.toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">
                 From active subscriptions
@@ -500,7 +516,7 @@ export default function SubscriptionsPage() {
             ) : (
               filteredSubscriptions.map((sub) => {
                 const chatUsagePercent =
-                  sub.plan.maxChatTokensPerMonth === -1
+                  sub.plan.maxChatTokensPerMonth === -1 || sub.plan.maxChatTokensPerMonth === 0
                     ? 0
                     : Math.round(
                         (sub.chatUsageThisMonth /
@@ -614,6 +630,40 @@ export default function SubscriptionsPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Controls */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {((pagination.page - 1) * pagination.limit) + 1} to{" "}
+              {Math.min(pagination.page * pagination.limit, pagination.totalCount)} of{" "}
+              {pagination.totalCount} subscriptions
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                disabled={pagination.page === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm px-2">
+                Page {pagination.page} of {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                disabled={pagination.page >= pagination.totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Edit Dialog */}
@@ -643,8 +693,8 @@ export default function SubscriptionsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="TRIAL">Trial</SelectItem>
-                    <SelectItem value="PRO">Pro ($29/mo)</SelectItem>
-                    <SelectItem value="BUSINESS">Business ($99/mo)</SelectItem>
+                    <SelectItem value="PRO">Pro</SelectItem>
+                    <SelectItem value="BUSINESS">Business</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

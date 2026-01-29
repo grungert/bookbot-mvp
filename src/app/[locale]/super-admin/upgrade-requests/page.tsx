@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -112,6 +122,7 @@ export default function PaymentRequestsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
@@ -282,7 +293,7 @@ export default function PaymentRequestsPage() {
 
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
-
+    setShowDeleteConfirm(false);
     setIsDeleting(true);
     try {
       const upgradeIds: string[] = [];
@@ -493,7 +504,7 @@ export default function PaymentRequestsPage() {
           <Button
             variant="destructive"
             size="sm"
-            onClick={handleDeleteSelected}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
           >
             {isDeleting ? (
@@ -717,6 +728,28 @@ export default function PaymentRequestsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} request(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected
+              payment request{selectedIds.size > 1 ? "s" : ""} from the database.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSelected}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

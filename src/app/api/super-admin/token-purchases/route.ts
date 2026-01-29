@@ -14,6 +14,37 @@ export async function GET() {
       );
     }
 
+    // Get stats using database aggregation
+    const [statusCounts, pendingAmountResult] = await Promise.all([
+      prisma.tokenPurchase.groupBy({
+        by: ["status"],
+        _count: true,
+      }),
+      prisma.tokenPurchase.aggregate({
+        where: { status: "PENDING" },
+        _sum: { priceEurCents: true },
+      }),
+    ]);
+
+    // Format status counts
+    const statsMap: Record<string, number> = {
+      PENDING: 0,
+      APPROVED: 0,
+      REJECTED: 0,
+      CANCELLED: 0,
+    };
+    statusCounts.forEach((item) => {
+      statsMap[item.status] = item._count;
+    });
+
+    const stats = {
+      pending: statsMap.PENDING,
+      approved: statsMap.APPROVED,
+      rejected: statsMap.REJECTED,
+      cancelled: statsMap.CANCELLED,
+      totalPendingAmount: pendingAmountResult._sum.priceEurCents || 0,
+    };
+
     const tokenPurchases = await prisma.tokenPurchase.findMany({
       include: {
         user: {
@@ -36,17 +67,6 @@ export async function GET() {
         { createdAt: "desc" },
       ],
     });
-
-    // Get stats
-    const stats = {
-      pending: tokenPurchases.filter(p => p.status === "PENDING").length,
-      approved: tokenPurchases.filter(p => p.status === "APPROVED").length,
-      rejected: tokenPurchases.filter(p => p.status === "REJECTED").length,
-      cancelled: tokenPurchases.filter(p => p.status === "CANCELLED").length,
-      totalPendingAmount: tokenPurchases
-        .filter(p => p.status === "PENDING")
-        .reduce((sum, p) => sum + p.priceEurCents, 0),
-    };
 
     return NextResponse.json({
       purchases: tokenPurchases,

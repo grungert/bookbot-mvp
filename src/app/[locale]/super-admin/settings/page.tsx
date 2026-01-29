@@ -219,7 +219,11 @@ export default function SettingsPage() {
                 {settings.BANK_IBAN && (
                   <div className="flex gap-2">
                     <span className="text-muted-foreground w-32">IBAN:</span>
-                    <span className="font-mono font-medium">{settings.BANK_IBAN}</span>
+                    <span className="font-mono font-medium">
+                      {settings.BANK_IBAN.length > 4
+                        ? "•".repeat(settings.BANK_IBAN.length - 4) + settings.BANK_IBAN.slice(-4)
+                        : settings.BANK_IBAN}
+                    </span>
                   </div>
                 )}
                 {settings.BANK_BIC && (

@@ -15,6 +15,9 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const planTier = searchParams.get("planTier");
     const search = searchParams.get("search");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const skip = (page - 1) * limit;
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -35,6 +38,9 @@ export async function GET(request: Request) {
         ],
       };
     }
+
+    // Get total count for pagination
+    const totalCount = await prisma.userSubscription.count({ where });
 
     const subscriptions = await prisma.userSubscription.findMany({
       where,
@@ -62,6 +68,8 @@ export async function GET(request: Request) {
         },
       },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     });
 
     // Get company counts for each user
@@ -134,7 +142,15 @@ export async function GET(request: Request) {
       chatUsageThisMonth: chatUsageMap.get(sub.userId) || 0,
     }));
 
-    return NextResponse.json(formattedSubscriptions);
+    return NextResponse.json({
+      subscriptions: formattedSubscriptions,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching subscriptions:", error);
     return NextResponse.json(

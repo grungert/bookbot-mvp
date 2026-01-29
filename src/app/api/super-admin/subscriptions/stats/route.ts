@@ -17,19 +17,25 @@ export async function GET() {
       _count: true,
     });
 
-    // Get subscription counts by plan tier
-    const subscriptionsWithPlan = await prisma.userSubscription.findMany({
-      include: {
-        plan: {
-          select: { tier: true },
-        },
-      },
+    // Get subscription counts by plan tier using groupBy aggregation (fixes N+1 query)
+    const planTierCountsRaw = await prisma.userSubscription.groupBy({
+      by: ["planId"],
+      _count: true,
     });
 
+    // Get plan tiers for the planIds
+    const planIds = planTierCountsRaw.map((p) => p.planId);
+    const plans = await prisma.plan.findMany({
+      where: { id: { in: planIds } },
+      select: { id: true, tier: true },
+    });
+
+    const planIdToTier = new Map(plans.map((p) => [p.id, p.tier]));
+
     const planTierCounts: Record<string, number> = {};
-    subscriptionsWithPlan.forEach((sub) => {
-      const tier = sub.plan.tier;
-      planTierCounts[tier] = (planTierCounts[tier] || 0) + 1;
+    planTierCountsRaw.forEach((item) => {
+      const tier = planIdToTier.get(item.planId) || "UNKNOWN";
+      planTierCounts[tier] = (planTierCounts[tier] || 0) + item._count;
     });
 
     // Get total subscriptions
@@ -43,7 +49,21 @@ export async function GET() {
       },
     });
 
-    // Get monthly revenue (sum of active subscriptions)
+    // Get pricing config for accurate revenue calculation
+    const pricingConfigs = await prisma.pricingConfig.findMany({
+      where: {
+        key: {
+          in: ["PRO_BASE", "CHATBOT_ADDON", "EXTRA_COMPANY", "BUSINESS_BASE"],
+        },
+      },
+    });
+
+    const pricing: Record<string, number> = {};
+    pricingConfigs.forEach((config) => {
+      pricing[config.key] = config.priceEurCents / 100; // Convert cents to euros
+    });
+
+    // Get monthly revenue (sum of active subscriptions using PricingConfig)
     const activeSubscriptions = await prisma.userSubscription.findMany({
       where: {
         status: "ACTIVE",
@@ -51,8 +71,7 @@ export async function GET() {
       include: {
         plan: {
           select: {
-            priceMonthly: true,
-            extraCompanyPrice: true,
+            tier: true,
           },
         },
       },
@@ -60,11 +79,18 @@ export async function GET() {
 
     let monthlyRevenue = 0;
     activeSubscriptions.forEach((sub) => {
-      monthlyRevenue += sub.plan.priceMonthly.toNumber();
-      if (sub.extraCompanySlots > 0 && sub.plan.extraCompanyPrice) {
-        monthlyRevenue +=
-          sub.extraCompanySlots * sub.plan.extraCompanyPrice.toNumber();
+      if (sub.plan.tier === "BUSINESS") {
+        monthlyRevenue += pricing.BUSINESS_BASE || 0;
+      } else if (sub.plan.tier === "PRO") {
+        monthlyRevenue += pricing.PRO_BASE || 0;
+        if (sub.hasChatbot) {
+          monthlyRevenue += pricing.CHATBOT_ADDON || 0;
+        }
+        if (sub.extraCompanySlots > 0) {
+          monthlyRevenue += sub.extraCompanySlots * (pricing.EXTRA_COMPANY || 0);
+        }
       }
+      // TRIAL tier has no revenue
     });
 
     // Get trials expiring soon (next 7 days)

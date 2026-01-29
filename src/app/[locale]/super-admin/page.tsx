@@ -42,6 +42,7 @@ export default async function SuperAdminDashboard({
     activeSubscriptions,
     trialsExpiringSoon,
     totalChatUsage,
+    pricingConfigs,
   ] = await Promise.all([
     prisma.company.count(),
     prisma.user.count(),
@@ -55,7 +56,7 @@ export default async function SuperAdminDashboard({
       where: { status: "ACTIVE" },
       include: {
         plan: {
-          select: { priceMonthly: true, extraCompanyPrice: true },
+          select: { tier: true },
         },
       },
     }),
@@ -72,16 +73,36 @@ export default async function SuperAdminDashboard({
       where: { periodStart },
       _sum: { tokenCount: true },
     }),
+    prisma.pricingConfig.findMany({
+      where: {
+        key: {
+          in: ["PRO_BASE", "CHATBOT_ADDON", "EXTRA_COMPANY", "BUSINESS_BASE"],
+        },
+      },
+    }),
   ]);
 
-  // Calculate monthly revenue
+  // Build pricing lookup (cents to euros)
+  const pricing: Record<string, number> = {};
+  pricingConfigs.forEach((config) => {
+    pricing[config.key] = config.priceEurCents / 100;
+  });
+
+  // Calculate monthly revenue using PricingConfig
   let monthlyRevenue = 0;
   activeSubscriptions.forEach((sub) => {
-    monthlyRevenue += sub.plan.priceMonthly.toNumber();
-    if (sub.extraCompanySlots > 0 && sub.plan.extraCompanyPrice) {
-      monthlyRevenue +=
-        sub.extraCompanySlots * sub.plan.extraCompanyPrice.toNumber();
+    if (sub.plan.tier === "BUSINESS") {
+      monthlyRevenue += pricing.BUSINESS_BASE || 0;
+    } else if (sub.plan.tier === "PRO") {
+      monthlyRevenue += pricing.PRO_BASE || 0;
+      if (sub.hasChatbot) {
+        monthlyRevenue += pricing.CHATBOT_ADDON || 0;
+      }
+      if (sub.extraCompanySlots > 0) {
+        monthlyRevenue += sub.extraCompanySlots * (pricing.EXTRA_COMPANY || 0);
+      }
     }
+    // TRIAL tier has no revenue
   });
 
   // Format subscription status counts
@@ -132,7 +153,7 @@ export default async function SuperAdminDashboard({
   const subscriptionStatsData = [
     {
       title: "Monthly Revenue",
-      value: `$${monthlyRevenue.toFixed(0)}`,
+      value: `€${monthlyRevenue.toFixed(2)}`,
       subtitle: `${statusCounts.ACTIVE} active subscriptions`,
       icon: TrendingUp,
       color: "text-green-500",

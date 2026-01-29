@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { sendUpgradeRequestUserEmail, sendUpgradeRequestAdminEmail } from "@/lib/email/send";
+import { DEFAULT_PRICING } from "@/lib/constants/pricing";
 
 // Generate a unique payment reference
 function generatePaymentReference(userId: string): string {
@@ -76,15 +77,15 @@ export async function POST(request: Request) {
 
     if (isBusinessUpgrade) {
       // Business plan - flat fee, includes everything
-      basePrice = pricing["BUSINESS_BASE"] || 9900;
+      basePrice = pricing["BUSINESS_BASE"] || DEFAULT_PRICING.BUSINESS_BASE;
       chatbotPrice = 0; // Included in business
       extraCompaniesPrice = 0; // Unlimited in business
     } else {
       // PRO plan
       // If addon-only mode (user already has PRO), don't charge base price
-      basePrice = addonOnlyMode ? 0 : (pricing["PRO_BASE"] || 1000);
-      chatbotPrice = includeChatbot ? (pricing["CHATBOT_ADDON"] || 1000) : 0;
-      extraCompaniesPrice = companyCount * (pricing["EXTRA_COMPANY"] || 700);
+      basePrice = addonOnlyMode ? 0 : (pricing["PRO_BASE"] || DEFAULT_PRICING.PRO_BASE);
+      chatbotPrice = includeChatbot ? (pricing["CHATBOT_ADDON"] || DEFAULT_PRICING.CHATBOT_ADDON) : 0;
+      extraCompaniesPrice = companyCount * (pricing["EXTRA_COMPANY"] || DEFAULT_PRICING.EXTRA_COMPANY);
     }
 
     const totalMonthlyPrice = basePrice + chatbotPrice + extraCompaniesPrice;

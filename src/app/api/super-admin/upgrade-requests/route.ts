@@ -55,6 +55,37 @@ export async function GET() {
       );
     }
 
+    // Get stats using database aggregation
+    const [statusCounts, pendingAmountResult] = await Promise.all([
+      prisma.upgradeRequest.groupBy({
+        by: ["status"],
+        _count: true,
+      }),
+      prisma.upgradeRequest.aggregate({
+        where: { status: "PENDING" },
+        _sum: { totalMonthlyPrice: true },
+      }),
+    ]);
+
+    // Format status counts
+    const statsMap: Record<string, number> = {
+      PENDING: 0,
+      APPROVED: 0,
+      REJECTED: 0,
+      CANCELLED: 0,
+    };
+    statusCounts.forEach((item) => {
+      statsMap[item.status] = item._count;
+    });
+
+    const stats = {
+      pending: statsMap.PENDING,
+      approved: statsMap.APPROVED,
+      rejected: statsMap.REJECTED,
+      cancelled: statsMap.CANCELLED,
+      totalPendingAmount: pendingAmountResult._sum.totalMonthlyPrice || 0,
+    };
+
     const upgradeRequests = await prisma.upgradeRequest.findMany({
       include: {
         user: {
@@ -71,17 +102,6 @@ export async function GET() {
         { createdAt: "desc" },
       ],
     });
-
-    // Get stats
-    const stats = {
-      pending: upgradeRequests.filter(r => r.status === "PENDING").length,
-      approved: upgradeRequests.filter(r => r.status === "APPROVED").length,
-      rejected: upgradeRequests.filter(r => r.status === "REJECTED").length,
-      cancelled: upgradeRequests.filter(r => r.status === "CANCELLED").length,
-      totalPendingAmount: upgradeRequests
-        .filter(r => r.status === "PENDING")
-        .reduce((sum, r) => sum + r.totalMonthlyPrice, 0),
-    };
 
     return NextResponse.json({
       requests: upgradeRequests,

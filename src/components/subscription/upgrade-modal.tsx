@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DEFAULT_PRICING } from "@/lib/constants/pricing";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -83,10 +84,10 @@ export function UpgradeModal({
   const [paymentReference, setPaymentReference] = useState("");
   const [copied, setCopied] = useState(false);
   const [pricing, setPricing] = useState<Pricing>({
-    PRO_BASE: 1000,
-    CHATBOT_ADDON: 1000,
-    EXTRA_COMPANY: 700,
-    BUSINESS_BASE: 9900,
+    PRO_BASE: DEFAULT_PRICING.PRO_BASE,
+    CHATBOT_ADDON: DEFAULT_PRICING.CHATBOT_ADDON,
+    EXTRA_COMPANY: DEFAULT_PRICING.EXTRA_COMPANY,
+    BUSINESS_BASE: DEFAULT_PRICING.BUSINESS_BASE,
   });
 
   // Fetch pricing from API when modal opens
@@ -767,7 +768,7 @@ export function UpgradeModal({
                   </div>
                   <span className="font-medium text-muted-foreground">{tUpgrade("existingProPlan")}</span>
                 </div>
-                <span className="text-sm text-muted-foreground line-through">€9.99/mo</span>
+                <span className="text-sm text-muted-foreground line-through">{formatPrice(pricing.PRO_BASE)}/mo</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-3">

@@ -19,6 +19,12 @@ const SYSTEM_LIMIT_KEYS = [
 // All allowed settings keys
 const ALL_SETTINGS_KEYS = [...BANK_SETTINGS_KEYS, ...SYSTEM_LIMIT_KEYS];
 
+// IBAN validation regex - basic format check (2 letters + 2 digits + up to 30 alphanumeric)
+const IBAN_REGEX = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/;
+
+// BIC/SWIFT validation regex (8 or 11 characters: 4 letters bank code, 2 letters country, 2 alphanumeric location, optional 3 alphanumeric branch)
+const BIC_REGEX = /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+
 // GET system settings
 export async function GET() {
   try {
@@ -83,6 +89,33 @@ export async function PUT(request: Request) {
         { error: "Invalid settings data" },
         { status: 400 }
       );
+    }
+
+    // Validate IBAN format if provided
+    if (settings.BANK_IBAN && typeof settings.BANK_IBAN === "string" && settings.BANK_IBAN.trim() !== "") {
+      // Remove spaces and convert to uppercase for validation
+      const cleanIban = settings.BANK_IBAN.replace(/\s/g, "").toUpperCase();
+      if (!IBAN_REGEX.test(cleanIban)) {
+        return NextResponse.json(
+          { error: "Invalid IBAN format. Expected format: 2 letters followed by 2 digits and up to 30 alphanumeric characters (e.g., RS35123456789012345678)" },
+          { status: 400 }
+        );
+      }
+      // Store the cleaned version
+      settings.BANK_IBAN = cleanIban;
+    }
+
+    // Validate BIC format if provided
+    if (settings.BANK_BIC && typeof settings.BANK_BIC === "string" && settings.BANK_BIC.trim() !== "") {
+      const cleanBic = settings.BANK_BIC.replace(/\s/g, "").toUpperCase();
+      if (!BIC_REGEX.test(cleanBic)) {
+        return NextResponse.json(
+          { error: "Invalid BIC/SWIFT format. Expected format: 8 or 11 characters (e.g., RABORARS or RABORARSXXX)" },
+          { status: 400 }
+        );
+      }
+      // Store the cleaned version
+      settings.BANK_BIC = cleanBic;
     }
 
     // Update each setting

@@ -190,15 +190,20 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       });
 
-      // Send approval email to user
+      // Send approval email to user (non-blocking - don't fail the approval if email fails)
       const planName = upgradeRequest.requestedPlanTier === "PRO" ? "Pro" : "Business";
-      await sendUpgradeApprovedEmail({
-        userEmail: upgradeRequest.user.email || "",
-        userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
-        planName,
-        includeChatbot: upgradeRequest.includeChatbot,
-        extraCompanyCount: upgradeRequest.extraCompanyCount,
-      });
+      try {
+        await sendUpgradeApprovedEmail({
+          userEmail: upgradeRequest.user.email || "",
+          userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
+          planName,
+          includeChatbot: upgradeRequest.includeChatbot,
+          extraCompanyCount: upgradeRequest.extraCompanyCount,
+        });
+      } catch (emailError) {
+        console.error("Failed to send upgrade approval email:", emailError);
+        // Continue - email failure shouldn't block the approval
+      }
 
       return NextResponse.json({
         success: true,
@@ -216,14 +221,19 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         },
       });
 
-      // Send rejection email to user
+      // Send rejection email to user (non-blocking - don't fail the rejection if email fails)
       const rejectedPlanName = upgradeRequest.requestedPlanTier === "PRO" ? "Pro" : "Business";
-      await sendUpgradeRejectedEmail({
-        userEmail: upgradeRequest.user.email || "",
-        userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
-        planName: rejectedPlanName,
-        adminNotes: adminNotes || undefined,
-      });
+      try {
+        await sendUpgradeRejectedEmail({
+          userEmail: upgradeRequest.user.email || "",
+          userName: upgradeRequest.user.name || upgradeRequest.user.email || "User",
+          planName: rejectedPlanName,
+          adminNotes: adminNotes || undefined,
+        });
+      } catch (emailError) {
+        console.error("Failed to send upgrade rejection email:", emailError);
+        // Continue - email failure shouldn't block the rejection
+      }
 
       return NextResponse.json({
         success: true,
