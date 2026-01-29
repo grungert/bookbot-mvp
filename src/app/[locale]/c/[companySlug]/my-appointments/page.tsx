@@ -13,6 +13,7 @@ import { AppointmentsCalendar } from "@/components/customer/appointments-calenda
 import { AppointmentsList } from "@/components/customer/appointments-list";
 import { AppointmentSheet } from "@/components/customer/appointment-sheet";
 import { GlobalAppointmentsList } from "@/components/customer/global-appointments-list";
+import { APPOINTMENTS_CHANNEL, type AppointmentEvent } from "@/lib/broadcast-channel";
 
 interface Company {
   id: string;
@@ -21,6 +22,7 @@ interface Company {
   logoUrl: string | null;
   primaryColor: string | null;
 }
+
 
 interface Appointment {
   id: string;
@@ -58,6 +60,7 @@ export default function MyAppointmentsPage() {
   const [closedDays, setClosedDays] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // View state
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
@@ -249,9 +252,9 @@ export default function MyAppointmentsPage() {
   const loadData = useCallback(async () => {
     try {
       const [appointmentsRes, allAppointmentsRes, workingHoursRes] = await Promise.all([
-        fetch(`/api/c/${companySlug}/appointments?myOnly=true`),
-        fetch(`/api/user/appointments`),
-        fetch(`/api/c/${companySlug}/working-hours`),
+        fetch(`/api/c/${companySlug}/appointments?myOnly=true`, { cache: 'no-store' }),
+        fetch(`/api/user/appointments`, { cache: 'no-store' }),
+        fetch(`/api/c/${companySlug}/working-hours`, { cache: 'no-store' }),
       ]);
 
       if (appointmentsRes.ok) {
@@ -287,6 +290,22 @@ export default function MyAppointmentsPage() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Listen for broadcast messages from chat widget when a booking is made
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+
+    const channel = new BroadcastChannel(APPOINTMENTS_CHANNEL);
+    channel.onmessage = (event: MessageEvent<AppointmentEvent>) => {
+      if (event.data.type === "new-booking") {
+        // Increment refresh key to force re-render of all components
+        setRefreshKey(prev => prev + 1);
+        loadData(); // Refetch appointments
+      }
+    };
+
+    return () => channel.close();
   }, [loadData]);
 
   async function handleCancel(appointmentId: string, cancelCompanySlug?: string) {

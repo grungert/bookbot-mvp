@@ -9,9 +9,16 @@ import { Input } from "@/components/ui/input";
 import { MessageSquare, X, Send, Loader2, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatMessageRenderer } from "./chat-message-renderer";
-import { createRichMessageContent } from "./message-parser";
+import { createRichMessageContent, parseMessage } from "./message-parser";
 import { LimitModal, useLimitModal, type LimitType } from "@/components/subscription/limit-modal";
+import { broadcastAppointmentUpdate } from "@/lib/broadcast-channel";
 import type { ChatMessage, ChatService, ChatTimeSlot, ChatUICallbacks } from "./types";
+
+// Helper to check if a message contains a booking-card (new booking created)
+function containsBookingCard(messageContent: string): boolean {
+  const parsed = parseMessage({ role: "assistant", content: messageContent });
+  return parsed.ui?.component === "booking-card";
+}
 
 interface InitData {
   greeting: string | null;
@@ -312,6 +319,11 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
         ...prev,
         { role: "assistant", content: data.message, timestamp: new Date().toISOString() },
       ]);
+
+      // Broadcast when a new booking is created (response contains booking-card)
+      if (containsBookingCard(data.message)) {
+        broadcastAppointmentUpdate({ type: "new-booking", companySlug });
+      }
     } catch (error) {
       setMessages((prev) => [
         ...prev,
@@ -366,6 +378,11 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
         ...prev,
         { role: "assistant", content: data.message, timestamp: new Date().toISOString() },
       ]);
+
+      // Broadcast when a new booking is created (response contains booking-card)
+      if (containsBookingCard(data.message)) {
+        broadcastAppointmentUpdate({ type: "new-booking", companySlug });
+      }
     } catch (error) {
       setMessages((prev) => [
         ...prev,

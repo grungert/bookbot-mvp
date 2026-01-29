@@ -11,8 +11,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Menu, Settings, Calendar } from "lucide-react";
+import { AppointmentBadge } from "./appointment-badge";
+import { Menu, Settings, Calendar, MessageCircle } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -28,6 +28,9 @@ interface MobileNavProps {
   showAdminLink?: boolean;
   showMyAppointments?: boolean;
   appointmentCount?: number;
+  whatsappEnabled?: boolean;
+  whatsappPhoneNumber?: string | null;
+  botName?: string | null;
 }
 
 export function MobileNav({
@@ -39,6 +42,9 @@ export function MobileNav({
   showAdminLink = false,
   showMyAppointments = false,
   appointmentCount = 0,
+  whatsappEnabled = false,
+  whatsappPhoneNumber,
+  botName,
 }: MobileNavProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -94,6 +100,21 @@ export function MobileNav({
               {item.label}
             </Link>
           ))}
+          {whatsappEnabled && whatsappPhoneNumber && (
+            <>
+              <div className="h-px bg-border my-2" />
+              <a
+                href={`https://wa.me/${whatsappPhoneNumber.replace(/\D/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="flex items-center text-green-600 hover:text-green-700 dark:text-green-400 transition-colors py-2"
+              >
+                <MessageCircle className="mr-2 h-4 w-4" />
+                {tNav("chatWithAssistant", { name: botName || tNav("assistant") })}
+              </a>
+            </>
+          )}
           {showMyAppointments && (
             <>
               <div className="h-px bg-border my-2" />
@@ -104,11 +125,9 @@ export function MobileNav({
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 {tNav("myAppointments")}
-                {appointmentCount > 0 && (
-                  <Badge variant="default" className="ml-2 h-5 min-w-5 px-1.5 text-xs">
-                    {appointmentCount}
-                  </Badge>
-                )}
+                <span className="ml-2">
+                  <AppointmentBadge initialCount={appointmentCount} />
+                </span>
               </Link>
             </>
           )}

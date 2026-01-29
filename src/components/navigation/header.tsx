@@ -5,9 +5,9 @@ import { Link } from "@/i18n/routing";
 import { UserMenu } from "./user-menu";
 import { MobileNav } from "./mobile-nav";
 import { LanguageSwitcher } from "./language-switcher";
+import { AppointmentBadge } from "./appointment-badge";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Settings, Calendar } from "lucide-react";
+import { Settings, Calendar, MessageCircle } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -23,6 +23,9 @@ interface HeaderProps {
   showMyAppointments?: boolean;
   appointmentCount?: number;
   navItems?: NavItem[];
+  whatsappEnabled?: boolean;
+  whatsappPhoneNumber?: string | null;
+  botName?: string | null;
 }
 
 export function Header({
@@ -34,6 +37,9 @@ export function Header({
   showMyAppointments = false,
   appointmentCount = 0,
   navItems = [],
+  whatsappEnabled = false,
+  whatsappPhoneNumber,
+  botName,
 }: HeaderProps) {
   const tNav = useTranslations("nav");
 
@@ -53,6 +59,9 @@ export function Header({
           showAdminLink={showAdminLink}
           showMyAppointments={showMyAppointments}
           appointmentCount={appointmentCount}
+          whatsappEnabled={whatsappEnabled}
+          whatsappPhoneNumber={whatsappPhoneNumber}
+          botName={botName}
         />
 
         {/* Logo / Company name */}
@@ -87,21 +96,28 @@ export function Header({
           ))}
         </nav>
 
-        {/* Right side - My Appointments, Admin link & User menu */}
+        {/* Right side - WhatsApp, My Appointments, Admin link & User menu */}
         <div className="flex flex-1 items-center justify-end gap-1">
+          {whatsappEnabled && whatsappPhoneNumber && (
+            <a
+              href={`https://wa.me/${whatsappPhoneNumber.replace(/\D/g, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={tNav("chatWithAssistantTooltip", { name: botName || tNav("assistant") })}
+              className="hidden md:flex"
+            >
+              <Button variant="ghost" size="sm" className="gap-2 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950/30">
+                <MessageCircle className="h-4 w-4" />
+                <span>{tNav("chatWithAssistant", { name: botName || tNav("assistant") })}</span>
+              </Button>
+            </a>
+          )}
           {showMyAppointments && (
             <Link href={myAppointmentsHref} className="hidden md:flex">
               <Button variant="ghost" size="sm" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 <span>{tNav("myAppointments")}</span>
-                {appointmentCount > 0 && (
-                  <Badge
-                    variant="default"
-                    className="h-5 min-w-5 px-1.5 text-xs rounded-full"
-                  >
-                    {appointmentCount}
-                  </Badge>
-                )}
+                <AppointmentBadge initialCount={appointmentCount} />
               </Button>
             </Link>
           )}
