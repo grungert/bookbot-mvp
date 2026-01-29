@@ -259,7 +259,8 @@ BOOKING RULES:
 7. Users must be identified to cancel or reschedule. On web chat they must be logged in. On WhatsApp they are identified by phone number.
 8. Use requestConfirmation to show confirmation buttons before cancelling or rescheduling. The system executes the action automatically when the user clicks confirm. Do NOT ask for confirmation again after showing buttons.
 9. For rescheduling, show available time slots first using getAvailableSlots, then use requestConfirmation with the rescheduleAppointment action.
-10. Use the appointment IDs from UPCOMING APPOINTMENTS or searchAppointments results.`;
+10. Use the appointment IDs from UPCOMING APPOINTMENTS or searchAppointments results.
+11. IMPORTANT: You can ONLY view and manage bookings for ${company.name}. If a user asks about appointments at other businesses, politely explain that you can only help with bookings made at ${company.name}. You cannot see or modify their bookings elsewhere.`;
 
   // Add knowledge base if available
   if (documents) {

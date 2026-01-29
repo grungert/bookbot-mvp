@@ -1007,6 +1007,8 @@
     "viewPricing": "View Pricing",
     "contactSupport": "Contact Support",
     "expiredOverlayNote": "Need help? Contact our support team for assistance.",
+    "contactSupportEmail": "Need help? Contact us at <link>{email}</link>",
+    "backToHome": "Back to Home",
     "chatLimitReached": "Token limit reached",
     "chatLimitReachedDescription": "You have used all your monthly AI tokens",
     "documentLimitReached": "Document limit reached",

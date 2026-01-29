@@ -94,6 +94,29 @@ export default async function AdminLayout({
 
   // If blocked, show the expired overlay
   if (isBlocked) {
+    const [superAdmin, ownerCompanyCount, pendingUpgrade] = await Promise.all([
+      prisma.user.findFirst({
+        where: { role: "SUPER_ADMIN" },
+        select: { email: true },
+      }),
+      ownerMembership
+        ? prisma.companyMembership.count({
+            where: { userId: ownerMembership.userId, role: "OWNER" },
+          })
+        : Promise.resolve(1),
+      ownerMembership
+        ? prisma.upgradeRequest.findFirst({
+            where: { userId: ownerMembership.userId, status: "PENDING" },
+            select: {
+              id: true,
+              totalMonthlyPrice: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: "desc" },
+          })
+        : Promise.resolve(null),
+    ]);
+
     return (
       <SidebarProvider>
         <div className="min-h-screen bg-muted/30 relative">
@@ -107,7 +130,15 @@ export default async function AdminLayout({
               </div>
             </div>
           </header>
-          <ExpiredOverlay status={trialStatus.status as "TRIAL_EXPIRED" | "PAST_DUE" | "CANCELLED"} />
+          <ExpiredOverlay
+            status={trialStatus.status as "TRIAL_EXPIRED" | "PAST_DUE" | "CANCELLED"}
+            supportEmail={superAdmin?.email}
+            currentTier={subscription?.plan.tier}
+            hasChatbot={subscription?.hasChatbot ?? false}
+            primaryColor={company.primaryColor}
+            currentCompanyCount={ownerCompanyCount}
+            hasPendingUpgrade={!!pendingUpgrade}
+          />
         </div>
       </SidebarProvider>
     );

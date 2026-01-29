@@ -274,6 +274,10 @@ export default function SettingsPage() {
   const [newNotificationEmail, setNewNotificationEmail] = useState("");
   const [taxRate, setTaxRate] = useState<number>(20);
 
+  // Embed & Channels copy state (hoisted to avoid hooks inside inline sections)
+  const [copiedEmbedCode, setCopiedEmbedCode] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
   // Logo upload
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -693,13 +697,6 @@ export default function SettingsPage() {
   const BrandingSection = () => {
     const displayLogo = logoPreview || logoUrl;
     const canUseBranding = subscriptionData?.features.customBranding ?? false;
-
-    // Load subscription data if not loaded yet
-    useEffect(() => {
-      if (!subscriptionData && !isLoadingSubscription) {
-        loadSubscriptionData();
-      }
-    }, []);
 
     if (isLoadingSubscription) {
       return (
@@ -1130,7 +1127,6 @@ export default function SettingsPage() {
   };
 
   const EmbedSection = () => {
-    const [copied, setCopied] = useState(false);
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const embedUrl = `${baseUrl}/${locale}/embed/${companySlug}`;
 
@@ -1146,9 +1142,9 @@ export default function SettingsPage() {
     const handleCopy = async () => {
       try {
         await navigator.clipboard.writeText(embedCode);
-        setCopied(true);
+        setCopiedEmbedCode(true);
         toast.success(t("embedCodeCopied"));
-        setTimeout(() => setCopied(false), 2000);
+        setTimeout(() => setCopiedEmbedCode(false), 2000);
       } catch {
         toast.error(tCommon("error"));
       }
@@ -1176,7 +1172,7 @@ export default function SettingsPage() {
                 onClick={handleCopy}
                 className="absolute top-2 right-2"
               >
-                {copied ? (
+                {copiedEmbedCode ? (
                   <>
                     <Check className="h-3.5 w-3.5 mr-1" />
                     {t("copied")}
@@ -1338,7 +1334,6 @@ export default function SettingsPage() {
   const ChannelsSection = () => {
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const webhookUrl = `${baseUrl}/api/webhooks/whatsapp`;
-    const [copiedWebhook, setCopiedWebhook] = useState(false);
 
     const handleCopyWebhook = async () => {
       try {
@@ -2348,7 +2343,7 @@ export default function SettingsPage() {
       {/* Mobile: Horizontal scrollable tabs */}
       <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
         {tabConfig.map((tab) => {
-          const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed") && !hasChatbotAccess;
+          const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed" || tab.id === "channels") && !hasChatbotAccess;
           return (
             <button
               key={tab.id}
@@ -2376,7 +2371,7 @@ export default function SettingsPage() {
         {/* Desktop Sidebar Navigation */}
         <nav className="hidden md:block w-48 shrink-0 space-y-1 sticky top-4 self-start">
           {tabConfig.map((tab) => {
-            const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed") && !hasChatbotAccess;
+            const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed" || tab.id === "channels") && !hasChatbotAccess;
             return (
               <button
                 key={tab.id}
@@ -2401,9 +2396,9 @@ export default function SettingsPage() {
 
         {/* Content Area */}
         <div className="flex-1 min-w-0">
-          {activeTab === "general" && <GeneralSection />}
-          {activeTab === "branding" && <BrandingSection />}
-          {activeTab === "ai" && <AiChatbotSection />}
+          {activeTab === "general" && GeneralSection()}
+          {activeTab === "branding" && BrandingSection()}
+          {activeTab === "ai" && AiChatbotSection()}
           {activeTab === "bot" && (
             <div className="rounded-xl border bg-card p-4">
               <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
@@ -2494,10 +2489,10 @@ export default function SettingsPage() {
               </div>
             </div>
           )}
-          {activeTab === "business" && <BusinessDetailsSection />}
-          {activeTab === "embed" && <EmbedSection />}
-          {activeTab === "channels" && <ChannelsSection />}
-          {activeTab === "subscription" && <SubscriptionSection />}
+          {activeTab === "business" && BusinessDetailsSection()}
+          {activeTab === "embed" && EmbedSection()}
+          {activeTab === "channels" && ChannelsSection()}
+          {activeTab === "subscription" && SubscriptionSection()}
           {activeTab === "invoices" && (
             <InvoicesSection
               companySlug={companySlug}

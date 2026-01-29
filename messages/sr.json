@@ -1007,6 +1007,8 @@
     "viewPricing": "Pogledaj cene",
     "contactSupport": "Kontaktiraj podrsku",
     "expiredOverlayNote": "Potrebna vam je pomoc? Kontaktirajte nas tim za podrsku.",
+    "contactSupportEmail": "Potrebna vam je pomoc? Kontaktirajte nas na <link>{email}</link>",
+    "backToHome": "Nazad na početnu",
     "chatLimitReached": "Limit tokena dostignut",
     "chatLimitReachedDescription": "Iskoristili ste sve mesečne AI tokene",
     "documentLimitReached": "Limit dokumenata dostignut",
