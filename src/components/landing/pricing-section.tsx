@@ -184,9 +184,9 @@ function WhatsAppIntegrationBanner() {
         }}
         className="mt-8 max-w-4xl mx-auto"
       >
-        <div className="relative rounded-2xl overflow-hidden">
-          {/* Gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 via-emerald-500/20 to-teal-500/20" />
+        <div className="relative rounded-2xl overflow-hidden bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-green-500/20 dark:border-green-500/10 shadow-lg shadow-green-500/5">
+          {/* Green gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-emerald-500/5 to-teal-500/10 pointer-events-none" />
 
           {/* Content */}
           <div className="relative p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
