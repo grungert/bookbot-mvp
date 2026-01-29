@@ -2305,6 +2305,7 @@ export default function SettingsPage() {
             loadPendingTokenPurchase();
             loadSubscriptionData();
           }}
+          primaryColor={primaryColor}
         />
 
         {/* Create Company Modal */}

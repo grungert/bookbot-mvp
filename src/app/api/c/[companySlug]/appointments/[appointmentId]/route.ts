@@ -192,26 +192,38 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       ...(parsed.data.notes !== undefined && { notes: parsed.data.notes }),
     };
 
-    // Handle service change
-    let newService = null;
-    if (parsed.data.serviceId && parsed.data.serviceId !== appointment.serviceId) {
+    // Determine if we need service info for time calculations
+    const hasTimeChange = parsed.data.startTime && new Date(parsed.data.startTime).getTime() !== appointment.startTime.getTime();
+    const hasServiceChange = parsed.data.serviceId && parsed.data.serviceId !== appointment.serviceId;
+
+    // Fetch service info once if we need it (for time change or service change)
+    let serviceDuration: number | null = null;
+    let newService: { id: string; duration: number } | null = null;
+
+    if (hasServiceChange) {
+      // New service requested - fetch it
       newService = await prisma.service.findFirst({
         where: { id: parsed.data.serviceId, companyId: company.id },
+        select: { id: true, duration: true },
       });
       if (!newService) {
         return NextResponse.json({ error: "Service not found" }, { status: 404 });
       }
       updateData.serviceId = parsed.data.serviceId;
+      serviceDuration = newService.duration;
+    } else if (hasTimeChange) {
+      // Time change without service change - fetch current service duration
+      const currentService = await prisma.service.findUnique({
+        where: { id: appointment.serviceId },
+        select: { duration: true },
+      });
+      serviceDuration = currentService?.duration || 60;
     }
 
-    // Handle time change
-    const hasTimeChange = parsed.data.startTime && new Date(parsed.data.startTime).getTime() !== appointment.startTime.getTime();
-    const hasServiceChange = newService !== null;
-
+    // Handle time/service change - recalculate end time
     if (hasTimeChange || hasServiceChange) {
       const newStartTime = parsed.data.startTime ? new Date(parsed.data.startTime) : appointment.startTime;
-      const serviceDuration = newService?.duration || (await prisma.service.findUnique({ where: { id: appointment.serviceId } }))?.duration || 60;
-      const newEndTime = addMinutes(newStartTime, serviceDuration);
+      const newEndTime = addMinutes(newStartTime, serviceDuration || 60);
 
       updateData.startTime = newStartTime;
       updateData.endTime = newEndTime;

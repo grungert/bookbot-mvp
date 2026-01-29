@@ -128,7 +128,7 @@ export function CompanySwitcher({
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9"
+              className="h-9 w-full"
               disabled={isLoading}
             >
               <Building2 className="h-4 w-4" />

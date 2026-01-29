@@ -48,6 +48,11 @@ const STATUS_STYLES: Record<string, { text: string; border: string; itemBg: stri
     border: "border-primary/30 hover:border-primary/50",
     itemBg: "bg-primary/10",
   },
+  multiple: {
+    text: "text-purple-700",
+    border: "border-purple-500/50 hover:border-purple-500/70",
+    itemBg: "bg-purple-500/10",
+  },
   PENDING: {
     text: "text-orange-700",
     border: "border-orange-500/50 hover:border-orange-500/70",
@@ -104,8 +109,11 @@ export function CalendarFilterBar({
     if (filters.statuses.length === 1) {
       return filters.statuses[0];
     }
-    return "all"; // Default to all if multiple but not all selected
+    return "multiple"; // Multiple statuses selected (but not all)
   }, [filters.statuses]);
+
+  // Count for multiple selection display
+  const multipleStatusCount = filters.statuses.length;
 
   // Get the style for the current status
   const currentStatusStyle = STATUS_STYLES[currentStatusValue] || STATUS_STYLES.all;
@@ -153,7 +161,16 @@ export function CalendarFilterBar({
               currentStatusStyle.border
             )}
           >
-            <SelectValue placeholder={t("filterByStatus")} />
+            {currentStatusValue === "multiple" ? (
+              <span className="flex items-center gap-2">
+                <span>{t("multipleStatuses")}</span>
+                <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs bg-purple-500/20 text-purple-700 font-medium">
+                  {multipleStatusCount}
+                </span>
+              </span>
+            ) : (
+              <SelectValue placeholder={t("filterByStatus")} />
+            )}
           </SelectTrigger>
           <SelectContent className="bg-card/95 backdrop-blur-md border-border/50">
             <SelectItem

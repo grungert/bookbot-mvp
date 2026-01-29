@@ -261,7 +261,10 @@ function NavContent({
       return (
         <Tooltip key={item.href}>
           <TooltipTrigger asChild>{disabledContent}</TooltipTrigger>
-          <TooltipContent side={isCollapsed ? "right" : "top"}>
+          <TooltipContent
+            side={isCollapsed ? "right" : "top"}
+            style={isCollapsed && primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+          >
             {item.disabledTooltip || item.label}
           </TooltipContent>
         </Tooltip>
@@ -319,26 +322,28 @@ function NavContent({
     );
 
     if (isCollapsed) {
+      const hasBadge = item.badge !== undefined && item.badge > 0;
       return (
         <Tooltip key={item.href}>
           <TooltipTrigger asChild>{navLink}</TooltipTrigger>
-          <TooltipContent side="right" className="flex flex-col gap-1">
+          <TooltipContent
+            side="right"
+            className="flex flex-col gap-1"
+            style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+          >
             <span className="flex items-center gap-2">
               {item.label}
-              {item.badge !== undefined && item.badge > 0 && (
+              {hasBadge && (
                 <Badge
-                  className="h-5 min-w-5 px-1.5"
-                  style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+                  variant="secondary"
+                  className="h-5 min-w-5 px-1.5 bg-white/20 text-white hover:bg-white/30"
                 >
                   {item.badge}
                 </Badge>
               )}
             </span>
-            {item.badge !== undefined && item.badge > 0 && item.badgeTooltip && (
-              <span
-                className="text-xs px-2 py-0.5 rounded"
-                style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
-              >
+            {hasBadge && item.badgeTooltip && (
+              <span className="text-xs opacity-90">
                 {item.badgeTooltip}
               </span>
             )}
@@ -364,7 +369,12 @@ function NavContent({
                 <ChevronLeft className="h-5 w-5" />
               </Link>
             </TooltipTrigger>
-            <TooltipContent side="right">{tNav("backToSite")}</TooltipContent>
+            <TooltipContent
+              side="right"
+              style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+            >
+              {tNav("backToSite")}
+            </TooltipContent>
           </Tooltip>
         ) : (
           <>
@@ -443,7 +453,10 @@ export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAp
                 )}
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right">
+            <TooltipContent
+              side="right"
+              style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+            >
               {isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             </TooltipContent>
           </Tooltip>

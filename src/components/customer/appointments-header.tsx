@@ -218,6 +218,7 @@ export function AppointmentsHeader({
             )}
           </div>
 
+
         </div>
       </div>
     </header>

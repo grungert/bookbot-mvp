@@ -24,11 +24,13 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatTokenCount } from "@/lib/utils/format-tokens";
+import { generateThemePalette } from "@/lib/utils/colors";
 
 interface BuyTokensModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  primaryColor?: string;
 }
 
 interface TokenPack {
@@ -42,9 +44,13 @@ export function BuyTokensModal({
   open,
   onOpenChange,
   onSuccess,
+  primaryColor,
 }: BuyTokensModalProps) {
   const t = useTranslations("tokenPurchase");
   const tCommon = useTranslations("common");
+
+  // Generate theme palette from primary color
+  const palette = primaryColor ? generateThemePalette(primaryColor) : null;
 
   const [step, setStep] = useState(1);
   const [packs, setPacks] = useState<TokenPack[]>([]);
@@ -75,17 +81,28 @@ export function BuyTokensModal({
     }
   }, [open]);
 
-  // Reset state when modal opens
+  // Reset state when modal opens (but not when it just closed after submission)
   useEffect(() => {
-    if (open) {
+    if (open && !submitted) {
       setStep(1);
       setSelectedPackId(null);
       setIsSubmitting(false);
-      setSubmitted(false);
       setPaymentReference("");
       setCopied(false);
     }
-  }, [open]);
+    // Reset submitted state when modal closes
+    if (!open) {
+      // Delay reset to allow close animation
+      const timer = setTimeout(() => {
+        setSubmitted(false);
+        setStep(1);
+        setSelectedPackId(null);
+        setPaymentReference("");
+        setCopied(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open, submitted]);
 
   const totalSteps = 3;
 
@@ -399,7 +416,14 @@ export function BuyTokensModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        style={palette ? {
+          "--primary": palette.primary,
+          "--primary-foreground": palette.foreground,
+          "--ring": palette.ring,
+        } as React.CSSProperties : undefined}
+      >
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />

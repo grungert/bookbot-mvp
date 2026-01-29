@@ -103,6 +103,9 @@ export default async function CompanyLayout({
         showAdminLink={canAccessAdmin}
         showMyAppointments={isLoggedIn}
         appointmentCount={appointmentCount}
+        whatsappEnabled={company.whatsappEnabled && !!company.whatsappPhoneNumber}
+        whatsappPhoneNumber={company.whatsappPhoneNumber}
+        botName={company.aiBotName}
       />
       {children}
       {isChatAvailable && (

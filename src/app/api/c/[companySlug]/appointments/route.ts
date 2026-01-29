@@ -41,9 +41,16 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
+    const statuses = searchParams.get("statuses"); // Support multiple statuses
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const myOnly = searchParams.get("myOnly") === "true";
+    const serviceIds = searchParams.get("services"); // Support service filtering
+    const all = searchParams.get("all") === "true"; // Return all without pagination (for calendar view)
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Check if user has admin access to this company (via membership)
     const membership = await prisma.companyMembership.findUnique({
@@ -67,8 +74,22 @@ export async function GET(request: Request, { params }: RouteParams) {
       where.userId = user.id;
     }
 
-    if (status) {
+    // Support both single status and multiple statuses
+    if (statuses) {
+      const statusList = statuses.split(",").filter(Boolean) as AppointmentStatus[];
+      if (statusList.length > 0) {
+        where.status = { in: statusList };
+      }
+    } else if (status) {
       where.status = status as AppointmentStatus;
+    }
+
+    // Service filtering
+    if (serviceIds) {
+      const serviceIdList = serviceIds.split(",").filter(Boolean);
+      if (serviceIdList.length > 0) {
+        where.serviceId = { in: serviceIdList };
+      }
     }
 
     if (startDate || endDate) {
@@ -76,6 +97,32 @@ export async function GET(request: Request, { params }: RouteParams) {
       if (startDate) (where.startTime as { gte?: Date; lte?: Date }).gte = new Date(startDate);
       if (endDate) (where.startTime as { gte?: Date; lte?: Date }).lte = new Date(endDate);
     }
+
+    // For calendar view or when all=true, return all appointments without pagination
+    if (all) {
+      const appointments = await prisma.appointment.findMany({
+        where,
+        include: {
+          service: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              image: true,
+            },
+          },
+        },
+        orderBy: { startTime: "asc" },
+      });
+      return NextResponse.json(appointments);
+    }
+
+    // Get total count for pagination
+    const total = await prisma.appointment.count({ where });
+    const totalPages = Math.ceil(total / limit);
+    const skip = (page - 1) * limit;
 
     const appointments = await prisma.appointment.findMany({
       where,
@@ -91,10 +138,18 @@ export async function GET(request: Request, { params }: RouteParams) {
           },
         },
       },
-      orderBy: { startTime: "asc" },
+      orderBy: { startTime: "desc" },
+      skip,
+      take: limit,
     });
 
-    return NextResponse.json(appointments);
+    return NextResponse.json({
+      appointments,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
   } catch (error) {
     console.error("Error fetching appointments:", error);
     return NextResponse.json(

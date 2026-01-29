@@ -143,7 +143,8 @@
     "sourceBot": "Chat Bot",
     "sourceWhatsapp": "WhatsApp",
     "sourceAdmin": "Admin",
-    "created": "Created"
+    "created": "Created",
+    "multipleStatuses": "Multiple"
   },
   "booking": {
     "title": "Book an Appointment",
@@ -322,7 +323,9 @@
     "complete": "Complete",
     "showing": "Showing",
     "of": "of",
-    "searchPlaceholder": "Search by name, email, service..."
+    "searchPlaceholder": "Search by name, email, service...",
+    "errorLoading": "Failed to load appointments",
+    "retry": "Try again"
   },
   "invoices": {
     "title": "Invoices",
@@ -398,7 +401,14 @@
     "searchInvoiceNumber": "Search invoice number...",
     "allCustomers": "All Customers",
     "service": "Service",
-    "paidOn": "Paid"
+    "paidOn": "Paid",
+    "errorLoadingInvoices": "Failed to load invoices",
+    "retry": "Try Again",
+    "validationSelectCustomer": "Please select a customer",
+    "validationDescriptionRequired": "All line items must have a description",
+    "validationQuantityPositive": "Quantity must be a positive whole number",
+    "validationPriceNonNegative": "Price cannot be negative",
+    "validationDueDateFuture": "Due date must be today or in the future"
   },
   "workingHours": {
     "title": "Working Hours",

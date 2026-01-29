@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { getTrialStatus } from "@/lib/subscription/trial";
 import { getUserSubscription } from "@/lib/subscription/limits";
 import { SubscriptionStatus } from "@prisma/client";
+import { generateThemePalette } from "@/lib/utils/colors";
 
 interface AdminLayoutProps {
   children: React.ReactNode;

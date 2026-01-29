@@ -68,6 +68,11 @@ export async function GET(request: Request, { params }: RouteParams) {
     const serviceIds = searchParams.get("serviceIds"); // Comma-separated service IDs
     const customerId = searchParams.get("customerId"); // Filter by customer/user ID
     const search = searchParams.get("search"); // Search by invoice number
+    const all = searchParams.get("all") === "true"; // Return all without pagination
+
+    // Pagination parameters
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
     // Check if user has admin access to this company (via membership)
     const membership = await prisma.companyMembership.findUnique({
@@ -120,34 +125,59 @@ export async function GET(request: Request, { params }: RouteParams) {
       }
     }
 
-    const invoices = await prisma.invoice.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-          },
+    const includeConfig = {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
         },
-        lineItems: true,
-        appointment: {
-          select: {
-            id: true,
-            startTime: true,
-            service: {
-              select: {
-                name: true,
-              },
+      },
+      lineItems: true,
+      appointment: {
+        select: {
+          id: true,
+          startTime: true,
+          service: {
+            select: {
+              name: true,
             },
           },
         },
       },
+    };
+
+    // For backwards compatibility, return all invoices without pagination when all=true
+    if (all) {
+      const invoices = await prisma.invoice.findMany({
+        where,
+        include: includeConfig,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(invoices);
+    }
+
+    // Get total count for pagination
+    const total = await prisma.invoice.count({ where });
+    const totalPages = Math.ceil(total / limit);
+    const skip = (page - 1) * limit;
+
+    const invoices = await prisma.invoice.findMany({
+      where,
+      include: includeConfig,
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     });
 
-    return NextResponse.json(invoices);
+    return NextResponse.json({
+      invoices,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
   } catch (error) {
     console.error("Error fetching invoices:", error);
     return NextResponse.json(
@@ -182,61 +212,89 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const { userId, appointmentId, dueDate, notes, lineItems } = parsed.data;
 
-    // Process line items - fetch services if serviceId provided to apply discounts
-    const processedLineItems = await Promise.all(
-      lineItems.map(async (item) => {
-        // If serviceId is provided, fetch the service to check for discounts
-        if (item.serviceId) {
-          const service = await prisma.service.findUnique({
-            where: { id: item.serviceId },
-            select: {
-              price: true,
-              currency: true,
-              discountType: true,
-              discountValue: true,
-              discountStartDate: true,
-              discountEndDate: true,
-            },
+    // Batch fetch all services referenced in line items to avoid N+1 queries
+    const serviceIds = lineItems
+      .map((item) => item.serviceId)
+      .filter((id): id is string => !!id);
+
+    const servicesMap = new Map<string, {
+      price: number;
+      currency: string;
+      discountType: string | null;
+      discountValue: number | null;
+      discountStartDate: Date | null;
+      discountEndDate: Date | null;
+    }>();
+
+    if (serviceIds.length > 0) {
+      const services = await prisma.service.findMany({
+        where: { id: { in: serviceIds } },
+        select: {
+          id: true,
+          price: true,
+          currency: true,
+          discountType: true,
+          discountValue: true,
+          discountStartDate: true,
+          discountEndDate: true,
+        },
+      });
+
+      services.forEach((service) => {
+        servicesMap.set(service.id, {
+          price: Number(service.price),
+          currency: service.currency,
+          discountType: service.discountType,
+          discountValue: service.discountValue ? Number(service.discountValue) : null,
+          discountStartDate: service.discountStartDate,
+          discountEndDate: service.discountEndDate,
+        });
+      });
+    }
+
+    // Process line items using pre-fetched services
+    const processedLineItems = lineItems.map((item) => {
+      // If serviceId is provided, use the pre-fetched service to check for discounts
+      if (item.serviceId) {
+        const service = servicesMap.get(item.serviceId);
+
+        if (service) {
+          const discountResult = calculateDiscountedPrice({
+            price: service.price,
+            currency: service.currency,
+            discountType: service.discountType as "percentage" | "fixed" | null,
+            discountValue: service.discountValue,
+            discountStartDate: service.discountStartDate,
+            discountEndDate: service.discountEndDate,
           });
 
-          if (service) {
-            const discountResult = calculateDiscountedPrice({
-              price: Number(service.price),
-              currency: service.currency,
-              discountType: service.discountType as "percentage" | "fixed" | null,
-              discountValue: service.discountValue ? Number(service.discountValue) : null,
-              discountStartDate: service.discountStartDate,
-              discountEndDate: service.discountEndDate,
-            });
-
-            if (discountResult.isDiscounted) {
-              return {
-                description: item.description,
-                quantity: item.quantity,
-                unitPrice: discountResult.finalPrice,
-                total: item.quantity * discountResult.finalPrice,
-                originalUnitPrice: discountResult.originalPrice,
-                discountType: service.discountType,
-                discountValue: service.discountValue ? Number(service.discountValue) : null,
-                discountPercentage: discountResult.discountPercentage,
-              };
-            }
+          if (discountResult.isDiscounted) {
+            return {
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: discountResult.finalPrice,
+              total: item.quantity * discountResult.finalPrice,
+              originalUnitPrice: discountResult.originalPrice,
+              discountType: service.discountType,
+              discountValue: service.discountValue,
+              discountPercentage: discountResult.discountPercentage,
+            };
           }
         }
+      }
 
-        // No service or no discount - use provided values
-        return {
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.quantity * item.unitPrice,
-          originalUnitPrice: item.originalUnitPrice || null,
-          discountType: item.discountType || null,
-          discountValue: item.discountValue || null,
-          discountPercentage: item.discountPercentage || null,
-        };
-      })
-    );
+      // No service or no discount - use provided values
+      return {
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        total: item.quantity * item.unitPrice,
+        originalUnitPrice: item.originalUnitPrice || null,
+        discountType: item.discountType || null,
+        discountValue: item.discountValue || null,
+        discountPercentage: item.discountPercentage || null,
+      };
+    });
 
     // Calculate totals using processed (potentially discounted) prices
     const subtotal = processedLineItems.reduce(

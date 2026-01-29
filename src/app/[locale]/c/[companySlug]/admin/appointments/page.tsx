@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Mail, MessageSquare, Globe, Bot, ShieldCheck } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Clock, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Mail, MessageSquare, Globe, Bot, ShieldCheck, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   CalendarHeader,
@@ -96,7 +96,12 @@ export default function AppointmentsPage() {
   const [customDateFrom, setCustomDateFrom] = useState("");
   const [customDateTo, setCustomDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalAppointments, setTotalAppointments] = useState(0);
+  const itemsPerPage = 20;
+
+  // Error state
+  const [error, setError] = useState<string | null>(null);
 
   // Search and sort state
   const [searchQuery, setSearchQuery] = useState("");
@@ -152,13 +157,17 @@ export default function AppointmentsPage() {
     updateUrl(filters, viewMode, currentDate);
   }, [filters, viewMode, currentDate, updateUrl]);
 
-  // Load appointments, services, company settings, and working hours
+  // Load services, company settings, and working hours on mount
   useEffect(() => {
-    loadAppointments();
     loadServices();
     loadCompanySettings();
     loadWorkingHours();
   }, [companySlug]);
+
+  // Load appointments when filters, view mode, or pagination changes
+  useEffect(() => {
+    loadAppointments();
+  }, [companySlug, viewMode, currentPage, filters.statuses, filters.services, datePeriod, customDateFrom, customDateTo]);
 
   async function loadCompanySettings() {
     try {
@@ -203,12 +212,74 @@ export default function AppointmentsPage() {
 
   async function loadAppointments() {
     try {
-      const response = await fetch(`/api/c/${companySlug}/appointments`);
-      if (response.ok) {
-        const data = await response.json();
-        setAppointments(data);
+      setError(null);
+
+      // Build query params
+      const params = new URLSearchParams();
+
+      // Calendar view needs all appointments for the visible week
+      if (viewMode === "schedule") {
+        params.set("all", "true");
+      } else {
+        // Table view uses pagination
+        params.set("page", currentPage.toString());
+        params.set("limit", itemsPerPage.toString());
       }
-    } catch (error) {
+
+      // Add status filters
+      if (filters.statuses.length > 0 && filters.statuses.length < 4) {
+        params.set("statuses", filters.statuses.join(","));
+      }
+
+      // Add service filters
+      if (filters.services.length > 0 && filters.services.length < services.length) {
+        params.set("services", filters.services.join(","));
+      }
+
+      // Add date filters for table view
+      if (viewMode === "table" && datePeriod !== "all") {
+        const now = new Date();
+        let startDate: Date | null = null;
+        let endDate: Date = new Date();
+
+        if (datePeriod === "7d") {
+          startDate = subDays(now, 7);
+        } else if (datePeriod === "30d") {
+          startDate = subDays(now, 30);
+        } else if (datePeriod === "90d") {
+          startDate = subDays(now, 90);
+        } else if (datePeriod === "custom" && customDateFrom && customDateTo) {
+          startDate = startOfDay(new Date(customDateFrom));
+          endDate = endOfDay(new Date(customDateTo));
+        }
+
+        if (startDate) {
+          params.set("startDate", startDate.toISOString());
+          params.set("endDate", endDate.toISOString());
+        }
+      }
+
+      const response = await fetch(`/api/c/${companySlug}/appointments?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Failed to load appointments");
+      }
+
+      const data = await response.json();
+
+      // Handle both paginated and non-paginated responses
+      if (Array.isArray(data)) {
+        // Non-paginated response (calendar view)
+        setAppointments(data);
+        setTotalAppointments(data.length);
+        setTotalPages(1);
+      } else {
+        // Paginated response (table view)
+        setAppointments(data.appointments);
+        setTotalAppointments(data.total);
+        setTotalPages(data.totalPages);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tCommon("error"));
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
@@ -304,18 +375,13 @@ export default function AppointmentsPage() {
     }
   }
 
-  // Filter appointments with date range support for table view
+  // Filter and sort appointments
+  // Note: Server-side filtering is applied for status, services, and date ranges
+  // Client-side filtering handles search (quick local filter) and sorting
   const filteredAppointments = useMemo(() => {
-    let filtered = appointments.filter((apt) => {
-      const serviceMatch =
-        filters.services.length === 0 ||
-        (apt.service.id && filters.services.includes(apt.service.id));
-      const statusMatch =
-        filters.statuses.length === 0 || filters.statuses.includes(apt.status);
-      return serviceMatch && statusMatch;
-    });
+    let filtered = [...appointments];
 
-    // Apply search filter for table view
+    // Apply search filter for table view (client-side for responsiveness)
     if (viewMode === "table" && searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter((apt) => {
@@ -332,32 +398,7 @@ export default function AppointmentsPage() {
       });
     }
 
-    // Apply date filter only for table view
-    if (viewMode === "table" && datePeriod !== "all") {
-      const now = new Date();
-      let startDate: Date | null = null;
-      let endDate: Date = endOfDay(now);
-
-      if (datePeriod === "7d") {
-        startDate = startOfDay(subDays(now, 7));
-      } else if (datePeriod === "30d") {
-        startDate = startOfDay(subDays(now, 30));
-      } else if (datePeriod === "90d") {
-        startDate = startOfDay(subDays(now, 90));
-      } else if (datePeriod === "custom" && customDateFrom && customDateTo) {
-        startDate = startOfDay(new Date(customDateFrom));
-        endDate = endOfDay(new Date(customDateTo));
-      }
-
-      if (startDate) {
-        filtered = filtered.filter((apt) => {
-          const aptDate = parseISO(apt.startTime);
-          return isWithinInterval(aptDate, { start: startDate!, end: endDate });
-        });
-      }
-    }
-
-    // Sort for table view
+    // Sort for table view (client-side)
     if (viewMode === "table") {
       filtered.sort((a, b) => {
         let comparison = 0;
@@ -389,7 +430,7 @@ export default function AppointmentsPage() {
     }
 
     return filtered;
-  }, [appointments, filters, viewMode, datePeriod, customDateFrom, customDateTo, searchQuery, sortField, sortDirection]);
+  }, [appointments, viewMode, searchQuery, sortField, sortDirection, services]);
 
   // Toggle sort direction or change field
   const handleSort = (field: SortField) => {
@@ -401,13 +442,12 @@ export default function AppointmentsPage() {
     }
   };
 
-  // Pagination for table view
-  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
+  // For table view, appointments are already paginated from server
+  // For calendar view (schedule), use all filtered appointments
   const paginatedAppointments = useMemo(() => {
-    if (viewMode !== "table") return filteredAppointments;
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAppointments.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredAppointments, currentPage, itemsPerPage, viewMode]);
+    // In table view, data is already paginated from server, just apply client-side search filter
+    return filteredAppointments;
+  }, [filteredAppointments]);
 
   // Group paginated appointments by date
   const paginatedGroupedAppointments = useMemo(() => {
@@ -424,10 +464,15 @@ export default function AppointmentsPage() {
     return groups;
   }, [paginatedAppointments, viewMode]);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters or view mode change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters, datePeriod, customDateFrom, customDateTo, searchQuery, sortField, sortDirection]);
+  }, [filters, datePeriod, customDateFrom, customDateTo, searchQuery, sortField, sortDirection, viewMode]);
+
+  // Clear selection when page changes (to avoid confusion with bulk actions)
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [currentPage]);
 
   // Selection helpers
   function toggleSelectAll() {
@@ -563,7 +608,7 @@ export default function AppointmentsPage() {
           setCustomDateTo(to);
         }}
         primaryColor={primaryColor}
-        appointmentCount={filteredAppointments.length}
+        appointmentCount={viewMode === "table" ? totalAppointments : filteredAppointments.length}
       />
 
       {/* Horizontal filter bar */}
@@ -640,7 +685,19 @@ export default function AppointmentsPage() {
           )}
 
           {/* Table */}
-          {filteredAppointments.length === 0 ? (
+          {error ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-4" />
+                <p className="text-destructive font-medium mb-2">{t("errorLoading")}</p>
+                <p className="text-muted-foreground text-sm mb-4">{error}</p>
+                <Button variant="outline" onClick={handleRefresh}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  {t("retry")}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : filteredAppointments.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <p className="text-muted-foreground">{t("noAppointments")}</p>
@@ -904,7 +961,7 @@ export default function AppointmentsPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-4 py-3 border-t">
                   <p className="text-sm text-muted-foreground">
-                    {t("showing")} {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredAppointments.length)} {t("of")} {filteredAppointments.length}
+                    {t("showing")} {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalAppointments)} {t("of")} {totalAppointments}
                   </p>
                   <div className="flex items-center gap-1">
                     <Button
