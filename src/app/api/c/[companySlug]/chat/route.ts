@@ -95,9 +95,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Check chatbot access control (#2) - user must have chatbot addon enabled
+    // Check chatbot access control (#2)
+    // During trial, chatbot is included. After trial, requires hasChatbot addon.
     const ownerSubscription = await getUserSubscription(ownerId);
-    if (!ownerSubscription?.hasChatbot) {
+    const isTrial = ownerSubscription?.status === "TRIALING";
+    const hasChatbotAccess = isTrial || ownerSubscription?.hasChatbot;
+
+    if (!hasChatbotAccess) {
       return NextResponse.json(
         {
           error: "AI Chatbot is not enabled for your subscription",

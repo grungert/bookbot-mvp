@@ -40,8 +40,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
         getUserSubscription(ownerId),
       ]);
 
-      // Chat requires active subscription, tokens available, AND chatbot addon (#2)
-      if (!subStatus.active || !limitResult.allowed || !subscription?.hasChatbot) {
+      // Chat requires active subscription and tokens available
+      // During trial, chatbot is included. After trial, requires hasChatbot addon.
+      const isTrial = subscription?.status === "TRIALING";
+      const hasChatbotAccess = isTrial || subscription?.hasChatbot;
+
+      if (!subStatus.active || !limitResult.allowed || !hasChatbotAccess) {
         chatAvailable = false;
       }
     }
