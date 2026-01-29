@@ -98,7 +98,10 @@
     "settings": "Settings",
     "admin": "Admin",
     "profile": "Profile",
-    "backToSite": "Back to site"
+    "backToSite": "Back to site",
+    "assistant": "Assistant",
+    "chatWithAssistant": "Chat with {name}",
+    "chatWithAssistantTooltip": "Message {name} on WhatsApp to manage your bookings"
   },
   "calendar": {
     "week": "Week",
@@ -224,6 +227,7 @@
     "clearFilters": "Clear filters",
     "showing": "Showing",
     "of": "of",
+    "total": "total",
     "active": "Active",
     "inactive": "Inactive",
     "activate": "Activate service",
@@ -244,7 +248,10 @@
       "pricePositive": "Price must be 0 or greater",
       "percentageRange": "Percentage must be between 0 and 100",
       "fixedExceedsPrice": "Discount cannot exceed the service price",
-      "endAfterStart": "End date must be after start date"
+      "endAfterStart": "End date must be after start date",
+      "maxTwoDecimals": "Value must have at most 2 decimal places",
+      "discountTypeRequired": "Select a discount type when dates are set",
+      "discountValueRequired": "Discount value is required"
     },
     "error": {
       "saveFailed": "Failed to save service",
@@ -288,6 +295,7 @@
     "viewList": "List",
     "bookNew": "Book",
     "upcomingCount": "{count} upcoming",
+    "manageViaWhatsApp": "Manage via WhatsApp",
     "appointmentDetails": "Appointment Details",
     "reschedule": "Reschedule",
     "filterByStatus": "Filter by status",
@@ -1363,10 +1371,17 @@
     "bonusTokens": "Bonus Tokens",
     "tokens": "tokens",
     "summary": "Summary",
+    "summaryDescription": "Review your token pack selection before proceeding",
+    "selectedPack": "Selected Pack",
     "confirmPurchase": "Confirm Purchase",
+    "confirmPurchaseDescription": "Confirm your purchase to receive payment details",
     "bankTransferNote": "Complete the bank transfer with the reference below. Your tokens will be credited after admin approval.",
     "requestSubmitted": "Purchase Request Submitted",
     "requestSubmittedDescription": "We've sent you an email with bank transfer details. Your tokens will be credited once payment is confirmed.",
+    "purchaseSubmitted": "Purchase request submitted",
+    "submitPurchase": "Submit Purchase",
+    "purchaseSubmittedTitle": "Purchase Submitted!",
+    "purchaseSubmittedDescription": "Complete the bank transfer to receive your tokens",
     "pendingPurchase": "Pending Token Purchase",
     "pendingPurchaseDescription": "Your token purchase request is being processed. Please complete the bank transfer if you haven't already.",
     "cancelPurchase": "Cancel Purchase",
@@ -1378,6 +1393,12 @@
     "paymentReference": "Payment Reference",
     "pack": "Pack",
     "price": "Price",
-    "copied": "Copied to clipboard"
+    "total": "Total",
+    "bankDetails": "Bank Transfer Details",
+    "amount": "Amount",
+    "confirmNote": "After submission, you'll receive an email with bank transfer details. Your tokens will be credited once payment is confirmed.",
+    "emailSent": "We've sent an email with full bank details to your address.",
+    "copied": "Copied to clipboard",
+    "referenceCopied": "Reference copied to clipboard"
   }
 }

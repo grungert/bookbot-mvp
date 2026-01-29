@@ -4,17 +4,27 @@ import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
 import { logAuditEvent, getClientIp, getUserAgent, computeChanges } from "@/lib/db/audit";
 import { z } from "zod";
 
+// Helper to validate max 2 decimal places
+const decimalPrecision = (val: number) => {
+  const decimalPart = val.toString().split('.')[1];
+  return !decimalPart || decimalPart.length <= 2;
+};
+
 const updateServiceSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
   duration: z.number().int().min(5).max(480).optional(),
-  price: z.number().min(0).optional(),
+  price: z.number().min(0).refine(decimalPrecision, {
+    message: "Price must have at most 2 decimal places"
+  }).optional(),
   currency: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   isActive: z.boolean().optional(),
   // Discount fields
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
-  discountValue: z.number().min(0).nullable().optional(),
+  discountValue: z.number().min(0).refine(decimalPrecision, {
+    message: "Discount value must have at most 2 decimal places"
+  }).nullable().optional(),
   discountStartDate: z.string().datetime().nullable().optional(),
   discountEndDate: z.string().datetime().nullable().optional(),
   promotionalBadge: z.enum(["SALE", "NEW", "POPULAR", "HOT"]).nullable().optional(),
@@ -54,7 +64,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { error: "Company not found", code: "NOT_FOUND" },
         { status: 404 }
       );
     }
@@ -68,7 +78,7 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     if (!service) {
       return NextResponse.json(
-        { error: "Service not found" },
+        { error: "Service not found", code: "NOT_FOUND" },
         { status: 404 }
       );
     }
@@ -89,7 +99,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   } catch (error) {
     console.error("Error fetching service:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }
@@ -99,11 +109,11 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function PATCH(request: Request, { params }: RouteParams) {
   try {
     const { companySlug, serviceId } = await params;
-    const { error, company } = await validateCompanyAdminAccess(companySlug);
+    const { error, company, user } = await validateCompanyAdminAccess(companySlug);
 
     if (error || !company) {
       return NextResponse.json(
-        { error: error || "Company not found" },
+        { error: error || "Company not found", code: error === "Unauthorized" ? "UNAUTHORIZED" : "FORBIDDEN" },
         { status: error === "Unauthorized" ? 401 : 403 }
       );
     }
@@ -115,7 +125,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     if (!existingService) {
       return NextResponse.json(
-        { error: "Service not found" },
+        { error: "Service not found", code: "NOT_FOUND" },
         { status: 404 }
       );
     }
@@ -125,7 +135,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.flatten() },
+        { error: "Invalid input", code: "VALIDATION_ERROR", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
@@ -137,6 +147,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         return NextResponse.json(
           {
             error: "Invalid input",
+            code: "VALIDATION_ERROR",
             details: {
               fieldErrors: { discountValue: ["Fixed discount cannot exceed the service price"] },
               formErrors: []
@@ -161,8 +172,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       data: updateData,
     });
 
-    // Log audit event
-    const { user } = await validateCompanyAdminAccess(companySlug);
+    // Log audit event (user already available from initial access check)
     if (user) {
       const changes = computeChanges(
         {
@@ -200,7 +210,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   } catch (error) {
     console.error("Error updating service:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
+      { error: error instanceof Error ? error.message : "Internal server error", code: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }
@@ -210,11 +220,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const { companySlug, serviceId } = await params;
-    const { error, company } = await validateCompanyAdminAccess(companySlug);
+    const { searchParams } = new URL(request.url);
+    const forceDelete = searchParams.get("force") === "true";
+
+    const { error, company, user } = await validateCompanyAdminAccess(companySlug);
 
     if (error || !company) {
       return NextResponse.json(
-        { error: error || "Company not found" },
+        { error: error || "Company not found", code: error === "Unauthorized" ? "UNAUTHORIZED" : "FORBIDDEN" },
         { status: error === "Unauthorized" ? 401 : 403 }
       );
     }
@@ -226,9 +239,34 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     if (!existingService) {
       return NextResponse.json(
-        { error: "Service not found" },
+        { error: "Service not found", code: "NOT_FOUND" },
         { status: 404 }
       );
+    }
+
+    // Check for future appointments unless force delete is requested
+    if (!forceDelete) {
+      const futureAppointmentCount = await prisma.appointment.count({
+        where: {
+          serviceId: serviceId,
+          startTime: { gte: new Date() },
+          status: { in: ["PENDING", "CONFIRMED"] },
+        },
+      });
+
+      if (futureAppointmentCount > 0) {
+        return NextResponse.json(
+          {
+            error: "Cannot delete service with scheduled appointments",
+            code: "HAS_APPOINTMENTS",
+            futureAppointmentCount,
+            details: {
+              message: `This service has ${futureAppointmentCount} upcoming appointment(s). Please reschedule or cancel them before deleting, or use force=true to delete anyway.`
+            }
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Soft delete by setting isActive to false
@@ -238,7 +276,6 @@ export async function DELETE(request: Request, { params }: RouteParams) {
     });
 
     // Log audit event
-    const { user } = await validateCompanyAdminAccess(companySlug);
     if (user) {
       await logAuditEvent({
         companyId: company.id,
@@ -249,6 +286,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
         changes: {
           name: { old: existingService.name },
           isActive: { old: true, new: false },
+          ...(forceDelete && { forceDelete: { new: true } }),
         },
         ipAddress: getClientIp(request),
         userAgent: getUserAgent(request),
@@ -259,7 +297,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
   } catch (error) {
     console.error("Error deleting service:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }

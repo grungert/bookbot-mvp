@@ -54,6 +54,8 @@ interface ValidationErrors {
   price?: string;
   discountValue?: string;
   discountDates?: string;
+  discountType?: string;
+  badge?: string;
 }
 
 interface Service {
@@ -109,9 +111,8 @@ export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [discountFilter, setDiscountFilter] = useState<"all" | "with_discount" | "no_discount">("all");
 
-  // Pagination state
+  // Pagination state (now client-side only)
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const pageSize = 20;
 
   // Form validation state
@@ -180,18 +181,13 @@ export default function ServicesPage() {
   const [promotionalBadge, setPromotionalBadge] = useState<PromotionalBadgeType>(null);
   const [customBadgeLabel, setCustomBadgeLabel] = useState("");
 
-  const loadServices = useCallback(async (page = 1) => {
+  const loadServices = useCallback(async () => {
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: pageSize.toString(),
-      });
-      const response = await fetch(`/api/c/${companySlug}/services?${params}`);
+      // Load all services for client-side filtering/pagination
+      const response = await fetch(`/api/c/${companySlug}/services?all=true`);
       if (response.ok) {
         const data = await response.json();
         setServices(data.services || data);
-        setTotalCount(data.total || data.length || 0);
-        setCurrentPage(page);
       }
     } catch {
       toast.error(tCommon("error"));
@@ -201,7 +197,7 @@ export default function ServicesPage() {
   }, [companySlug, tCommon]);
 
   useEffect(() => {
-    loadServices(1);
+    loadServices();
   }, [loadServices]);
 
   // Reset to page 1 when search/filter changes
@@ -249,9 +245,14 @@ export default function ServicesPage() {
     return filtered;
   }, [services, searchQuery, discountFilter, sortColumn, sortDirection]);
 
-  // Pagination calculations
-  const totalPages = Math.ceil(totalCount / pageSize);
-  const displayedServices = filteredAndSortedServices;
+  // Pagination calculations (now fully client-side)
+  const totalFilteredCount = filteredAndSortedServices.length;
+  const totalPages = Math.ceil(totalFilteredCount / pageSize);
+  const paginatedServices = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAndSortedServices.slice(start, start + pageSize);
+  }, [filteredAndSortedServices, currentPage, pageSize]);
+  const displayedServices = paginatedServices;
 
   // Selection helpers
   function toggleSelectAll() {
@@ -316,7 +317,7 @@ export default function ServicesPage() {
 
       setSelectedIds(new Set());
       setIsBulkDeleteOpen(false);
-      loadServices(currentPage);
+      loadServices();
     } catch {
       toast.error("Failed to delete services. Please try again.");
     } finally {
@@ -341,15 +342,17 @@ export default function ServicesPage() {
     }
 
     // Duration validation (5-480 minutes)
-    const durationNum = parseInt(duration);
+    const durationNum = parseInt(duration, 10);
     if (isNaN(durationNum) || durationNum < 5 || durationNum > 480) {
       errors.duration = t("validation.durationRange");
     }
 
-    // Price validation (>= 0)
+    // Price validation (>= 0, max 2 decimal places)
     const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum < 0) {
       errors.price = t("validation.pricePositive");
+    } else if (!/^\d+(\.\d{1,2})?$/.test(price) && price !== "") {
+      errors.price = t("validation.maxTwoDecimals");
     }
 
     // Discount validation
@@ -361,6 +364,10 @@ export default function ServicesPage() {
       if (discountType === "fixed" && discountNum > priceNum) {
         errors.discountValue = t("validation.fixedExceedsPrice");
       }
+      // Validate decimal places for discount value
+      if (!/^\d+(\.\d{1,2})?$/.test(discountValue) && discountValue !== "") {
+        errors.discountValue = t("validation.maxTwoDecimals");
+      }
     }
 
     // Discount date validation
@@ -368,6 +375,16 @@ export default function ServicesPage() {
       if (discountDateRange.to <= discountDateRange.from) {
         errors.discountDates = t("validation.endAfterStart");
       }
+    }
+
+    // Require discount type if dates are set
+    if (discountType === "none" && (discountDateRange?.from || discountDateRange?.to)) {
+      errors.discountType = t("validation.discountTypeRequired");
+    }
+
+    // Require discount value if discount type is set
+    if (discountType !== "none" && !discountValue) {
+      errors.discountValue = t("validation.discountValueRequired");
     }
 
     setValidationErrors(errors);
@@ -403,7 +420,7 @@ export default function ServicesPage() {
       }
 
       toast.success(service.isActive ? t("serviceDeactivated") : t("serviceActivated"));
-      loadServices(currentPage);
+      loadServices();
     } catch {
       toast.error(t("toggleError"));
     } finally {
@@ -502,18 +519,22 @@ export default function ServicesPage() {
         ? `/api/c/${companySlug}/services/${editingService.id}`
         : `/api/c/${companySlug}/services`;
 
+      // Round price to 2 decimal places to avoid precision issues
+      const roundedPrice = Math.round(parseFloat(price) * 100) / 100;
+
       const requestBody: Record<string, unknown> = {
         name,
         description: description || undefined,
-        duration: parseInt(duration),
-        price: parseFloat(price),
+        duration: parseInt(duration, 10),
+        price: roundedPrice,
         color: color || undefined,
       };
 
-      // Add discount fields
+      // Add discount fields (round to 2 decimal places)
       if (discountType !== "none" && discountValue) {
+        const roundedDiscountValue = Math.round(parseFloat(discountValue) * 100) / 100;
         requestBody.discountType = discountType;
-        requestBody.discountValue = parseFloat(discountValue);
+        requestBody.discountValue = roundedDiscountValue;
         requestBody.discountStartDate = discountDateRange?.from ? discountDateRange.from.toISOString() : null;
         requestBody.discountEndDate = discountDateRange?.to ? discountDateRange.to.toISOString() : null;
       } else {
@@ -554,7 +575,7 @@ export default function ServicesPage() {
         editingService ? t("serviceUpdated") : t("serviceCreated")
       );
       closePanel();
-      loadServices(currentPage);
+      loadServices();
     } catch {
       toast.error(t("error.networkError"));
     } finally {
@@ -608,7 +629,7 @@ export default function ServicesPage() {
       }
 
       toast.success(t("serviceDeleted"));
-      loadServices(currentPage);
+      loadServices();
     } catch {
       toast.error(t("error.networkError"));
     } finally {
@@ -619,7 +640,7 @@ export default function ServicesPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await loadServices(currentPage);
+      await loadServices();
     } finally {
       setIsRefreshing(false);
     }
@@ -902,13 +923,16 @@ export default function ServicesPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t">
               <p className="text-sm text-muted-foreground">
-                {t("showing")} {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalCount)} {t("of")} {totalCount}
+                {t("showing")} {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalFilteredCount)} {t("of")} {totalFilteredCount}
+                {filteredAndSortedServices.length !== services.length && (
+                  <span className="ml-1">({services.length} {t("total")})</span>
+                )}
               </p>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => loadServices(currentPage - 1)}
+                  onClick={() => setCurrentPage(p => p - 1)}
                   disabled={currentPage <= 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -920,7 +944,7 @@ export default function ServicesPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => loadServices(currentPage + 1)}
+                  onClick={() => setCurrentPage(p => p + 1)}
                   disabled={currentPage >= totalPages}
                 >
                   {tCommon("next")}

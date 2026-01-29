@@ -98,7 +98,10 @@
     "settings": "Podesavanja",
     "admin": "Administracija",
     "profile": "Profil",
-    "backToSite": "Nazad na sajt"
+    "backToSite": "Nazad na sajt",
+    "assistant": "Asistent",
+    "chatWithAssistant": "Razgovaraj sa {name}",
+    "chatWithAssistantTooltip": "Pošalji poruku {name} na WhatsApp za upravljanje rezervacijama"
   },
   "calendar": {
     "week": "Nedelja",
@@ -224,6 +227,7 @@
     "clearFilters": "Obrisi filtere",
     "showing": "Prikazano",
     "of": "od",
+    "total": "ukupno",
     "active": "Aktivna",
     "inactive": "Neaktivna",
     "activate": "Aktiviraj uslugu",
@@ -244,7 +248,10 @@
       "pricePositive": "Cena mora biti 0 ili veca",
       "percentageRange": "Procenat mora biti izmedju 0 i 100",
       "fixedExceedsPrice": "Popust ne moze biti veci od cene usluge",
-      "endAfterStart": "Krajnji datum mora biti posle pocetnog"
+      "endAfterStart": "Krajnji datum mora biti posle pocetnog",
+      "maxTwoDecimals": "Vrednost mora imati maksimalno 2 decimale",
+      "discountTypeRequired": "Izaberite tip popusta kada su datumi postavljeni",
+      "discountValueRequired": "Vrednost popusta je obavezna"
     },
     "error": {
       "saveFailed": "Greska pri cuvanju usluge",
@@ -288,6 +295,7 @@
     "viewList": "Lista",
     "bookNew": "Zakazi",
     "upcomingCount": "{count} predstojecih",
+    "manageViaWhatsApp": "Upravljaj preko WhatsApp-a",
     "appointmentDetails": "Detalji termina",
     "reschedule": "Promeni termin",
     "filterByStatus": "Filtriraj po statusu",
@@ -1365,10 +1373,17 @@
     "bonusTokens": "Bonus tokeni",
     "tokens": "tokena",
     "summary": "Rezime",
+    "summaryDescription": "Pregledajte izbor paketa tokena pre nastavka",
+    "selectedPack": "Izabrani paket",
     "confirmPurchase": "Potvrdi kupovinu",
+    "confirmPurchaseDescription": "Potvrdite kupovinu da dobijete detalje za uplatu",
     "bankTransferNote": "Izvršite bankovni transfer sa referencom ispod. Vaši tokeni će biti odobreni nakon potvrde administratora.",
     "requestSubmitted": "Zahtev za kupovinu poslat",
     "requestSubmittedDescription": "Poslali smo vam email sa detaljima za bankovni transfer. Vaši tokeni će biti odobreni nakon potvrde uplate.",
+    "purchaseSubmitted": "Zahtev za kupovinu poslat",
+    "submitPurchase": "Pošalji zahtev",
+    "purchaseSubmittedTitle": "Zahtev poslat!",
+    "purchaseSubmittedDescription": "Izvršite bankovni transfer da dobijete vaše tokene",
     "pendingPurchase": "Kupovina tokena na čekanju",
     "pendingPurchaseDescription": "Vaš zahtev za kupovinu tokena se obrađuje. Molimo izvršite bankovni transfer ako to već niste uradili.",
     "cancelPurchase": "Otkaži kupovinu",
@@ -1380,6 +1395,12 @@
     "paymentReference": "Referenca plaćanja",
     "pack": "Paket",
     "price": "Cena",
-    "copied": "Kopirano u clipboard"
+    "total": "Ukupno",
+    "bankDetails": "Detalji za bankovni transfer",
+    "amount": "Iznos",
+    "confirmNote": "Nakon slanja, dobićete email sa detaljima za bankovni transfer. Vaši tokeni će biti odobreni nakon potvrde uplate.",
+    "emailSent": "Poslali smo email sa kompletnim podacima za uplatu na vašu adresu.",
+    "copied": "Kopirano u clipboard",
+    "referenceCopied": "Referenca kopirana u clipboard"
   }
 }

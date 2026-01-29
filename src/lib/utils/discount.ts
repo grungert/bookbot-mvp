@@ -32,6 +32,9 @@ export interface TimeRemaining {
   displayText: string;
 }
 
+// Translation function type for i18n support
+export type TimeRemainingTranslator = (key: string, values?: Record<string, number>) => string;
+
 export interface BadgeInfo {
   label: string;
   gradient: string;
@@ -61,10 +64,26 @@ export function isDiscountActive(service: ServiceWithDiscount): boolean {
   return true;
 }
 
+// Default English translations for time remaining
+const defaultTimeRemainingTranslations: Record<string, string> = {
+  "endsInDays": "Ends in {count} days",
+  "endsInDay": "Ends in 1 day",
+  "endsInHours": "Ends in {count} hours",
+  "endsInHour": "Ends in 1 hour",
+  "endsInMinutes": "Ends in {count} min",
+  "endsSoon": "Ends soon!",
+};
+
 /**
  * Calculate the time remaining until discount ends
+ * @param endDate - The end date of the discount
+ * @param t - Optional translation function for i18n support. If not provided, uses English defaults.
+ *            Expected keys: endsInDays, endsInDay, endsInHours, endsInHour, endsInMinutes, endsSoon
  */
-export function getTimeRemaining(endDate: Date | string | null | undefined): TimeRemaining | null {
+export function getTimeRemaining(
+  endDate: Date | string | null | undefined,
+  t?: TimeRemainingTranslator
+): TimeRemaining | null {
   if (!endDate) return null;
 
   const end = new Date(endDate);
@@ -77,13 +96,32 @@ export function getTimeRemaining(endDate: Date | string | null | undefined): Tim
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
+  // Use translator if provided, otherwise use default English
+  const translate = (key: string, values?: Record<string, number>): string => {
+    if (t) {
+      return t(key, values);
+    }
+    // Default English fallback
+    let text = defaultTimeRemainingTranslations[key] || key;
+    if (values?.count !== undefined) {
+      text = text.replace("{count}", values.count.toString());
+    }
+    return text;
+  };
+
   let displayText: string;
   if (days > 0) {
-    displayText = days === 1 ? "Ends in 1 day" : `Ends in ${days} days`;
+    displayText = days === 1
+      ? translate("endsInDay")
+      : translate("endsInDays", { count: days });
   } else if (hours > 0) {
-    displayText = hours === 1 ? "Ends in 1 hour" : `Ends in ${hours} hours`;
+    displayText = hours === 1
+      ? translate("endsInHour")
+      : translate("endsInHours", { count: hours });
   } else {
-    displayText = minutes <= 1 ? "Ends soon!" : `Ends in ${minutes} min`;
+    displayText = minutes <= 1
+      ? translate("endsSoon")
+      : translate("endsInMinutes", { count: minutes });
   }
 
   return {
@@ -97,8 +135,13 @@ export function getTimeRemaining(endDate: Date | string | null | undefined): Tim
 
 /**
  * Calculate the discounted price and related info
+ * @param service - Service with discount fields
+ * @param t - Optional translation function for i18n support (passed to getTimeRemaining)
  */
-export function calculateDiscountedPrice(service: ServiceWithDiscount): DiscountedPriceResult {
+export function calculateDiscountedPrice(
+  service: ServiceWithDiscount,
+  t?: TimeRemainingTranslator
+): DiscountedPriceResult {
   const originalPrice = Number(service.price);
 
   if (!isDiscountActive(service)) {
@@ -127,7 +170,7 @@ export function calculateDiscountedPrice(service: ServiceWithDiscount): Discount
   }
 
   const finalPrice = Math.max(0, originalPrice - discountAmount);
-  const timeRemaining = getTimeRemaining(service.discountEndDate);
+  const timeRemaining = getTimeRemaining(service.discountEndDate, t);
 
   // Expiring soon if within 3 days
   const isExpiringSoon = timeRemaining !== null && timeRemaining.days <= 3;

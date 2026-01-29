@@ -4,16 +4,26 @@ import { validateCompanyAdminAccess, getCompanyBySlug } from "@/lib/db/tenant";
 import { logAuditEvent, getClientIp, getUserAgent } from "@/lib/db/audit";
 import { z } from "zod";
 
+// Helper to validate max 2 decimal places
+const decimalPrecision = (val: number) => {
+  const decimalPart = val.toString().split('.')[1];
+  return !decimalPart || decimalPart.length <= 2;
+};
+
 const createServiceSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   duration: z.number().int().min(5).max(480),
-  price: z.number().min(0),
+  price: z.number().min(0).refine(decimalPrecision, {
+    message: "Price must have at most 2 decimal places"
+  }),
   currency: z.string().optional(),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   // Discount fields
   discountType: z.enum(["percentage", "fixed"]).nullable().optional(),
-  discountValue: z.number().min(0).nullable().optional(),
+  discountValue: z.number().min(0).refine(decimalPrecision, {
+    message: "Discount value must have at most 2 decimal places"
+  }).nullable().optional(),
   discountStartDate: z.string().datetime().nullable().optional(),
   discountEndDate: z.string().datetime().nullable().optional(),
   promotionalBadge: z.enum(["SALE", "NEW", "POPULAR", "HOT"]).nullable().optional(),
@@ -57,16 +67,17 @@ export async function GET(request: Request, { params }: RouteParams) {
     const { companySlug } = await params;
     const { searchParams } = new URL(request.url);
 
-    // Pagination parameters
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    // Support both paginated and all-at-once modes
+    const loadAll = searchParams.get("all") === "true";
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const skip = (page - 1) * limit;
 
     const company = await getCompanyBySlug(companySlug);
 
     if (!company) {
       return NextResponse.json(
-        { error: "Company not found" },
+        { error: "Company not found", code: "NOT_FOUND" },
         { status: 404 }
       );
     }
@@ -76,7 +87,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       isActive: true,
     };
 
-    // Get total count and services in parallel
+    // Load all services for client-side filtering/pagination (typical count <100)
+    if (loadAll) {
+      const services = await prisma.service.findMany({
+        where,
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json({
+        services,
+        total: services.length,
+      });
+    }
+
+    // Get total count and services in parallel (legacy paginated mode)
     const [total, services] = await Promise.all([
       prisma.service.count({ where }),
       prisma.service.findMany({
@@ -97,7 +120,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   } catch (error) {
     console.error("Error fetching services:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }
@@ -107,11 +130,11 @@ export async function GET(request: Request, { params }: RouteParams) {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { companySlug } = await params;
-    const { error, company } = await validateCompanyAdminAccess(companySlug);
+    const { error, company, user } = await validateCompanyAdminAccess(companySlug);
 
     if (error || !company) {
       return NextResponse.json(
-        { error: error || "Company not found" },
+        { error: error || "Company not found", code: error === "Unauthorized" ? "UNAUTHORIZED" : "FORBIDDEN" },
         { status: error === "Unauthorized" ? 401 : 403 }
       );
     }
@@ -121,12 +144,10 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.flatten() },
+        { error: "Invalid input", code: "VALIDATION_ERROR", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
-
-    const { user } = await validateCompanyAdminAccess(companySlug);
 
     const service = await prisma.service.create({
       data: {
@@ -167,7 +188,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   } catch (error) {
     console.error("Error creating service:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", code: "INTERNAL_ERROR" },
       { status: 500 }
     );
   }
