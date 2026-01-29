@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,9 @@ import {
   Loader2,
   Euro,
   Trash2,
+  Coins,
 } from "lucide-react";
+import { formatTokenCount } from "@/lib/utils/format-tokens";
 
 interface User {
   id: string;
@@ -71,6 +72,21 @@ interface UpgradeRequest {
   createdAt: string;
 }
 
+interface TokenPurchase {
+  id: string;
+  userId: string;
+  user: User;
+  packName: string;
+  tokenAmount: number;
+  priceEurCents: number;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+  paymentReference: string;
+  handledBy: string | null;
+  handledAt: string | null;
+  adminNotes: string | null;
+  createdAt: string;
+}
+
 interface Stats {
   pending: number;
   approved: number;
@@ -79,12 +95,17 @@ interface Stats {
   totalPendingAmount: number;
 }
 
-export default function UpgradeRequestsPage() {
-  const t = useTranslations();
-  const [requests, setRequests] = useState<UpgradeRequest[]>([]);
-  const [stats, setStats] = useState<Stats | null>(null);
+type PaymentRequest =
+  | { type: "subscription"; data: UpgradeRequest }
+  | { type: "token"; data: TokenPurchase };
+
+export default function PaymentRequestsPage() {
+  const [upgradeRequests, setUpgradeRequests] = useState<UpgradeRequest[]>([]);
+  const [tokenPurchases, setTokenPurchases] = useState<TokenPurchase[]>([]);
+  const [upgradeStats, setUpgradeStats] = useState<Stats | null>(null);
+  const [tokenStats, setTokenStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<UpgradeRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<PaymentRequest | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [processing, setProcessing] = useState(false);
@@ -94,23 +115,36 @@ export default function UpgradeRequestsPage() {
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 
-  const fetchRequests = async () => {
+  const fetchUpgradeRequests = async () => {
     try {
       const response = await fetch("/api/super-admin/upgrade-requests");
       if (!response.ok) throw new Error("Failed to fetch requests");
       const data = await response.json();
-      setRequests(data.requests);
-      setStats(data.stats);
+      setUpgradeRequests(data.requests);
+      setUpgradeStats(data.stats);
     } catch (error) {
       console.error("Error fetching requests:", error);
       toast.error("Failed to load upgrade requests");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchTokenPurchases = async () => {
+    try {
+      const response = await fetch("/api/super-admin/token-purchases");
+      if (!response.ok) throw new Error("Failed to fetch token purchases");
+      const data = await response.json();
+      setTokenPurchases(data.purchases);
+      setTokenStats(data.stats);
+    } catch (error) {
+      console.error("Error fetching token purchases:", error);
+      toast.error("Failed to load token purchases");
     }
   };
 
   useEffect(() => {
-    fetchRequests();
+    Promise.all([fetchUpgradeRequests(), fetchTokenPurchases()]).finally(() => {
+      setLoading(false);
+    });
   }, []);
 
   const handleAction = async () => {
@@ -118,7 +152,11 @@ export default function UpgradeRequestsPage() {
 
     setProcessing(true);
     try {
-      const response = await fetch(`/api/super-admin/upgrade-requests/${selectedRequest.id}`, {
+      const endpoint = selectedRequest.type === "subscription"
+        ? `/api/super-admin/upgrade-requests/${selectedRequest.data.id}`
+        : `/api/super-admin/token-purchases/${selectedRequest.data.id}`;
+
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -132,14 +170,23 @@ export default function UpgradeRequestsPage() {
         throw new Error(error.details || error.error || "Failed to process request");
       }
 
-      toast.success(
-        actionType === "approve"
+      const successMessage = selectedRequest.type === "subscription"
+        ? actionType === "approve"
           ? "Request approved and subscription activated"
           : "Request has been rejected"
-      );
+        : actionType === "approve"
+          ? "Token purchase approved and tokens credited"
+          : "Token purchase has been rejected";
 
-      // Refresh the list
-      fetchRequests();
+      toast.success(successMessage);
+
+      // Refresh the appropriate list
+      if (selectedRequest.type === "subscription") {
+        fetchUpgradeRequests();
+      } else {
+        fetchTokenPurchases();
+      }
+
       setSelectedRequest(null);
       setActionType(null);
       setAdminNotes("");
@@ -181,19 +228,45 @@ export default function UpgradeRequestsPage() {
     }
   };
 
-  const filteredRequests = requests.filter((req) => {
+  const getTypeBadge = (type: "subscription" | "token") => {
+    if (type === "subscription") {
+      return (
+        <Badge variant="outline" className="gap-1 border-blue-300 text-blue-700 bg-blue-50">
+          <CreditCard className="h-3 w-3" />
+          Subscription
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700 bg-amber-50">
+        <Coins className="h-3 w-3" />
+        Token Pack
+      </Badge>
+    );
+  };
+
+  // Combine and sort all requests by date
+  const allRequests: PaymentRequest[] = [
+    ...upgradeRequests.map((req): PaymentRequest => ({ type: "subscription", data: req })),
+    ...tokenPurchases.map((purchase): PaymentRequest => ({ type: "token", data: purchase })),
+  ].sort((a, b) => new Date(b.data.createdAt).getTime() - new Date(a.data.createdAt).getTime());
+
+  const filteredRequests = allRequests.filter((req) => {
     if (statusFilter === "all") return true;
-    return req.status === statusFilter;
+    return req.data.status === statusFilter;
   });
 
   // Selection handlers
-  const toggleSelect = (id: string) => {
+  const getRequestKey = (req: PaymentRequest) => `${req.type}-${req.data.id}`;
+
+  const toggleSelect = (req: PaymentRequest) => {
+    const key = getRequestKey(req);
     setSelectedIds((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
+      if (newSet.has(key)) {
+        newSet.delete(key);
       } else {
-        newSet.add(id);
+        newSet.add(key);
       }
       return newSet;
     });
@@ -203,7 +276,7 @@ export default function UpgradeRequestsPage() {
     if (selectedIds.size === filteredRequests.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredRequests.map((r) => r.id)));
+      setSelectedIds(new Set(filteredRequests.map(getRequestKey)));
     }
   };
 
@@ -212,26 +285,134 @@ export default function UpgradeRequestsPage() {
 
     setIsDeleting(true);
     try {
-      const response = await fetch("/api/super-admin/upgrade-requests", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      const upgradeIds: string[] = [];
+      const tokenIds: string[] = [];
+
+      selectedIds.forEach((key) => {
+        const [type, id] = key.split("-");
+        if (type === "subscription") {
+          upgradeIds.push(id);
+        } else {
+          tokenIds.push(id);
+        }
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to delete requests");
+      const promises: Promise<Response>[] = [];
+
+      if (upgradeIds.length > 0) {
+        promises.push(
+          fetch("/api/super-admin/upgrade-requests", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: upgradeIds }),
+          })
+        );
       }
 
-      const data = await response.json();
-      toast.success(`Deleted ${data.deletedCount} request(s)`);
+      if (tokenIds.length > 0) {
+        promises.push(
+          fetch("/api/super-admin/token-purchases", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: tokenIds }),
+          })
+        );
+      }
+
+      await Promise.all(promises);
+
+      toast.success(`Deleted ${selectedIds.size} request(s)`);
       setSelectedIds(new Set());
-      fetchRequests();
+      fetchUpgradeRequests();
+      fetchTokenPurchases();
     } catch (error) {
       console.error("Error deleting requests:", error);
       toast.error("Failed to delete requests");
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  // Combined stats
+  const combinedStats = {
+    pending: (upgradeStats?.pending || 0) + (tokenStats?.pending || 0),
+    approved: (upgradeStats?.approved || 0) + (tokenStats?.approved || 0),
+    rejected: (upgradeStats?.rejected || 0) + (tokenStats?.rejected || 0),
+    cancelled: (upgradeStats?.cancelled || 0) + (tokenStats?.cancelled || 0),
+    totalPendingAmount: (upgradeStats?.totalPendingAmount || 0) + (tokenStats?.totalPendingAmount || 0),
+  };
+
+  // Render details based on request type
+  const renderDetails = (req: PaymentRequest) => {
+    if (req.type === "subscription") {
+      const data = req.data;
+      return (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1 text-sm">
+            <CreditCard className="h-3 w-3" />
+            {data.requestedPlanTier}
+          </div>
+          {data.includeChatbot && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <MessageSquare className="h-3 w-3" />
+              With Chatbot
+            </div>
+          )}
+          {data.extraCompanyCount > 0 && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Building2 className="h-3 w-3" />
+              +{data.extraCompanyCount} companies
+            </div>
+          )}
+        </div>
+      );
+    } else {
+      const data = req.data;
+      return (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1 text-sm font-medium">
+            <Coins className="h-3 w-3" />
+            {data.packName}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {formatTokenCount(data.tokenAmount)} tokens
+          </div>
+        </div>
+      );
+    }
+  };
+
+  const getAmount = (req: PaymentRequest) => {
+    if (req.type === "subscription") {
+      return (
+        <div className="flex items-center gap-1">
+          <Euro className="h-4 w-4" />
+          <span className="font-medium">
+            {(req.data.totalMonthlyPrice / 100).toFixed(2)}
+          </span>
+          <span className="text-muted-foreground">/month</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-1">
+        <Euro className="h-4 w-4" />
+        <span className="font-medium">
+          {(req.data.priceEurCents / 100).toFixed(2)}
+        </span>
+      </div>
+    );
+  };
+
+  const getReference = (req: PaymentRequest) => {
+    if (req.type === "token") {
+      return (
+        <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+          {req.data.paymentReference}
+        </code>
+      );
+    }
+    return <span className="text-muted-foreground">-</span>;
   };
 
   if (loading) {
@@ -245,56 +426,54 @@ export default function UpgradeRequestsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Upgrade Requests</h1>
+        <h1 className="text-2xl font-bold">Payment Requests</h1>
         <p className="text-muted-foreground">
-          Manage subscription upgrade requests from users
+          Manage subscription upgrades and token purchases
         </p>
       </div>
 
       {/* Stats Cards */}
-      {stats && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pending}</div>
-              <p className="text-xs text-muted-foreground">
-                {formatPrice(stats.totalPendingAmount)}/month potential
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Approved</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.approved}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.rejected}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
-              <Ban className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.cancelled}</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <Clock className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{combinedStats.pending}</div>
+            <p className="text-xs text-muted-foreground">
+              {formatPrice(combinedStats.totalPendingAmount)} potential
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{combinedStats.approved}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+            <XCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{combinedStats.rejected}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cancelled</CardTitle>
+            <Ban className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{combinedStats.cancelled}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filters */}
       <div className="flex items-center gap-4">
@@ -327,10 +506,10 @@ export default function UpgradeRequestsPage() {
         )}
       </div>
 
-      {/* Requests Table */}
+      {/* Unified Requests Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Upgrade Requests</CardTitle>
+          <CardTitle>Payment Requests</CardTitle>
           <CardDescription>
             {filteredRequests.length} request(s) found
           </CardDescription>
@@ -338,7 +517,7 @@ export default function UpgradeRequestsPage() {
         <CardContent>
           {filteredRequests.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No upgrade requests found
+              No payment requests found
             </div>
           ) : (
             <Table>
@@ -350,69 +529,46 @@ export default function UpgradeRequestsPage() {
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>User</TableHead>
-                  <TableHead>Plan Details</TableHead>
-                  <TableHead>Monthly Price</TableHead>
+                  <TableHead>Details</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Reference</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Requested</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRequests.map((request) => (
-                  <TableRow key={request.id}>
+                {filteredRequests.map((req) => (
+                  <TableRow key={getRequestKey(req)}>
                     <TableCell>
                       <Checkbox
-                        checked={selectedIds.has(request.id)}
-                        onCheckedChange={() => toggleSelect(request.id)}
+                        checked={selectedIds.has(getRequestKey(req))}
+                        onCheckedChange={() => toggleSelect(req)}
                       />
                     </TableCell>
+                    <TableCell>{getTypeBadge(req.type)}</TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{request.user.name || "No name"}</p>
-                        <p className="text-sm text-muted-foreground">{request.user.email}</p>
+                        <p className="font-medium">{req.data.user.name || "No name"}</p>
+                        <p className="text-sm text-muted-foreground">{req.data.user.email}</p>
                       </div>
                     </TableCell>
+                    <TableCell>{renderDetails(req)}</TableCell>
+                    <TableCell>{getAmount(req)}</TableCell>
+                    <TableCell>{getReference(req)}</TableCell>
+                    <TableCell>{getStatusBadge(req.data.status)}</TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1 text-sm">
-                          <CreditCard className="h-3 w-3" />
-                          {request.requestedPlanTier}
-                        </div>
-                        {request.includeChatbot && (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <MessageSquare className="h-3 w-3" />
-                            With Chatbot
-                          </div>
-                        )}
-                        {request.extraCompanyCount > 0 && (
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <Building2 className="h-3 w-3" />
-                            +{request.extraCompanyCount} companies
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Euro className="h-4 w-4" />
-                        <span className="font-medium">
-                          {(request.totalMonthlyPrice / 100).toFixed(2)}
-                        </span>
-                        <span className="text-muted-foreground">/month</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(request.status)}</TableCell>
-                    <TableCell>
-                      {format(new Date(request.createdAt), "MMM d, yyyy")}
+                      {format(new Date(req.data.createdAt), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell className="text-right">
-                      {request.status === "PENDING" && (
+                      {req.data.status === "PENDING" && (
                         <div className="flex justify-end gap-2">
                           <Button
                             size="sm"
                             onClick={() => {
-                              setSelectedRequest(request);
+                              setSelectedRequest(req);
                               setActionType("approve");
                             }}
                           >
@@ -422,7 +578,7 @@ export default function UpgradeRequestsPage() {
                             size="sm"
                             variant="destructive"
                             onClick={() => {
-                              setSelectedRequest(request);
+                              setSelectedRequest(req);
                               setActionType("reject");
                             }}
                           >
@@ -430,9 +586,9 @@ export default function UpgradeRequestsPage() {
                           </Button>
                         </div>
                       )}
-                      {request.adminNotes && (
+                      {req.data.adminNotes && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Note: {request.adminNotes}
+                          Note: {req.data.adminNotes}
                         </p>
                       )}
                     </TableCell>
@@ -456,12 +612,22 @@ export default function UpgradeRequestsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {actionType === "approve" ? "Approve Upgrade Request" : "Reject Upgrade Request"}
+              {actionType === "approve"
+                ? selectedRequest?.type === "subscription"
+                  ? "Approve Upgrade Request"
+                  : "Approve Token Purchase"
+                : selectedRequest?.type === "subscription"
+                  ? "Reject Upgrade Request"
+                  : "Reject Token Purchase"}
             </DialogTitle>
             <DialogDescription>
               {actionType === "approve"
-                ? "This will activate the user's subscription immediately."
-                : "This will reject the upgrade request."}
+                ? selectedRequest?.type === "subscription"
+                  ? "This will activate the user's subscription immediately."
+                  : "This will credit the tokens to the user's account immediately."
+                : selectedRequest?.type === "subscription"
+                  ? "This will reject the upgrade request."
+                  : "This will reject the token purchase request."}
             </DialogDescription>
           </DialogHeader>
 
@@ -469,25 +635,48 @@ export default function UpgradeRequestsPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-lg p-4 space-y-2">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Type:</span>
+                  <span>{getTypeBadge(selectedRequest.type)}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">User:</span>
-                  <span className="font-medium">{selectedRequest.user.email}</span>
+                  <span className="font-medium">{selectedRequest.data.user.email}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Plan:</span>
-                  <span className="font-medium">{selectedRequest.requestedPlanTier}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">With Chatbot:</span>
-                  <span className="font-medium">{selectedRequest.includeChatbot ? "Yes" : "No"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Extra Companies:</span>
-                  <span className="font-medium">{selectedRequest.extraCompanyCount}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2 mt-2">
-                  <span className="text-muted-foreground">Total Monthly:</span>
-                  <span className="font-bold">{formatPrice(selectedRequest.totalMonthlyPrice)}</span>
-                </div>
+                {selectedRequest.type === "subscription" ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Plan:</span>
+                      <span className="font-medium">{selectedRequest.data.requestedPlanTier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">With Chatbot:</span>
+                      <span className="font-medium">{selectedRequest.data.includeChatbot ? "Yes" : "No"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Extra Companies:</span>
+                      <span className="font-medium">{selectedRequest.data.extraCompanyCount}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2 mt-2">
+                      <span className="text-muted-foreground">Total Monthly:</span>
+                      <span className="font-bold">{formatPrice(selectedRequest.data.totalMonthlyPrice)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Pack:</span>
+                      <span className="font-medium">{selectedRequest.data.packName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tokens:</span>
+                      <span className="font-medium">{formatTokenCount(selectedRequest.data.tokenAmount)}</span>
+                    </div>
+                    <div className="flex justify-between border-t pt-2 mt-2">
+                      <span className="text-muted-foreground">Price:</span>
+                      <span className="font-bold">{formatPrice(selectedRequest.data.priceEurCents)}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -519,7 +708,11 @@ export default function UpgradeRequestsPage() {
               disabled={processing}
             >
               {processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {actionType === "approve" ? "Approve & Activate" : "Reject Request"}
+              {actionType === "approve"
+                ? selectedRequest?.type === "subscription"
+                  ? "Approve & Activate"
+                  : "Approve & Credit Tokens"
+                : "Reject Request"}
             </Button>
           </DialogFooter>
         </DialogContent>

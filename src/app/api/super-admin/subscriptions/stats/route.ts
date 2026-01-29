@@ -105,6 +105,18 @@ export async function GET() {
       formattedStatusCounts[sc.status] = sc._count;
     });
 
+    // Get token purchase stats (approved purchases only)
+    const tokenPurchaseStats = await prisma.tokenPurchase.aggregate({
+      where: {
+        status: "APPROVED",
+      },
+      _sum: {
+        tokenAmount: true,
+        priceEurCents: true,
+      },
+      _count: true,
+    });
+
     return NextResponse.json({
       totalSubscriptions,
       usersWithoutSubscription,
@@ -113,6 +125,10 @@ export async function GET() {
       totalChatUsageThisMonth: totalChatUsage._sum.tokenCount || 0,
       byStatus: formattedStatusCounts,
       byPlanTier: planTierCounts,
+      // Token purchase stats
+      totalTokensPurchased: tokenPurchaseStats._sum.tokenAmount || 0,
+      tokenRevenueCents: tokenPurchaseStats._sum.priceEurCents || 0,
+      tokenPurchaseCount: tokenPurchaseStats._count || 0,
     });
   } catch (error) {
     console.error("Error fetching subscription stats:", error);

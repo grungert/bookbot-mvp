@@ -43,6 +43,7 @@ import {
   Edit,
   Bot,
   BotOff,
+  Coins,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { formatTokenCount } from "@/lib/utils/format-tokens";
@@ -88,6 +89,10 @@ interface Stats {
   totalChatUsageThisMonth: number;
   byStatus: Record<string, number>;
   byPlanTier: Record<string, number>;
+  // Token purchase stats
+  totalTokensPurchased: number;
+  tokenRevenueCents: number;
+  tokenPurchaseCount: number;
 }
 
 const statusColors: Record<string, string> = {
@@ -243,7 +248,7 @@ export default function SubscriptionsPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -341,6 +346,40 @@ export default function SubscriptionsPage() {
                 {subscriptions.length > 0
                   ? `${Math.round((usersWithChatbot / subscriptions.length) * 100)}% of users`
                   : "0% of users"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Token Revenue
+              </CardTitle>
+              <Coins className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                €{(stats.tokenRevenueCents / 100).toFixed(2)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                From {stats.tokenPurchaseCount} purchase(s)
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Tokens Purchased
+              </CardTitle>
+              <Coins className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatTokenCount(stats.totalTokensPurchased)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Total tokens sold
               </p>
             </CardContent>
           </Card>
