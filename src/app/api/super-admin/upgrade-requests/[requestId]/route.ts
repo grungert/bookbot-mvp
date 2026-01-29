@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { sendUpgradeApprovedEmail, sendUpgradeRejectedEmail } from "@/lib/email/send";
 
 interface RouteParams {
@@ -71,7 +71,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const { requestId } = await params;
     const body = await request.json();
-    const { action, adminNotes } = body;
+    const { action, adminNotes: rawAdminNotes } = body;
 
     if (!action || !["approve", "reject"].includes(action)) {
       return NextResponse.json(
@@ -80,13 +80,27 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       );
     }
 
-    // Get the upgrade request
+    // Sanitize admin notes: max length and basic validation (#26)
+    let adminNotes: string | null = null;
+    if (rawAdminNotes && typeof rawAdminNotes === "string") {
+      // Limit to 1000 chars and strip any HTML-like tags
+      adminNotes = rawAdminNotes.slice(0, 1000).replace(/<[^>]*>/g, "").trim() || null;
+    }
+
+    // Get the upgrade request with subscription details including bonusTokenBalance
     const upgradeRequest = await prisma.upgradeRequest.findUnique({
       where: { id: requestId },
       include: {
         user: {
           include: {
-            subscription: true,
+            subscription: {
+              select: {
+                id: true,
+                hasChatbot: true,
+                extraCompanySlots: true,
+                bonusTokenBalance: true,
+              },
+            },
           },
         },
       },
@@ -148,46 +162,54 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       const existingExtraSlots = upgradeRequest.user.subscription?.extraCompanySlots ?? 0;
       const extraCompanySlots = isBusiness ? 0 : (existingExtraSlots + upgradeRequest.extraCompanyCount);
 
-      // Update the user's subscription
-      if (upgradeRequest.user.subscription) {
-        await prisma.userSubscription.update({
-          where: { id: upgradeRequest.user.subscription.id },
-          data: {
-            plan: { connect: { id: plan.id } },
-            status: "ACTIVE",
-            trialEndsAt: null,
-            currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
-            extraCompanySlots,
-            hasChatbot,
-            notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
-          },
-        });
-      } else {
-        // Create new subscription if it doesn't exist
-        await prisma.userSubscription.create({
-          data: {
-            user: { connect: { id: upgradeRequest.userId } },
-            plan: { connect: { id: plan.id } },
-            status: "ACTIVE",
-            currentPeriodStart: now,
-            currentPeriodEnd: periodEnd,
-            extraCompanySlots,
-            hasChatbot,
-            notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
-          },
-        });
-      }
+      // Preserve existing bonus tokens (#4)
+      const existingBonusTokens = upgradeRequest.user.subscription?.bonusTokenBalance ?? 0;
 
-      // Update upgrade request status
-      await prisma.upgradeRequest.update({
-        where: { id: requestId },
-        data: {
-          status: "APPROVED",
-          handledBy: user.id,
-          handledAt: now,
-          adminNotes: adminNotes || null,
-        },
+      // Wrap in transaction to ensure atomic updates (#5)
+      await prisma.$transaction(async (tx) => {
+        // Update the user's subscription
+        if (upgradeRequest.user.subscription) {
+          await tx.userSubscription.update({
+            where: { id: upgradeRequest.user.subscription.id },
+            data: {
+              plan: { connect: { id: plan.id } },
+              status: "ACTIVE",
+              trialEndsAt: null,
+              currentPeriodStart: now,
+              currentPeriodEnd: periodEnd,
+              extraCompanySlots,
+              hasChatbot,
+              bonusTokenBalance: existingBonusTokens, // Preserve bonus tokens (#4)
+              notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
+            },
+          });
+        } else {
+          // Create new subscription if it doesn't exist
+          await tx.userSubscription.create({
+            data: {
+              user: { connect: { id: upgradeRequest.userId } },
+              plan: { connect: { id: plan.id } },
+              status: "ACTIVE",
+              currentPeriodStart: now,
+              currentPeriodEnd: periodEnd,
+              extraCompanySlots,
+              hasChatbot,
+              bonusTokenBalance: 0, // New subscription starts with 0 bonus tokens
+              notes: `Upgraded to ${requestedTier} via bank transfer. Chatbot: ${hasChatbot ? "Yes" : "No"}, Extra Companies: ${extraCompanySlots}`,
+            },
+          });
+        }
+
+        // Update upgrade request status
+        await tx.upgradeRequest.update({
+          where: { id: requestId },
+          data: {
+            status: "APPROVED",
+            handledBy: user.id,
+            handledAt: now,
+            adminNotes: adminNotes || null,
+          },
+        });
       });
 
       // Send approval email to user (non-blocking - don't fail the approval if email fails)
@@ -210,13 +232,14 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         message: "Upgrade request approved and subscription activated",
       });
     } else {
-      // Reject the request
+      // Reject the request - use 'now' consistently (#25)
+      const now = new Date();
       await prisma.upgradeRequest.update({
         where: { id: requestId },
         data: {
           status: "REJECTED",
           handledBy: user.id,
-          handledAt: new Date(),
+          handledAt: now,
           adminNotes: adminNotes || null,
         },
       });

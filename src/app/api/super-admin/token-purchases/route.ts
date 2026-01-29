@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+// Zod schema for validating CUID arrays (#14)
+const deleteIdsSchema = z.object({
+  ids: z.array(z.string().cuid()).min(1, "At least one ID required"),
+});
 
 // GET — list all token purchases
 export async function GET() {
@@ -94,14 +100,17 @@ export async function DELETE(request: Request) {
     }
 
     const body = await request.json();
-    const { ids } = body;
 
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    // Validate IDs are valid CUIDs (#14)
+    const parsed = deleteIdsSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "No purchase IDs provided" },
+        { error: "Invalid IDs provided", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
+
+    const { ids } = parsed.data;
 
     const result = await prisma.tokenPurchase.deleteMany({
       where: {

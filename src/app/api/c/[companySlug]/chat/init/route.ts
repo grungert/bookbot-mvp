@@ -5,6 +5,7 @@ import {
   getCompanyOwnerId,
   checkChatLimit,
   checkSubscriptionActive,
+  getUserSubscription,
 } from "@/lib/subscription";
 
 interface RouteParams {
@@ -26,19 +27,21 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // Check chat availability (subscription + token limits)
+    // Check chat availability (subscription + token limits + chatbot addon)
     let chatAvailable = true;
 
     const ownerId = await getCompanyOwnerId(company.id);
     if (!ownerId) {
       chatAvailable = false;
     } else {
-      const [subStatus, limitResult] = await Promise.all([
+      const [subStatus, limitResult, subscription] = await Promise.all([
         checkSubscriptionActive(ownerId),
         checkChatLimit(ownerId),
+        getUserSubscription(ownerId),
       ]);
 
-      if (!subStatus.active || !limitResult.allowed) {
+      // Chat requires active subscription, tokens available, AND chatbot addon (#2)
+      if (!subStatus.active || !limitResult.allowed || !subscription?.hasChatbot) {
         chatAvailable = false;
       }
     }

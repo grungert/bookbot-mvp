@@ -15,9 +15,16 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const planTier = searchParams.get("planTier");
     const search = searchParams.get("search");
+    const chatbot = searchParams.get("chatbot"); // "with" | "without" | null
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    // Limit cap to prevent DoS (#8)
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 500);
     const skip = (page - 1) * limit;
+
+    // Validate search term length (#21)
+    if (search && search.length > 100) {
+      return NextResponse.json({ error: "Search term too long" }, { status: 400 });
+    }
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -28,6 +35,13 @@ export async function GET(request: Request) {
 
     if (planTier) {
       where.plan = { tier: planTier };
+    }
+
+    // Server-side chatbot filter (#1)
+    if (chatbot === "with") {
+      where.hasChatbot = true;
+    } else if (chatbot === "without") {
+      where.hasChatbot = false;
     }
 
     if (search) {

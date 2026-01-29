@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Loader2, ExternalLink, RefreshCw, AlertCircle } from "lucide-react";
 
 interface Company {
   id: string;
@@ -57,6 +57,7 @@ export default function CompaniesPage() {
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null); // Error state (#12)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -70,13 +71,18 @@ export default function CompaniesPage() {
   }, []);
 
   async function loadCompanies() {
+    setLoadError(null); // Reset error state
     try {
       const response = await fetch("/api/super-admin/companies");
-      if (response.ok) {
-        const data = await response.json();
-        setCompanies(data);
+      if (!response.ok) {
+        throw new Error("Failed to load companies");
       }
+      const data = await response.json();
+      // Handle new pagination response format
+      setCompanies(data.companies || data);
     } catch (error) {
+      console.error("Error loading companies:", error);
+      setLoadError("Failed to load companies. Please try again."); // Track error state (#12)
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
@@ -118,12 +124,14 @@ export default function CompaniesPage() {
 
       toast.success("Company created");
       setIsDialogOpen(false);
+      // Only clear form on success (#24)
       setName("");
       setSlug("");
       setDescription("");
       setPrimaryColor("#3B82F6");
       loadCompanies();
     } catch (error) {
+      // Don't clear form on error - user keeps their input (#24)
       toast.error(error instanceof Error ? error.message : tCommon("error"));
     } finally {
       setIsSubmitting(false);
@@ -227,7 +235,19 @@ export default function CompaniesPage() {
         </Dialog>
       </div>
 
-      {companies.length === 0 ? (
+      {/* Error state with retry button (#12) */}
+      {loadError ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+            <p className="text-muted-foreground mb-4">{loadError}</p>
+            <Button variant="outline" onClick={loadCompanies}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : companies.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground">No companies yet</p>

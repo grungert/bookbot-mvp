@@ -239,17 +239,23 @@ export default function PaymentRequestsPage() {
     }
   };
 
+  // Type badge color constants with dark mode support (#23)
+  const TYPE_BADGE_COLORS = {
+    subscription: "gap-1 border-blue-300 text-blue-700 bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:bg-blue-950",
+    token: "gap-1 border-amber-300 text-amber-700 bg-amber-50 dark:border-amber-700 dark:text-amber-300 dark:bg-amber-950",
+  } as const;
+
   const getTypeBadge = (type: "subscription" | "token") => {
     if (type === "subscription") {
       return (
-        <Badge variant="outline" className="gap-1 border-blue-300 text-blue-700 bg-blue-50">
+        <Badge variant="outline" className={TYPE_BADGE_COLORS.subscription}>
           <CreditCard className="h-3 w-3" />
           Subscription
         </Badge>
       );
     }
     return (
-      <Badge variant="outline" className="gap-1 border-amber-300 text-amber-700 bg-amber-50">
+      <Badge variant="outline" className={TYPE_BADGE_COLORS.token}>
         <Coins className="h-3 w-3" />
         Token Pack
       </Badge>
@@ -330,9 +336,39 @@ export default function PaymentRequestsPage() {
         );
       }
 
-      await Promise.all(promises);
+      // Use Promise.allSettled to handle partial failures (#6)
+      const results = await Promise.allSettled(promises);
 
-      toast.success(`Deleted ${selectedIds.size} request(s)`);
+      // Check for failures
+      const failures = results.filter((r) => r.status === "rejected");
+      const successes = results.filter((r) => r.status === "fulfilled");
+
+      // Also check for non-OK responses in fulfilled promises
+      const responseFailures = await Promise.all(
+        successes
+          .filter((r): r is PromiseFulfilledResult<Response> => r.status === "fulfilled")
+          .map(async (r) => {
+            if (!r.value.ok) {
+              const data = await r.value.json().catch(() => ({}));
+              return data.error || "Request failed";
+            }
+            return null;
+          })
+      );
+      const httpFailures = responseFailures.filter((f) => f !== null);
+
+      if (failures.length > 0 || httpFailures.length > 0) {
+        const failureCount = failures.length + httpFailures.length;
+        const successCount = promises.length - failureCount;
+        if (successCount > 0) {
+          toast.warning(`Deleted ${successCount} request(s), but ${failureCount} failed`);
+        } else {
+          toast.error("Failed to delete requests");
+        }
+      } else {
+        toast.success(`Deleted ${selectedIds.size} request(s)`);
+      }
+
       setSelectedIds(new Set());
       fetchUpgradeRequests();
       fetchTokenPurchases();

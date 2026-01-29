@@ -45,10 +45,14 @@ export async function getTrialStatus(userId: string): Promise<TrialStatus> {
 
   // Check if trial is expired
   if (trialEndsAt && trialEndsAt < now) {
-    // Update status to TRIAL_EXPIRED if not already
+    // Use atomic update to prevent race conditions (#27)
+    // Only update if status is still TRIALING (not already expired by another process)
     if (status !== "TRIAL_EXPIRED") {
-      await prisma.userSubscription.update({
-        where: { id: subscription.id },
+      await prisma.userSubscription.updateMany({
+        where: {
+          id: subscription.id,
+          status: "TRIALING", // Only update if still TRIALING
+        },
         data: { status: "TRIAL_EXPIRED" },
       });
     }
@@ -117,9 +121,12 @@ export async function checkSubscriptionActive(userId: string): Promise<{
     case "TRIALING":
       // Check if trial has expired
       if (trialEndsAt && trialEndsAt < now) {
-        // Update to expired
-        await prisma.userSubscription.update({
-          where: { id: subscription.id },
+        // Use atomic update to prevent race conditions (#27)
+        await prisma.userSubscription.updateMany({
+          where: {
+            id: subscription.id,
+            status: "TRIALING", // Only update if still TRIALING
+          },
           data: { status: "TRIAL_EXPIRED" },
         });
         return {
@@ -212,6 +219,7 @@ export async function createTrialSubscription(
       planId: trialPlan.id,
       status: "TRIALING",
       trialEndsAt,
+      currentPeriodStart: now, // Explicitly set to avoid timezone issues (#17)
       currentPeriodEnd: periodEnd,
     },
   });

@@ -16,3 +16,11 @@ export const DEFAULT_PRICING = {
 } as const;
 
 export type PricingKey = keyof typeof DEFAULT_PRICING;
+
+/**
+ * Subscription system constants
+ */
+export const SUBSCRIPTION_CONSTANTS = {
+  /** Number of days before trial expiry to show warning (#20) */
+  TRIAL_EXPIRY_WARNING_DAYS: 7,
+} as const;

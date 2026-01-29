@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { DEFAULT_PRICING } from "@/lib/constants/pricing";
 
 // Default pricing configs (used if database is empty or on error)
@@ -91,9 +91,9 @@ export async function PUT(request: Request) {
         continue;
       }
 
-      // Validate price is positive
-      if (item.priceEurCents < 0) {
-        validationErrors.push(`Invalid price for ${item.key}: price cannot be negative`);
+      // Validate price is positive and non-zero (#15)
+      if (item.priceEurCents <= 0) {
+        validationErrors.push(`Invalid price for ${item.key}: price must be greater than zero`);
         continue;
       }
 

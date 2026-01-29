@@ -220,9 +220,12 @@ export default function SettingsPage() {
                   <div className="flex gap-2">
                     <span className="text-muted-foreground w-32">IBAN:</span>
                     <span className="font-mono font-medium">
-                      {settings.BANK_IBAN.length > 4
+                      {/* Require minimum 8 chars to mask, otherwise show placeholder (#19) */}
+                      {settings.BANK_IBAN.length >= 8
                         ? "•".repeat(settings.BANK_IBAN.length - 4) + settings.BANK_IBAN.slice(-4)
-                        : settings.BANK_IBAN}
+                        : settings.BANK_IBAN.length > 0
+                          ? "••••••••" // Too short - show generic mask
+                          : settings.BANK_IBAN}
                     </span>
                   </div>
                 )}

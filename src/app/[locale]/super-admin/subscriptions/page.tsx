@@ -146,15 +146,30 @@ export default function SubscriptionsPage() {
     notes: "",
   });
 
+  // Reset to page 1 when filters change (#13)
+  useEffect(() => {
+    setPagination((p) => ({ ...p, page: 1 }));
+  }, [searchQuery, statusFilter, tierFilter, chatbotFilter]);
+
   useEffect(() => {
     loadData();
-  }, [pagination.page]);
+  }, [pagination.page, searchQuery, statusFilter, tierFilter, chatbotFilter]);
 
   async function loadData() {
     setIsLoading(true);
     try {
+      // Build query params for server-side filtering (#1)
+      const params = new URLSearchParams({
+        page: String(pagination.page),
+        limit: String(pagination.limit),
+      });
+      if (searchQuery) params.set("search", searchQuery);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (tierFilter !== "all") params.set("planTier", tierFilter);
+      if (chatbotFilter !== "all") params.set("chatbot", chatbotFilter);
+
       const [subsResponse, statsResponse] = await Promise.all([
-        fetch(`/api/super-admin/subscriptions?page=${pagination.page}&limit=${pagination.limit}`),
+        fetch(`/api/super-admin/subscriptions?${params.toString()}`),
         fetch("/api/super-admin/subscriptions/stats"),
       ]);
 
@@ -224,28 +239,8 @@ export default function SubscriptionsPage() {
     }
   }
 
-  // Filter subscriptions
-  const filteredSubscriptions = subscriptions.filter((sub) => {
-    const matchesSearch =
-      !searchQuery ||
-      sub.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.user.name?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || sub.status === statusFilter;
-
-    const matchesTier =
-      tierFilter === "all" || sub.plan.tier === tierFilter;
-
-    const matchesChatbot =
-      chatbotFilter === "all" ||
-      (chatbotFilter === "with" && sub.hasChatbot) ||
-      (chatbotFilter === "without" && !sub.hasChatbot);
-
-    return matchesSearch && matchesStatus && matchesTier && matchesChatbot;
-  });
-
-  // Calculate chatbot stats
+  // Server-side filtering is now used (#1) - subscriptions are already filtered
+  // Calculate chatbot stats from current page (for display only)
   const usersWithChatbot = subscriptions.filter((sub) => sub.hasChatbot).length;
 
   if (isLoading) {
@@ -507,14 +502,14 @@ export default function SubscriptionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSubscriptions.length === 0 ? (
+            {subscriptions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
                   <p className="text-muted-foreground">No subscriptions found</p>
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSubscriptions.map((sub) => {
+              subscriptions.map((sub) => {
                 const chatUsagePercent =
                   sub.plan.maxChatTokensPerMonth === -1 || sub.plan.maxChatTokensPerMonth === 0
                     ? 0

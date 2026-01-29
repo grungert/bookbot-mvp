@@ -15,6 +15,7 @@ import {
   checkChatLimit,
   incrementChatUsage,
   checkSubscriptionActive,
+  getUserSubscription,
 } from "@/lib/subscription";
 import {
   handleBookingSelection,
@@ -88,6 +89,19 @@ export async function POST(request: Request, { params }: RouteParams) {
             subscriptionStatus.status === "TRIAL_EXPIRED"
               ? "TRIAL_EXPIRED"
               : "SUBSCRIPTION_INACTIVE",
+          upgradeUrl: "/pricing",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check chatbot access control (#2) - user must have chatbot addon enabled
+    const ownerSubscription = await getUserSubscription(ownerId);
+    if (!ownerSubscription?.hasChatbot) {
+      return NextResponse.json(
+        {
+          error: "AI Chatbot is not enabled for your subscription",
+          code: "CHATBOT_NOT_ENABLED",
           upgradeUrl: "/pricing",
         },
         { status: 403 }

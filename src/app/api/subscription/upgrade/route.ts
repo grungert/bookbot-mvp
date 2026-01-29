@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { sendUpgradeRequestUserEmail, sendUpgradeRequestAdminEmail } from "@/lib/email/send";
 import { DEFAULT_PRICING } from "@/lib/constants/pricing";
 
-// Generate a unique payment reference
+// Generate a unique payment reference with stronger uniqueness (#9)
 function generatePaymentReference(userId: string): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const userIdPart = userId.slice(-4).toUpperCase();
-  return `BB-${userIdPart}-${timestamp}`;
+  // Add random suffix to prevent collisions on same millisecond
+  const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `BB-${userIdPart}-${timestamp}-${randomSuffix}`;
 }
 
 export async function POST(request: Request) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import { sendTokenPurchaseApprovedEmail, sendTokenPurchaseRejectedEmail } from "@/lib/email/send";
 
 interface RouteParams {
@@ -72,13 +72,20 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const { purchaseId } = await params;
     const body = await request.json();
-    const { action, adminNotes } = body;
+    const { action, adminNotes: rawAdminNotes } = body;
 
     if (!action || !["approve", "reject"].includes(action)) {
       return NextResponse.json(
         { error: "Invalid action. Must be 'approve' or 'reject'" },
         { status: 400 }
       );
+    }
+
+    // Sanitize admin notes: max length and basic validation (#26)
+    let adminNotes: string | null = null;
+    if (rawAdminNotes && typeof rawAdminNotes === "string") {
+      // Limit to 1000 chars and strip any HTML-like tags
+      adminNotes = rawAdminNotes.slice(0, 1000).replace(/<[^>]*>/g, "").trim() || null;
     }
 
     // Get the token purchase
@@ -110,17 +117,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const now = new Date();
 
     if (action === "approve") {
-      // Credit bonus tokens to user's subscription
-      if (purchase.user.subscription) {
-        await prisma.userSubscription.update({
-          where: { id: purchase.user.subscription.id },
-          data: {
-            bonusTokenBalance: {
-              increment: purchase.tokenAmount,
-            },
-          },
-        });
+      // Error if no subscription to credit tokens to (#7)
+      if (!purchase.user.subscription) {
+        return NextResponse.json(
+          { error: "Cannot credit tokens: user has no active subscription" },
+          { status: 400 }
+        );
       }
+
+      // Credit bonus tokens to user's subscription
+      await prisma.userSubscription.update({
+        where: { id: purchase.user.subscription.id },
+        data: {
+          bonusTokenBalance: {
+            increment: purchase.tokenAmount,
+          },
+        },
+      });
 
       // Update purchase status
       await prisma.tokenPurchase.update({

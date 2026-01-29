@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { SUBSCRIPTION_CONSTANTS } from "@/lib/constants/pricing";
 
 // GET /api/super-admin/subscriptions/stats
 export async function GET() {
@@ -77,32 +78,33 @@ export async function GET() {
       },
     });
 
-    let monthlyRevenue = 0;
+    let subscriptionRevenue = 0;
     activeSubscriptions.forEach((sub) => {
       if (sub.plan.tier === "BUSINESS") {
-        monthlyRevenue += pricing.BUSINESS_BASE || 0;
+        subscriptionRevenue += pricing.BUSINESS_BASE || 0;
       } else if (sub.plan.tier === "PRO") {
-        monthlyRevenue += pricing.PRO_BASE || 0;
+        subscriptionRevenue += pricing.PRO_BASE || 0;
         if (sub.hasChatbot) {
-          monthlyRevenue += pricing.CHATBOT_ADDON || 0;
+          subscriptionRevenue += pricing.CHATBOT_ADDON || 0;
         }
         if (sub.extraCompanySlots > 0) {
-          monthlyRevenue += sub.extraCompanySlots * (pricing.EXTRA_COMPANY || 0);
+          subscriptionRevenue += sub.extraCompanySlots * (pricing.EXTRA_COMPANY || 0);
         }
       }
       // TRIAL tier has no revenue
     });
 
-    // Get trials expiring soon (next 7 days)
+    // Get trials expiring soon (use constant instead of hardcoded value #20)
     const now = new Date();
-    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const warningDays = SUBSCRIPTION_CONSTANTS.TRIAL_EXPIRY_WARNING_DAYS;
+    const warningWindowEnd = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
 
     const trialsExpiringSoon = await prisma.userSubscription.count({
       where: {
         status: "TRIALING",
         trialEndsAt: {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: warningWindowEnd,
         },
       },
     });
@@ -142,6 +144,10 @@ export async function GET() {
       },
       _count: true,
     });
+
+    // Include token revenue in total monthly revenue (#10)
+    const tokenRevenueEur = (tokenPurchaseStats._sum.priceEurCents || 0) / 100;
+    const monthlyRevenue = subscriptionRevenue + tokenRevenueEur;
 
     return NextResponse.json({
       totalSubscriptions,

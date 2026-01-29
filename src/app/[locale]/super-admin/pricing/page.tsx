@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Loader2, Save, Euro, RotateCcw, Crown, Building2, MessageSquare, Sparkles } from "lucide-react";
+import { Loader2, Save, Euro, RotateCcw, Crown, Building2, MessageSquare, Sparkles, Coins, Plus, Trash2 } from "lucide-react";
 
 interface PricingConfig {
   id: string;
@@ -16,6 +17,15 @@ interface PricingConfig {
   isActive: boolean;
   updatedAt: string;
   updatedBy: string | null;
+}
+
+interface TokenPack {
+  id: string;
+  name: string;
+  tokenAmount: number;
+  priceEurCents: number;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 const PRICING_ITEMS = [
@@ -53,9 +63,22 @@ const PRICING_ITEMS = [
   },
 ];
 
+// Helper to format token amounts for display
+const formatTokenAmount = (amount: number): string => {
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toFixed(amount % 1_000_000 === 0 ? 0 : 1)}M`;
+  }
+  if (amount >= 1_000) {
+    return `${(amount / 1_000).toFixed(amount % 1_000 === 0 ? 0 : 1)}K`;
+  }
+  return amount.toString();
+};
+
 export default function PricingConfigPage() {
   const [pricing, setPricing] = useState<PricingConfig[]>([]);
   const [originalPricing, setOriginalPricing] = useState<PricingConfig[]>([]);
+  const [tokenPacks, setTokenPacks] = useState<TokenPack[]>([]);
+  const [originalTokenPacks, setOriginalTokenPacks] = useState<TokenPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -66,6 +89,8 @@ export default function PricingConfigPage() {
       const data = await response.json();
       setPricing(data.pricing);
       setOriginalPricing(data.pricing);
+      setTokenPacks(data.tokenPacks || []);
+      setOriginalTokenPacks(data.tokenPacks || []);
     } catch (error) {
       console.error("Error fetching pricing:", error);
       toast.error("Failed to load pricing configuration");
@@ -91,6 +116,21 @@ export default function PricingConfigPage() {
   };
 
   const handleSave = async () => {
+    // Validate token pack names before save (#16)
+    const emptyNamePacks = tokenPacks.filter((p) => !p.name.trim());
+    if (emptyNamePacks.length > 0) {
+      toast.error("All token packs must have a name");
+      return;
+    }
+
+    // Check for duplicate names (#16)
+    const names = tokenPacks.map((p) => p.name.trim().toLowerCase());
+    const duplicates = names.filter((name, idx) => names.indexOf(name) !== idx);
+    if (duplicates.length > 0) {
+      toast.error("Token pack names must be unique");
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await fetch("/api/super-admin/pricing", {
@@ -103,6 +143,14 @@ export default function PricingConfigPage() {
             description: item.description,
             isActive: item.isActive,
           })),
+          tokenPacks: tokenPacks.map((pack) => ({
+            id: pack.id,
+            name: pack.name.trim(), // Trim whitespace
+            tokenAmount: pack.tokenAmount,
+            priceEurCents: pack.priceEurCents,
+            isActive: pack.isActive,
+            sortOrder: pack.sortOrder,
+          })),
         }),
       });
 
@@ -114,6 +162,8 @@ export default function PricingConfigPage() {
       const data = await response.json();
       setPricing(data.pricing);
       setOriginalPricing(data.pricing);
+      setTokenPacks(data.tokenPacks || []);
+      setOriginalTokenPacks(data.tokenPacks || []);
 
       toast.success("Pricing configuration has been saved successfully");
     } catch (error) {
@@ -126,9 +176,36 @@ export default function PricingConfigPage() {
 
   const handleReset = () => {
     setPricing(originalPricing);
+    setTokenPacks(originalTokenPacks);
   };
 
-  const hasChanges = JSON.stringify(pricing) !== JSON.stringify(originalPricing);
+  const hasChanges = JSON.stringify(pricing) !== JSON.stringify(originalPricing) ||
+    JSON.stringify(tokenPacks) !== JSON.stringify(originalTokenPacks);
+
+  // Token Pack handlers
+  const handleAddTokenPack = () => {
+    const newPack: TokenPack = {
+      id: `new-${Date.now()}`,
+      name: "",
+      tokenAmount: 500000,
+      priceEurCents: 500,
+      isActive: true,
+      sortOrder: tokenPacks.length,
+    };
+    setTokenPacks([...tokenPacks, newPack]);
+  };
+
+  const handleDeleteTokenPack = (id: string) => {
+    setTokenPacks(tokenPacks.filter((p) => p.id !== id));
+  };
+
+  const handleTokenPackChange = (id: string, field: keyof TokenPack, value: string | number | boolean) => {
+    setTokenPacks(
+      tokenPacks.map((pack) =>
+        pack.id === id ? { ...pack, [field]: value } : pack
+      )
+    );
+  };
 
   // Calculate example pricing
   const getExamplePricing = () => {
@@ -238,6 +315,132 @@ export default function PricingConfigPage() {
           );
         })}
       </div>
+
+      {/* Separator */}
+      <div className="border-t my-2" />
+
+      {/* Token Packs Section */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-amber-500" />
+              Token Packs
+            </CardTitle>
+            <CardDescription>
+              Manage purchasable AI token bundles
+            </CardDescription>
+          </div>
+          <Button onClick={handleAddTokenPack} variant="outline" size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Pack
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {tokenPacks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Coins className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No token packs configured</p>
+              <Button onClick={handleAddTokenPack} variant="link" className="mt-2">
+                Add your first token pack
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b text-sm text-muted-foreground">
+                    <th className="text-left font-medium py-3 px-2">Name</th>
+                    <th className="text-left font-medium py-3 px-2 w-36">Tokens</th>
+                    <th className="text-left font-medium py-3 px-2 w-32">Price</th>
+                    <th className="text-left font-medium py-3 px-2 w-20">Order</th>
+                    <th className="text-center font-medium py-3 px-2 w-20">Active</th>
+                    <th className="w-12"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tokenPacks.map((pack) => (
+                    <tr key={pack.id} className="border-b last:border-0">
+                      {/* Name */}
+                      <td className="py-3 px-2">
+                        <Input
+                          value={pack.name}
+                          onChange={(e) => handleTokenPackChange(pack.id, "name", e.target.value)}
+                          placeholder="Pack name"
+                          className="h-9"
+                        />
+                      </td>
+
+                      {/* Tokens */}
+                      <td className="py-3 px-2">
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            value={pack.tokenAmount}
+                            onChange={(e) => handleTokenPackChange(pack.id, "tokenAmount", parseInt(e.target.value) || 0)}
+                            className="h-9 pr-12"
+                            min="0"
+                            step="10000"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            {formatTokenAmount(pack.tokenAmount)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Price */}
+                      <td className="py-3 px-2">
+                        <div className="relative">
+                          <Euro className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={(pack.priceEurCents / 100).toFixed(2)}
+                            onChange={(e) => handleTokenPackChange(pack.id, "priceEurCents", Math.round(parseFloat(e.target.value || "0") * 100))}
+                            className="h-9 pl-9"
+                          />
+                        </div>
+                      </td>
+
+                      {/* Sort Order */}
+                      <td className="py-3 px-2">
+                        <Input
+                          type="number"
+                          value={pack.sortOrder}
+                          onChange={(e) => handleTokenPackChange(pack.id, "sortOrder", parseInt(e.target.value) || 0)}
+                          className="h-9"
+                          min="0"
+                        />
+                      </td>
+
+                      {/* Active Toggle */}
+                      <td className="py-3 px-2 text-center">
+                        <Switch
+                          checked={pack.isActive}
+                          onCheckedChange={(checked) => handleTokenPackChange(pack.id, "isActive", checked)}
+                        />
+                      </td>
+
+                      {/* Delete */}
+                      <td className="py-3 px-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteTokenPack(pack.id)}
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Example Pricing */}
       <Card>

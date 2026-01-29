@@ -12,7 +12,7 @@ const createCompanySchema = z.object({
 });
 
 // GET /api/super-admin/companies
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
 
@@ -20,7 +20,32 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Add pagination support (#11)
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 500);
+    const skip = (page - 1) * limit;
+    const search = searchParams.get("search");
+
+    // Validate search term length
+    if (search && search.length > 100) {
+      return NextResponse.json({ error: "Search term too long" }, { status: 400 });
+    }
+
+    // Build where clause
+    const where: Record<string, unknown> = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { slug: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    // Get total count for pagination
+    const totalCount = await prisma.company.count({ where });
+
     const companies = await prisma.company.findMany({
+      where,
       include: {
         _count: {
           select: {
@@ -45,9 +70,19 @@ export async function GET() {
         },
       },
       orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
     });
 
-    return NextResponse.json(companies);
+    return NextResponse.json({
+      companies,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("Error fetching companies:", error);
     return NextResponse.json(

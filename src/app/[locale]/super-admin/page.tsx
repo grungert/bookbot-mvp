@@ -1,6 +1,7 @@
 import { setRequestLocale } from "next-intl/server";
 import { prisma } from "@/lib/prisma";
 import { formatTokenCount } from "@/lib/utils/format-tokens";
+import { SUBSCRIPTION_CONSTANTS } from "@/lib/constants/pricing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/routing";
@@ -31,7 +32,9 @@ export default async function SuperAdminDashboard({
   // Get current month dates for chat usage
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // Use constant instead of hardcoded 7 days (#20)
+  const warningDays = SUBSCRIPTION_CONSTANTS.TRIAL_EXPIRY_WARNING_DAYS;
+  const warningWindowEnd = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
 
   const [
     companyCount,
@@ -65,7 +68,7 @@ export default async function SuperAdminDashboard({
         status: "TRIALING",
         trialEndsAt: {
           gte: now,
-          lte: sevenDaysFromNow,
+          lte: warningWindowEnd,
         },
       },
     }),
@@ -161,7 +164,7 @@ export default async function SuperAdminDashboard({
     {
       title: "Active Trials",
       value: statusCounts.TRIALING,
-      subtitle: `${trialsExpiringSoon} expiring in 7 days`,
+      subtitle: `${trialsExpiringSoon} expiring in ${warningDays} days`,
       icon: Clock,
       color: "text-blue-500",
     },
