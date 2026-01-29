@@ -1,10 +1,16 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Link } from "@/i18n/routing";
+
+interface PricingOption {
+  label: string;
+  price: string;
+  highlight?: boolean;
+}
 
 interface PricingCardProps {
   name: string;
@@ -16,6 +22,7 @@ interface PricingCardProps {
   ctaText: string;
   delay?: number;
   index?: number;
+  pricingOptions?: PricingOption[];
 }
 
 // Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
@@ -42,6 +49,7 @@ export function PricingCard({
   ctaText,
   delay = 0,
   index = 0,
+  pricingOptions,
 }: PricingCardProps) {
   const prefersReducedMotion = useReducedMotion();
   const checkColor = getGradientColor(index);
@@ -100,21 +108,69 @@ export function PricingCard({
         {/* Header */}
         <div className="text-center px-6 pb-2 pt-8">
           <h3 className="text-xl font-semibold mb-4">{name}</h3>
-          <div className="flex items-baseline justify-center gap-1">
-            <motion.span
-              className="text-4xl md:text-5xl font-bold"
-              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.5 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{
-                duration: prefersReducedMotion ? 0 : 0.5,
-                delay: prefersReducedMotion ? 0 : delay + 0.2,
-              }}
-            >
-              {price}
-            </motion.span>
-            <span className="text-muted-foreground text-sm">{priceDetail}</span>
-          </div>
+
+          {/* Pricing Options Display */}
+          {pricingOptions && pricingOptions.length > 0 ? (
+            <div className="space-y-3">
+              {pricingOptions.map((option, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.9 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{
+                    duration: prefersReducedMotion ? 0 : 0.4,
+                    delay: prefersReducedMotion ? 0 : delay + 0.2 + idx * 0.1,
+                  }}
+                  className={cn(
+                    "rounded-lg p-3 transition-all",
+                    option.highlight
+                      ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20"
+                      : "bg-muted/30 border border-transparent"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={cn(
+                      "text-sm font-medium",
+                      option.highlight ? "text-foreground" : "text-muted-foreground"
+                    )}>
+                      {option.label}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {option.highlight && (
+                        <Sparkles className="h-3.5 w-3.5 text-purple-500" />
+                      )}
+                      <span className={cn(
+                        "text-xl font-bold",
+                        option.highlight
+                          ? "bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+                          : "text-foreground"
+                      )}>
+                        {option.price}
+                      </span>
+                      <span className="text-xs text-muted-foreground">/mo</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-baseline justify-center gap-1">
+              <motion.span
+                className="text-4xl md:text-5xl font-bold"
+                initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.5 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.5,
+                  delay: prefersReducedMotion ? 0 : delay + 0.2,
+                }}
+              >
+                {price}
+              </motion.span>
+              <span className="text-muted-foreground text-sm">{priceDetail}</span>
+            </div>
+          )}
         </div>
 
         {/* Content */}

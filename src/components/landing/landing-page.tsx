@@ -9,6 +9,8 @@ import { UseCasesSection } from "./use-cases-section";
 import { PricingSection } from "./pricing-section";
 import { FAQSection } from "./faq-section";
 import { CtaSection } from "./cta-section";
+import type { PublicPlan } from "@/app/api/plans/route";
+import type { PricingConfig, TokenPack } from "@/app/[locale]/page";
 
 // Lazy load sphere background - covers full page
 const SphereBackground = dynamic(
@@ -64,7 +66,13 @@ function ScrollingGrid() {
   );
 }
 
-export function LandingPage() {
+interface LandingPageProps {
+  plans: PublicPlan[];
+  pricing: PricingConfig;
+  tokenPacks: TokenPack[];
+}
+
+export function LandingPage({ plans, pricing, tokenPacks }: LandingPageProps) {
   return (
     <main className="min-h-screen relative">
       {/* Full-page sphere background - fixed position */}
@@ -81,7 +89,7 @@ export function LandingPage() {
         <HowItWorksSection />
         <FeaturesSection />
         <UseCasesSection />
-        <PricingSection />
+        <PricingSection plans={plans} pricing={pricing} tokenPacks={tokenPacks} />
         <FAQSection />
         <CtaSection />
       </div>
