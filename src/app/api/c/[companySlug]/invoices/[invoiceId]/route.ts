@@ -42,11 +42,30 @@ export async function GET(request: Request, { params }: RouteParams) {
       );
     }
 
-    const invoice = await prisma.invoice.findFirst({
+    // Check if user has admin access to this company (via membership) BEFORE fetching invoice
+    const membership = await prisma.companyMembership.findUnique({
       where: {
-        id: invoiceId,
-        companyId: company.id,
+        userId_companyId: {
+          userId: user.id,
+          companyId: company.id,
+        },
       },
+    });
+    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
+
+    // Build where clause based on user access level
+    const whereClause: { id: string; companyId: string; userId?: string } = {
+      id: invoiceId,
+      companyId: company.id,
+    };
+
+    // Non-admin users can only see their own invoices
+    if (!isCompanyAdmin) {
+      whereClause.userId = user.id;
+    }
+
+    const invoice = await prisma.invoice.findFirst({
+      where: whereClause,
       include: {
         user: {
           select: {
@@ -70,22 +89,6 @@ export async function GET(request: Request, { params }: RouteParams) {
         { error: "Invoice not found" },
         { status: 404 }
       );
-    }
-
-    // Check if user has admin access to this company (via membership)
-    const membership = await prisma.companyMembership.findUnique({
-      where: {
-        userId_companyId: {
-          userId: user.id,
-          companyId: company.id,
-        },
-      },
-    });
-    const isCompanyAdmin = user.role === "SUPER_ADMIN" || !!membership;
-
-    // Non-admin users can only see their own invoices
-    if (!isCompanyAdmin && invoice.userId !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     return NextResponse.json(invoice);
@@ -165,7 +168,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
         (sum, item) => sum + item.quantity * item.unitPrice,
         0
       );
-      const tax = 0; // Tax can be calculated if needed
+      // Use 20% tax rate to match POST handler (typical VAT rate)
+      const tax = subtotal * 0.2;
       const total = subtotal + tax;
 
       // Create new line items
@@ -223,12 +227,12 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       }
     }
 
-    // Send email notifications on status changes
+    // Send email notifications on status changes (idempotent - only send if not already sent)
     if (updated.user.email) {
       const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || "http://localhost:3000";
 
-      // Send invoice email when status changes to SENT
-      if (parsed.data.status === "SENT" && invoice.status !== "SENT") {
+      // Send invoice email when status changes to SENT (only if not already sent)
+      if (parsed.data.status === "SENT" && invoice.status !== "SENT" && !invoice.sentEmailAt) {
         try {
           const dueDate = updated.dueDate || addDays(updated.issueDate, 30);
           await sendInvoiceSentEmail({
@@ -242,13 +246,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             companyName: company.name,
             invoiceUrl: `${baseUrl}/en/c/${companySlug}/invoices/${invoiceId}`,
           });
+          // Mark email as sent
+          await prisma.invoice.update({
+            where: { id: invoiceId },
+            data: { sentEmailAt: new Date() },
+          });
         } catch (error) {
           console.error("[EMAIL] Failed to send invoice sent email:", error);
         }
       }
 
-      // Send payment confirmation when status changes to PAID
-      if (parsed.data.status === "PAID" && invoice.status !== "PAID") {
+      // Send payment confirmation when status changes to PAID (only if not already sent)
+      if (parsed.data.status === "PAID" && invoice.status !== "PAID" && !invoice.paidEmailAt) {
         try {
           await sendInvoicePaidEmail({
             customerEmail: updated.user.email,
@@ -258,6 +267,11 @@ export async function PATCH(request: Request, { params }: RouteParams) {
             total: Number(updated.total),
             currency: updated.currency,
             companyName: company.name,
+          });
+          // Mark email as sent
+          await prisma.invoice.update({
+            where: { id: invoiceId },
+            data: { paidEmailAt: new Date() },
           });
         } catch (error) {
           console.error("[EMAIL] Failed to send invoice paid email:", error);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { format, parseISO, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
@@ -123,6 +123,7 @@ export default function InvoicesPage() {
   const [companyCurrency, setCompanyCurrency] = useState("RSD");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,6 +140,9 @@ export default function InvoicesPage() {
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [isViewPanelOpen, setIsViewPanelOpen] = useState(false);
   const [isDueDateOpen, setIsDueDateOpen] = useState(false);
+
+  // Refs for timeout cleanup
+  const panelTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Filter state
   const [datePeriod, setDatePeriod] = useState<DatePeriod>("7d");
@@ -184,6 +188,7 @@ export default function InvoicesPage() {
       const color = getComputedStyle(el).getPropertyValue("--company-primary").trim();
       if (color) setPrimaryColor(color);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Pagination state
@@ -231,14 +236,30 @@ export default function InvoicesPage() {
     };
   }, [isViewPanelOpen, isFormPanelOpen]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (panelTimeoutRef.current) {
+        clearTimeout(panelTimeoutRef.current);
+      }
+    };
+  }, []);
+
   async function loadInvoices() {
+    setLoadError(null);
     try {
-      const response = await fetch(`/api/c/${companySlug}/invoices`);
+      // Use all=true to get all invoices for client-side filtering/sorting
+      const response = await fetch(`/api/c/${companySlug}/invoices?all=true`);
       if (response.ok) {
         const data = await response.json();
-        setInvoices(data);
+        // Handle both paginated response and direct array
+        const invoiceData = Array.isArray(data) ? data : (data.invoices || data);
+        setInvoices(invoiceData);
+      } else {
+        setLoadError(t("errorLoadingInvoices"));
       }
     } catch (error) {
+      setLoadError(t("errorLoadingInvoices"));
       toast.error(tCommon("error"));
     } finally {
       setIsLoading(false);
@@ -246,16 +267,11 @@ export default function InvoicesPage() {
   }
 
   async function loadUsers() {
-    // In a real app, you'd have a users API endpoint
-    // For now, we'll use the appointments endpoint to get users
     try {
-      const response = await fetch(`/api/c/${companySlug}/appointments`);
+      const response = await fetch(`/api/c/${companySlug}/customers`);
       if (response.ok) {
         const data = await response.json();
-        const uniqueUsers = Array.from(
-          new Map(data.map((apt: { user: User }) => [apt.user.id, apt.user])).values()
-        ) as User[];
-        setUsers(uniqueUsers);
+        setUsers(data.customers || []);
       }
     } catch (error) {
       console.error("Error loading users:", error);
@@ -299,9 +315,42 @@ export default function InvoicesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedUserId || lineItems.some((item) => !item.description)) {
-      toast.error("Please fill in all required fields");
+
+    // Validate customer selection
+    if (!selectedUserId) {
+      toast.error(t("validationSelectCustomer"));
       return;
+    }
+
+    // Validate line items have descriptions
+    if (lineItems.some((item) => !item.description.trim())) {
+      toast.error(t("validationDescriptionRequired"));
+      return;
+    }
+
+    // Validate quantities are positive integers
+    const invalidQty = lineItems.find((item) => item.quantity < 1 || !Number.isInteger(item.quantity));
+    if (invalidQty) {
+      toast.error(t("validationQuantityPositive"));
+      return;
+    }
+
+    // Validate prices are non-negative
+    const invalidPrice = lineItems.find((item) => item.unitPrice < 0);
+    if (invalidPrice) {
+      toast.error(t("validationPriceNonNegative"));
+      return;
+    }
+
+    // Validate due date is in the future if provided
+    if (dueDate) {
+      const dueDateObj = new Date(dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (dueDateObj < today) {
+        toast.error(t("validationDueDateFuture"));
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -553,11 +602,31 @@ export default function InvoicesPage() {
     });
   }, [invoices, sortColumn, sortDirection, statusFilters, datePeriod, customDateFrom, customDateTo, searchQuery, selectedCustomerId, selectedServiceIds]);
 
-  // Calculate total paid amount for the selected period
+  // Calculate total paid amount for the selected period, respecting all filters
   const paidTotalForPeriod = useMemo(() => {
-    // Get invoices filtered by date only (ignore status filter for this calculation)
-    let dateFiltered = [...invoices];
+    let filtered = [...invoices];
 
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((inv) =>
+        inv.invoiceNumber.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply customer filter
+    if (selectedCustomerId) {
+      filtered = filtered.filter((inv) => inv.user.id === selectedCustomerId);
+    }
+
+    // Apply service filter
+    if (selectedServiceIds.size > 0) {
+      filtered = filtered.filter((inv) =>
+        inv.lineItems.some((item) => item.serviceId && selectedServiceIds.has(item.serviceId))
+      );
+    }
+
+    // Apply date filter
     const now = new Date();
     let startDate: Date | null = null;
     let endDateVal: Date = endOfDay(now);
@@ -574,19 +643,19 @@ export default function InvoicesPage() {
     }
 
     if (startDate) {
-      dateFiltered = dateFiltered.filter((inv) => {
+      filtered = filtered.filter((inv) => {
         const invoiceDate = parseISO(inv.issueDate);
         return isWithinInterval(invoiceDate, { start: startDate!, end: endDateVal });
       });
     }
 
-    // Sum only PAID invoices
-    const paidInvoices = dateFiltered.filter((inv) => inv.status === "PAID");
+    // Sum only PAID invoices from filtered results
+    const paidInvoices = filtered.filter((inv) => inv.status === "PAID");
     const total = paidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
     const currency = paidInvoices[0]?.currency || companyCurrency;
 
     return { total, currency, count: paidInvoices.length };
-  }, [invoices, datePeriod, customDateFrom, customDateTo, companyCurrency]);
+  }, [invoices, datePeriod, customDateFrom, customDateTo, companyCurrency, searchQuery, selectedCustomerId, selectedServiceIds]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedInvoices.length / itemsPerPage);
@@ -679,10 +748,13 @@ export default function InvoicesPage() {
   }
 
   // Close view panel handler with delayed clearing
-  function closePanel() {
+  const closePanel = useCallback(() => {
     setIsViewPanelOpen(false);
-    setTimeout(() => setViewingInvoice(null), 300);
-  }
+    if (panelTimeoutRef.current) {
+      clearTimeout(panelTimeoutRef.current);
+    }
+    panelTimeoutRef.current = setTimeout(() => setViewingInvoice(null), 300);
+  }, []);
 
   // Form panel handlers
   function openCreatePanel() {
@@ -696,23 +768,75 @@ export default function InvoicesPage() {
     setSelectedUserId(invoice.user.id);
     setDueDate(invoice.dueDate ? format(parseISO(invoice.dueDate), "yyyy-MM-dd") : "");
     setNotes(invoice.notes || "");
-    setLineItems(invoice.lineItems.map(item => ({
-      id: item.id,
-      serviceId: item.serviceId,
-      description: item.description,
-      quantity: item.quantity,
-      unitPrice: Number(item.unitPrice),
-    })));
+
+    // Recalculate discounts for service-based line items using current date
+    const updatedLineItems = invoice.lineItems.map(item => {
+      // If this is a service-based item, recalculate the discount
+      if (item.serviceId) {
+        const service = services.find(s => s.id === item.serviceId);
+        if (service) {
+          const discountResult = calculateDiscountedPrice({
+            price: service.price,
+            currency: service.currency,
+            discountType: service.discountType as "percentage" | "fixed" | null,
+            discountValue: service.discountValue,
+            discountStartDate: service.discountStartDate,
+            discountEndDate: service.discountEndDate,
+          });
+
+          if (discountResult.isDiscounted) {
+            return {
+              id: item.id,
+              serviceId: item.serviceId,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: discountResult.finalPrice,
+              originalUnitPrice: discountResult.originalPrice,
+              discountType: service.discountType,
+              discountValue: service.discountValue,
+              discountPercentage: discountResult.discountPercentage,
+            };
+          } else {
+            // Discount expired or not active - use original service price
+            return {
+              id: item.id,
+              serviceId: item.serviceId,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: service.price,
+              originalUnitPrice: undefined,
+              discountType: undefined,
+              discountValue: undefined,
+              discountPercentage: undefined,
+            };
+          }
+        }
+      }
+
+      // Custom item or service not found - keep original values
+      return {
+        id: item.id,
+        serviceId: item.serviceId,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice),
+      };
+    });
+
+    setLineItems(updatedLineItems);
     setIsFormPanelOpen(true);
   }
 
-  function closeFormPanel() {
+  const closeFormPanel = useCallback(() => {
     setIsFormPanelOpen(false);
-    setTimeout(() => {
+    if (panelTimeoutRef.current) {
+      clearTimeout(panelTimeoutRef.current);
+    }
+    panelTimeoutRef.current = setTimeout(() => {
       setEditingInvoice(null);
       resetForm();
     }, 300);
-  }
+  }, []);
 
   // Single invoice delete handlers
   function openDeleteDialog(invoice: Invoice) {
@@ -772,6 +896,27 @@ export default function InvoicesPage() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 mb-2">
+          <X className="h-6 w-6 text-destructive" />
+        </div>
+        <p className="text-muted-foreground">{loadError}</p>
+        <Button
+          onClick={() => {
+            setIsLoading(true);
+            loadInvoices();
+          }}
+          variant="outline"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          {t("retry")}
+        </Button>
       </div>
     );
   }

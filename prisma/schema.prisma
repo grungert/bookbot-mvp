@@ -338,6 +338,10 @@ model Invoice {
   notes          String?
   paidAt         DateTime?     // Timestamp when invoice was marked as paid
 
+  // Email notification tracking (for idempotency)
+  sentEmailAt    DateTime?     // When SENT notification was emailed
+  paidEmailAt    DateTime?     // When PAID notification was emailed
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
