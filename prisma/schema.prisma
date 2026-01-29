@@ -180,6 +180,7 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
   upgradeRequests         UpgradeRequest[]
   tokenPurchases          TokenPurchase[]
+  pricingScenarios        PricingScenario[]
 }
 
 // NextAuth.js Account model
@@ -726,4 +727,37 @@ model WhatsAppPhoneMapping {
   updatedAt       DateTime @updatedAt
 
   @@index([phoneNumberId])
+}
+
+// LLM Model Pricing - stores LLM provider pricing for calculator
+model LLMModelPricing {
+  id               String   @id @default(cuid())
+  provider         String   // "openai", "anthropic", "google", "custom"
+  modelName        String   // "gpt-4o", "claude-sonnet-4", etc.
+  displayName      String   // Human-readable name
+  inputPricePer1M  Decimal  @db.Decimal(10, 4) // USD per 1M input tokens
+  outputPricePer1M Decimal  @db.Decimal(10, 4) // USD per 1M output tokens
+  isDefault        Boolean  @default(false)    // Default model for cost calculations
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([provider, modelName])
+  @@index([isActive])
+}
+
+// Pricing Scenario - saved calculator scenarios
+model PricingScenario {
+  id         String   @id @default(cuid())
+  name       String
+  parameters Json     // All simulation inputs
+  results    Json     // Calculated outputs
+  createdBy  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  creator    User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([createdBy])
 }
