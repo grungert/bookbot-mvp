@@ -1,17 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowRight, Play, LayoutDashboard, Calendar, Shield } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import dynamic from "next/dynamic";
 import { VideoPlaceholder } from "./video-player";
-import { Logo } from "@/components/ui/logo";
-import { UserMenu } from "@/components/navigation/user-menu";
+import { MainNav } from "@/components/navigation/main-nav";
 
 // Lazy load video player
 const VideoPlayer = dynamic(
@@ -23,18 +19,8 @@ const VideoPlayer = dynamic(
 );
 
 export function HeroSection() {
-  const { data: session, status } = useSession();
   const t = useTranslations("landing");
-  const tNav = useTranslations("nav");
   const prefersReducedMotion = useReducedMotion();
-  const [mounted, setMounted] = useState(false);
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const isLoggedIn = mounted && status === "authenticated" && session?.user;
 
   const containerVariants: Variants = {
     hidden: { opacity: 0 },
@@ -66,48 +52,7 @@ export function HeroSection() {
   return (
     <section className="relative min-h-screen flex flex-col">
       {/* Header */}
-      <header className="relative z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Logo size="lg" showText />
-          <div className="flex items-center gap-4">
-            {isLoggedIn ? (
-              <>
-                {/* Show admin buttons based on role */}
-                {session.user.role === "SUPER_ADMIN" && (
-                  <Link href="/super-admin">
-                    <Button variant="ghost" className="cursor-pointer">
-                      <Shield className="mr-2 h-4 w-4" />
-                      {t("adminPanel")}
-                    </Button>
-                  </Link>
-                )}
-                {session.user.role !== "SUPER_ADMIN" && (
-                  <Link href={
-                    session.user.memberships?.[0]?.companySlug
-                      ? `/c/${session.user.memberships[0].companySlug}/admin`
-                      : "/onboarding"
-                  }>
-                    <Button variant="ghost" className="cursor-pointer">
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      {tNav("dashboard")}
-                    </Button>
-                  </Link>
-                )}
-                <UserMenu showDashboardLink={false} />
-              </>
-            ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" className="cursor-pointer">{t("login")}</Button>
-                </Link>
-                <Link href="/register">
-                  <Button variant="gradient" className="cursor-pointer">{t("getStarted")}</Button>
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <MainNav />
 
       {/* Hero Content */}
       <div className="relative z-10 flex-1 flex items-center">
