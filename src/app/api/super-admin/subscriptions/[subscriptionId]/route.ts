@@ -13,15 +13,6 @@ const updateSubscriptionSchema = z.object({
   trialEndsAt: z.string().nullable().optional(),
 });
 
-// Valid subscription state transitions
-// Key = current state, Value = array of allowed target states
-const VALID_STATUS_TRANSITIONS: Record<SubscriptionStatus, SubscriptionStatus[]> = {
-  TRIALING: ["ACTIVE", "TRIAL_EXPIRED", "CANCELLED"],
-  ACTIVE: ["PAST_DUE", "CANCELLED"],
-  TRIAL_EXPIRED: ["ACTIVE", "CANCELLED"],
-  PAST_DUE: ["ACTIVE", "CANCELLED"],
-  CANCELLED: ["ACTIVE"], // Allow reactivation only
-};
 
 interface RouteParams {
   params: Promise<{ subscriptionId: string }>;
@@ -133,22 +124,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 
     const updateData: Record<string, unknown> = {};
 
-    // Handle status change with transition validation
+    // Handle status change - super admins can set any status
     if (parsed.data.status !== undefined && parsed.data.status !== subscription.status) {
-      const currentStatus = subscription.status as SubscriptionStatus;
-      const newStatus = parsed.data.status;
-      const allowedTransitions = VALID_STATUS_TRANSITIONS[currentStatus];
-
-      if (!allowedTransitions.includes(newStatus)) {
-        return NextResponse.json(
-          {
-            error: "Invalid status transition",
-            details: `Cannot change status from ${currentStatus} to ${newStatus}. Allowed transitions: ${allowedTransitions.join(", ")}`,
-          },
-          { status: 400 }
-        );
-      }
-      updateData.status = newStatus;
+      updateData.status = parsed.data.status;
     }
 
     // Handle plan change

@@ -3,7 +3,7 @@
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { VideoEmbed, VideoPlaceholder } from "./video-embed";
 import type { LucideIcon } from "lucide-react";
 
@@ -60,22 +60,6 @@ export function FeatureHero({
   return (
     <section className="py-16 md:py-24">
       <div className="container mx-auto px-4">
-        {/* Back to features link */}
-        <motion.div
-          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
-          className="mb-8"
-        >
-          <Link
-            href="/#pricing"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to pricing</span>
-          </Link>
-        </motion.div>
-
         <motion.div
           className="max-w-4xl mx-auto text-center"
           variants={containerVariants}

@@ -18,7 +18,7 @@ interface HowItWorksProps {
 }
 
 // Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
-function getGradientColor(index: number, totalItems: number = 4): { bg: string; bgSolid: string; icon: string; border: string } {
+function getGradientColor(index: number, totalItems: number = 4): { bg: string; bgSolid: string; icon: string; border: string; lineFade: string } {
   const factor = index / (totalItems - 1 || 1);
   const clampedFactor = Math.max(0, Math.min(1, factor));
 
@@ -32,6 +32,7 @@ function getGradientColor(index: number, totalItems: number = 4): { bg: string; 
     bgSolid: `rgb(${r}, ${g}, ${b})`,
     icon: `rgb(${r}, ${g}, ${b})`,
     border: `rgba(${r}, ${g}, ${b}, 0.3)`,
+    lineFade: `linear-gradient(to bottom, rgba(${r}, ${g}, ${b}, 0.4), transparent)`,
   };
 }
 
@@ -97,7 +98,7 @@ export function HowItWorks({ title, subtitle, steps }: HowItWorksProps) {
                     <div
                       className="w-0.5 flex-1 mt-2"
                       style={{
-                        background: `linear-gradient(to bottom, ${colors.bgSolid}40, transparent)`,
+                        background: colors.lineFade,
                       }}
                     />
                   )}

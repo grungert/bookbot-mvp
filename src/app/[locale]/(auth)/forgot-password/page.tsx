@@ -54,59 +54,16 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-            <CardTitle className="text-2xl">{t("checkYourEmail")}</CardTitle>
-            <CardDescription>{t("resetLinkSent")}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center text-sm text-muted-foreground">
-            <p>{t("resetLinkInstructions")}</p>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Link href="/login">
-              <Button variant="ghost">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                {t("backToLogin")}
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-white/20 dark:border-gray-700/30 shadow-xl">
         <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Mail className="w-6 h-6 text-primary" />
+          <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
-          <CardTitle className="text-2xl">{t("forgotPassword")}</CardTitle>
-          <CardDescription>{t("forgotPasswordDescription")}</CardDescription>
+          <CardTitle className="text-2xl">{t("checkYourEmail")}</CardTitle>
+          <CardDescription>{t("resetLinkSent")}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">{tCommon("email")}</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder={t("emailPlaceholder")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? tCommon("loading") : t("sendResetLink")}
-            </Button>
-          </form>
+        <CardContent className="text-center text-sm text-muted-foreground">
+          <p>{t("resetLinkInstructions")}</p>
         </CardContent>
         <CardFooter className="flex justify-center">
           <Link href="/login">
@@ -117,6 +74,45 @@ export default function ForgotPasswordPage() {
           </Link>
         </CardFooter>
       </Card>
-    </div>
+    );
+  }
+
+  return (
+    <Card className="w-full max-w-md bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-white/20 dark:border-gray-700/30 shadow-xl">
+      <CardHeader className="text-center">
+        <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+          <Mail className="w-6 h-6 text-primary" />
+        </div>
+        <CardTitle className="text-2xl">{t("forgotPassword")}</CardTitle>
+        <CardDescription>{t("forgotPasswordDescription")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">{tCommon("email")}</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder={t("emailPlaceholder")}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+          </div>
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? tCommon("loading") : t("sendResetLink")}
+          </Button>
+        </form>
+      </CardContent>
+      <CardFooter className="flex justify-center">
+        <Link href="/login">
+          <Button variant="ghost">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t("backToLogin")}
+          </Button>
+        </Link>
+      </CardFooter>
+    </Card>
   );
 }

@@ -1247,7 +1247,9 @@
     "requestCancelled": "Zahtev za nadogradnju otkazan",
     "createdOn": "Zatrazeno",
     "approvedEmailSubject": "Pretplata aktivirana",
-    "rejectedEmailSubject": "Azuriranje zahteva za nadogradnju"
+    "rejectedEmailSubject": "Azuriranje zahteva za nadogradnju",
+    "alreadyHighestPlan": "Vec ste na najvisem planu",
+    "alreadyOnPlan": "Vec ste na ovom planu. Mozete dodati dodatne kompanije ili chatbot iz vaseg naloga."
   },
   "globalAppointments": {
     "title": "Svi moji termini",

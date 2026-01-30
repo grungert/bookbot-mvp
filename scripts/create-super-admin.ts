@@ -12,45 +12,59 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-async function main() {
-  const email = "admin@test.com";
-  const password = "password123";
+async function createOrUpdateUser(
+  email: string,
+  password: string,
+  name: string,
+  role: "SUPER_ADMIN" | "USER"
+) {
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Check if user exists
   const existing = await prisma.user.findUnique({ where: { email } });
 
   if (existing) {
-    // Update to super admin
     await prisma.user.update({
       where: { email },
       data: {
-        role: "SUPER_ADMIN",
+        role,
         password: hashedPassword,
+        name,
         emailVerified: new Date()
       }
     });
-    console.log("Updated existing user to SUPER_ADMIN:", email);
+    console.log(`Updated existing user to ${role}:`, email);
   } else {
-    // Create new super admin
     await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        name: "Super Admin",
-        role: "SUPER_ADMIN",
+        name,
+        role,
         emailVerified: new Date()
       }
     });
-    console.log("Created new SUPER_ADMIN:", email);
+    console.log(`Created new ${role}:`, email);
   }
 
-  // Verify
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, name: true, role: true }
   });
-  console.log("Super Admin account:", user);
+  console.log("Account:", user);
+  return user;
+}
+
+async function main() {
+  console.log("Creating test users...\n");
+
+  // Super admin users
+  await createOrUpdateUser("admin@test.com", "password123", "Super Admin", "SUPER_ADMIN");
+  await createOrUpdateUser("testadmin@example.com", "password123", "Test Admin", "SUPER_ADMIN");
+
+  // Regular user
+  await createOrUpdateUser("user@test.com", "password123", "Test User", "USER");
+
+  console.log("\nAll test users created!");
 }
 
 main()

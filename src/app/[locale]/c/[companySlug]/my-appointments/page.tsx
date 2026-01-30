@@ -252,7 +252,7 @@ export default function MyAppointmentsPage() {
   const loadData = useCallback(async () => {
     try {
       const [appointmentsRes, allAppointmentsRes, workingHoursRes] = await Promise.all([
-        fetch(`/api/c/${companySlug}/appointments?myOnly=true`, { cache: 'no-store' }),
+        fetch(`/api/c/${companySlug}/appointments?myOnly=true&all=true`, { cache: 'no-store' }),
         fetch(`/api/user/appointments`, { cache: 'no-store' }),
         fetch(`/api/c/${companySlug}/working-hours`, { cache: 'no-store' }),
       ]);

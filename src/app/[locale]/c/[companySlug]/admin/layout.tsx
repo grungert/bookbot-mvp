@@ -7,6 +7,7 @@ import { UserMenu } from "@/components/navigation/user-menu";
 import { LanguageSwitcher } from "@/components/navigation/language-switcher";
 import { TrialBannerWrapper } from "@/components/admin/trial-banner";
 import { ExpiredOverlay } from "@/components/subscription/expired-overlay";
+import { UpgradeModalTrigger } from "@/components/subscription/upgrade-modal-trigger";
 import { prisma } from "@/lib/prisma";
 import { getTrialStatus } from "@/lib/subscription/trial";
 import { getUserSubscription } from "@/lib/subscription/limits";
@@ -93,18 +94,20 @@ export default async function AdminLayout({
   const blockedStatuses: SubscriptionStatus[] = ["TRIAL_EXPIRED", "PAST_DUE", "CANCELLED"];
   const isBlocked = trialStatus?.status && blockedStatuses.includes(trialStatus.status as SubscriptionStatus);
 
+  // Fetch owner company count (needed for both blocked and non-blocked cases for upgrade modal)
+  const ownerCompanyCount = ownerMembership
+    ? await prisma.companyMembership.count({
+        where: { userId: ownerMembership.userId, role: "OWNER" },
+      })
+    : 1;
+
   // If blocked, show the expired overlay
   if (isBlocked) {
-    const [superAdmin, ownerCompanyCount, pendingUpgrade] = await Promise.all([
+    const [superAdmin, pendingUpgrade] = await Promise.all([
       prisma.user.findFirst({
         where: { role: "SUPER_ADMIN" },
         select: { email: true },
       }),
-      ownerMembership
-        ? prisma.companyMembership.count({
-            where: { userId: ownerMembership.userId, role: "OWNER" },
-          })
-        : Promise.resolve(1),
       ownerMembership
         ? prisma.upgradeRequest.findFirst({
             where: { userId: ownerMembership.userId, status: "PENDING" },
@@ -180,6 +183,13 @@ export default async function AdminLayout({
           <AdminMainContent>{children}</AdminMainContent>
         </div>
       </div>
+      {/* Upgrade modal trigger for openUpgrade query param */}
+      <UpgradeModalTrigger
+        currentTier={subscription?.plan.tier}
+        hasChatbot={subscription?.hasChatbot ?? false}
+        primaryColor={company.primaryColor}
+        currentCompanyCount={ownerCompanyCount}
+      />
     </SidebarProvider>
   );
 }

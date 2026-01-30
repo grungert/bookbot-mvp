@@ -56,7 +56,7 @@ function VerifyEmailContent() {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-white/20 dark:border-gray-700/30 shadow-xl">
       <CardHeader className="text-center">
         <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
           <Mail className="w-6 h-6 text-primary" />
@@ -113,10 +113,8 @@ function VerifyEmailLoading() {
 
 export default function VerifyEmailPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-      <Suspense fallback={<VerifyEmailLoading />}>
-        <VerifyEmailContent />
-      </Suspense>
-    </div>
+    <Suspense fallback={<VerifyEmailLoading />}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

@@ -115,7 +115,7 @@ function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-white/20 dark:border-gray-700/30 shadow-xl">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">{t("login")}</CardTitle>
         <CardDescription>
@@ -188,8 +188,8 @@ function LoginForm() {
         </form>
 
         <div className="relative my-6">
-          <Separator />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+          <Separator className="bg-border/50" />
+          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/80 dark:bg-gray-900/80 px-2 text-xs text-muted-foreground rounded">
             {t("orContinueWith")}
           </span>
         </div>
@@ -243,10 +243,8 @@ function LoginLoading() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-      <Suspense fallback={<LoginLoading />}>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={<LoginLoading />}>
+      <LoginForm />
+    </Suspense>
   );
 }

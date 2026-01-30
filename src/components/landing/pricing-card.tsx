@@ -4,13 +4,14 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Link } from "@/i18n/routing";
 
 interface PricingOption {
   label: string;
   price: string;
   highlight?: boolean;
 }
+
+type PlanTier = "TRIAL" | "PRO" | "BUSINESS";
 
 interface PricingCardProps {
   name: string;
@@ -23,6 +24,8 @@ interface PricingCardProps {
   delay?: number;
   index?: number;
   pricingOptions?: PricingOption[];
+  planTier: PlanTier;
+  onPlanSelect?: (tier: PlanTier) => void;
 }
 
 // Interpolate between blue (#3b82f6) and purple (#a855f7) based on position
@@ -50,9 +53,15 @@ export function PricingCard({
   delay = 0,
   index = 0,
   pricingOptions,
+  planTier,
+  onPlanSelect,
 }: PricingCardProps) {
   const prefersReducedMotion = useReducedMotion();
   const checkColor = getGradientColor(index);
+
+  const handleClick = () => {
+    onPlanSelect?.(planTier);
+  };
 
   return (
     <motion.div
@@ -196,18 +205,17 @@ export function PricingCard({
           </ul>
 
           {/* CTA Button */}
-          <Link href="/register" className="block">
-            <Button
-              className={cn(
-                "w-full transition-all duration-200 cursor-pointer",
-                !isPopular && "bg-white/50 hover:bg-white/80 text-foreground border border-white/20"
-              )}
-              variant={isPopular ? "gradient" : "outline"}
-              size="lg"
-            >
-              {ctaText}
-            </Button>
-          </Link>
+          <Button
+            onClick={handleClick}
+            className={cn(
+              "w-full transition-all duration-200 cursor-pointer",
+              !isPopular && "bg-white/50 hover:bg-white/80 text-foreground border border-white/20"
+            )}
+            variant={isPopular ? "gradient" : "outline"}
+            size="lg"
+          >
+            {ctaText}
+          </Button>
         </div>
       </motion.div>
     </motion.div>

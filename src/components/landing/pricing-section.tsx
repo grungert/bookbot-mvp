@@ -1,12 +1,26 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useState, useEffect, useRef } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { Coins, MessageCircle, Globe, Smartphone, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
+import { Link } from "@/i18n/routing";
 import { PricingCard } from "./pricing-card";
 import { ScrollReveal } from "./scroll-reveal";
 import type { PublicPlan } from "@/app/api/plans/route";
 import type { PricingConfig, TokenPack } from "@/app/[locale]/page";
+
+type PlanTier = "TRIAL" | "PRO" | "BUSINESS";
+
+interface SubscriptionData {
+  tier: string;
+  status: string;
+  hasChatbot: boolean;
+  companyCount: number;
+}
 
 interface PricingSectionProps {
   plans: PublicPlan[];
@@ -88,6 +102,7 @@ function WhatsAppIntegrationBanner() {
       color: "from-green-500 to-emerald-600",
       bgColor: "bg-green-500/10",
       iconColor: "text-green-500",
+      href: "/features/whatsapp",
     },
     {
       icon: Globe,
@@ -96,6 +111,7 @@ function WhatsAppIntegrationBanner() {
       color: "from-blue-500 to-cyan-600",
       bgColor: "bg-blue-500/10",
       iconColor: "text-blue-500",
+      href: "/features/chatbot",
     },
     {
       icon: Smartphone,
@@ -104,18 +120,13 @@ function WhatsAppIntegrationBanner() {
       color: "from-purple-500 to-pink-600",
       bgColor: "bg-purple-500/10",
       iconColor: "text-purple-500",
+      href: "/features/mobile",
     },
   ];
 
   return (
     <div className="mt-16">
       <ScrollReveal className="text-center mb-10">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 mb-4">
-          <MessageCircle className="h-4 w-4 text-green-500" />
-          <span className="text-sm font-medium text-green-600 dark:text-green-400">
-            Included with AI Chatbot
-          </span>
-        </div>
         <h3
           className="text-2xl md:text-3xl font-bold mb-3"
           style={{
@@ -149,26 +160,28 @@ function WhatsAppIntegrationBanner() {
             whileHover={prefersReducedMotion ? {} : { scale: 1.03, y: -4 }}
             className="group relative"
           >
-            {/* Card */}
-            <div className="relative rounded-2xl p-6 h-full bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg overflow-hidden">
-              {/* Gradient overlay on hover */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${channel.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
+            <Link href={channel.href} className="block h-full">
+              {/* Card */}
+              <div className="relative rounded-2xl p-6 h-full bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-lg overflow-hidden">
+                {/* Gradient overlay on hover */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${channel.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
 
-              {/* Icon */}
-              <div className={`inline-flex p-3 rounded-xl ${channel.bgColor} mb-4`}>
-                <channel.icon className={`h-6 w-6 ${channel.iconColor}`} />
+                {/* Icon */}
+                <div className={`inline-flex p-3 rounded-xl ${channel.bgColor} mb-4`}>
+                  <channel.icon className={`h-6 w-6 ${channel.iconColor}`} />
+                </div>
+
+                {/* Content */}
+                <h4 className="font-semibold text-lg mb-2">{channel.name}</h4>
+                <p className="text-sm text-muted-foreground">{channel.description}</p>
+
+                {/* Arrow indicator */}
+                <div className="mt-4 flex items-center gap-1 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className={channel.iconColor}>Learn more</span>
+                  <ArrowRight className={`h-4 w-4 ${channel.iconColor} group-hover:translate-x-1 transition-transform`} />
+                </div>
               </div>
-
-              {/* Content */}
-              <h4 className="font-semibold text-lg mb-2">{channel.name}</h4>
-              <p className="text-sm text-muted-foreground">{channel.description}</p>
-
-              {/* Arrow indicator */}
-              <div className="mt-4 flex items-center gap-1 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className={channel.iconColor}>Learn more</span>
-                <ArrowRight className={`h-4 w-4 ${channel.iconColor} group-hover:translate-x-1 transition-transform`} />
-              </div>
-            </div>
+            </Link>
           </motion.div>
         ))}
       </div>
@@ -227,7 +240,82 @@ function WhatsAppIntegrationBanner() {
 
 export function PricingSection({ plans, pricing, tokenPacks }: PricingSectionProps) {
   const t = useTranslations("landing");
+  const tUpgrade = useTranslations("upgrade");
   const prefersReducedMotion = useReducedMotion();
+  const router = useRouter();
+  const locale = useLocale();
+  const { data: session, status } = useSession();
+
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const hasProcessedQueryParam = useRef(false);
+
+  // Fetch subscription data when authenticated
+  useEffect(() => {
+    if (status === "authenticated" && session?.user) {
+      fetch("/api/user/subscription")
+        .then((res) => res.json())
+        .then((data) => setSubscriptionData(data))
+        .catch(console.error);
+    }
+  }, [status, session]);
+
+  // Handle post-login redirect with openUpgrade query param
+  // Redirect to admin dashboard with the upgrade modal
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (hasProcessedQueryParam.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const openUpgrade = params.get("openUpgrade");
+
+    if (openUpgrade && status === "authenticated" && session?.user?.memberships?.length) {
+      hasProcessedQueryParam.current = true;
+      // Get the first company slug and redirect to admin with openUpgrade param
+      const companySlug = session.user.memberships[0].companySlug;
+      router.push(`/${locale}/c/${companySlug}/admin?openUpgrade=${openUpgrade}`);
+    }
+  }, [status, session, locale, router]);
+
+  const handlePlanSelect = (tier: PlanTier) => {
+    // Trial plan always goes to register
+    if (tier === "TRIAL") {
+      router.push(`/${locale}/register`);
+      return;
+    }
+
+    // Not logged in -> redirect to login with plan intent
+    if (status !== "authenticated") {
+      const callbackUrl = encodeURIComponent(`/${locale}/?openUpgrade=${tier}`);
+      router.push(`/${locale}/login?plan=${tier}&callbackUrl=${callbackUrl}`);
+      return;
+    }
+
+    // Logged in but no company -> onboarding with plan intent
+    if (!session?.user?.memberships?.length) {
+      router.push(`/${locale}/onboarding?plan=${tier}`);
+      return;
+    }
+
+    // Has company -> redirect to admin with openUpgrade param
+    // Admin will show the appropriate UI (normal + modal, or expired overlay + modal)
+    const currentTier = subscriptionData?.tier || "TRIAL";
+
+    // Already on Business (highest plan)
+    if (currentTier === "BUSINESS") {
+      toast.info(tUpgrade("alreadyHighestPlan"));
+      return;
+    }
+
+    // On PRO, clicking PRO again
+    if (currentTier === "PRO" && tier === "PRO") {
+      toast.info(tUpgrade("alreadyOnPlan"));
+      return;
+    }
+
+    // Redirect to admin with openUpgrade param
+    const companySlug = session.user.memberships[0].companySlug;
+    router.push(`/${locale}/c/${companySlug}/admin?openUpgrade=${tier}`);
+  };
 
   return (
     <section id="pricing" className="py-24">
@@ -302,6 +390,8 @@ export function PricingSection({ plans, pricing, tokenPacks }: PricingSectionPro
                 delay={index * 0.1}
                 index={index}
                 pricingOptions={pricingOptions}
+                planTier={plan.tier as PlanTier}
+                onPlanSelect={handlePlanSelect}
               />
             );
           })}

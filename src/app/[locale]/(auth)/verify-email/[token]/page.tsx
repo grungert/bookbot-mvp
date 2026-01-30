@@ -53,62 +53,58 @@ export default function VerifyEmailTokenPage() {
     verifyEmail();
   }, [token]);
 
+  const cardClassName = "w-full max-w-md bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border-white/20 dark:border-gray-700/30 shadow-xl";
+
   // Loading state
   if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-            </div>
-            <CardTitle className="text-2xl">{t("verifyingEmail")}</CardTitle>
-            <CardDescription>{t("pleaseWait")}</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <Card className={cardClassName}>
+        <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          </div>
+          <CardTitle className="text-2xl">{t("verifyingEmail")}</CardTitle>
+          <CardDescription>{t("pleaseWait")}</CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
   // Success state
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mb-4">
-              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-            </div>
-            <CardTitle className="text-2xl">{t("emailVerified")}</CardTitle>
-            <CardDescription>{t("emailVerifiedDescription")}</CardDescription>
-          </CardHeader>
-          <CardFooter className="flex justify-center">
-            <Link href="/login">
-              <Button>{t("login")}</Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
+      <Card className={cardClassName}>
+        <CardHeader className="text-center">
+          <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mb-4">
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+          </div>
+          <CardTitle className="text-2xl">{t("emailVerified")}</CardTitle>
+          <CardDescription>{t("emailVerifiedDescription")}</CardDescription>
+        </CardHeader>
+        <CardFooter className="flex justify-center">
+          <Link href="/login">
+            <Button>{t("login")}</Button>
+          </Link>
+        </CardFooter>
+      </Card>
     );
   }
 
   // Error state
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/50 px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center mb-4">
-            <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-          </div>
-          <CardTitle className="text-2xl">{t("verificationFailed")}</CardTitle>
-          <CardDescription>{t("verificationFailedDescription")}</CardDescription>
-        </CardHeader>
-        <CardFooter className="flex justify-center gap-2">
-          <Link href="/login">
-            <Button variant="outline">{t("login")}</Button>
-          </Link>
-        </CardFooter>
-      </Card>
-    </div>
+    <Card className={cardClassName}>
+      <CardHeader className="text-center">
+        <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center mb-4">
+          <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+        </div>
+        <CardTitle className="text-2xl">{t("verificationFailed")}</CardTitle>
+        <CardDescription>{t("verificationFailedDescription")}</CardDescription>
+      </CardHeader>
+      <CardFooter className="flex justify-center gap-2">
+        <Link href="/login">
+          <Button variant="outline">{t("login")}</Button>
+        </Link>
+      </CardFooter>
+    </Card>
   );
 }

@@ -40,6 +40,7 @@ interface UpgradeModalProps {
   hasChatbot?: boolean; // Does user already have chatbot addon?
   primaryColor?: string | null;
   currentCompanyCount?: number; // Number of companies user currently has
+  defaultSelectedPlan?: "PRO" | "BUSINESS"; // Pre-select a plan when opening
 }
 
 interface Pricing {
@@ -62,6 +63,7 @@ export function UpgradeModal({
   hasChatbot = false,
   primaryColor,
   currentCompanyCount,
+  defaultSelectedPlan,
 }: UpgradeModalProps) {
   const t = useTranslations("pricing");
   const tUpgrade = useTranslations("upgrade");
@@ -110,7 +112,7 @@ export function UpgradeModal({
       // PRO users start at step 1 to choose their upgrade path
       // Non-PRO users also start at step 1 to choose PRO vs Business
       setStep(1);
-      setSelectedPlan("PRO");
+      setSelectedPlan(defaultSelectedPlan || "PRO");
       setProUpgradeChoice(null);
       setIncludeChatbot(false);
 
@@ -131,7 +133,7 @@ export function UpgradeModal({
       setSubmitted(false);
       setPaymentReference("");
     }
-  }, [open, currentCompanyCount, currentTier]);
+  }, [open, currentCompanyCount, currentTier, defaultSelectedPlan]);
 
   const formatPrice = (cents: number) => `€${(cents / 100).toFixed(2)}`;
 

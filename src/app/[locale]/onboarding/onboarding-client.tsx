@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
@@ -104,6 +104,7 @@ function ScrollingGrid() {
 
 export function OnboardingClient({ canCreateCompany, locale }: OnboardingClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("admin");
   const tLanding = useTranslations("landing");
 
@@ -143,8 +144,15 @@ export function OnboardingClient({ canCreateCompany, locale }: OnboardingClientP
         return;
       }
 
-      // Redirect to the new company's admin page
-      router.push(`/${locale}/c/${data.company.slug}/admin`);
+      // Check if there's a plan intent from pricing page
+      const planIntent = searchParams.get("plan");
+      if (planIntent && (planIntent === "PRO" || planIntent === "BUSINESS")) {
+        // Redirect to home with upgrade modal trigger
+        router.push(`/${locale}/?openUpgrade=${planIntent}`);
+      } else {
+        // Normal redirect to the new company's admin page
+        router.push(`/${locale}/c/${data.company.slug}/admin`);
+      }
     } catch {
       setError("An unexpected error occurred");
     } finally {

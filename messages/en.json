@@ -1249,7 +1249,9 @@
     "requestCancelled": "Upgrade request cancelled",
     "createdOn": "Requested on",
     "approvedEmailSubject": "Subscription Activated",
-    "rejectedEmailSubject": "Upgrade Request Update"
+    "rejectedEmailSubject": "Upgrade Request Update",
+    "alreadyHighestPlan": "You're already on the highest plan",
+    "alreadyOnPlan": "You're already on this plan. You can add extra companies or chatbot from your dashboard."
   },
   "globalAppointments": {
     "title": "All My Appointments",

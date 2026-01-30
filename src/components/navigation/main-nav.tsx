@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
+import { TransitionLink } from "@/i18n/link";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
@@ -42,6 +43,7 @@ const UserMenu = dynamic(
 
 interface MainNavProps {
   variant?: "default" | "transparent";
+  hideAuthButtons?: boolean;
 }
 
 // Memoized nav items to prevent recreation
@@ -58,7 +60,7 @@ const USE_CASES_ITEMS = [
   { href: "/use-cases/consultants", labelKey: "useCasesConsultants", descKey: "useCasesConsultantsDesc", Icon: Briefcase },
 ] as const;
 
-function MainNavInner({ variant = "default" }: MainNavProps) {
+function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavProps) {
   const { data: session, status } = useSession();
   const t = useTranslations("landing");
   const tNav = useTranslations("nav");
@@ -104,9 +106,9 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
     <header className="relative z-10">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/">
+        <TransitionLink href="/">
           <Logo size="lg" showText />
-        </Link>
+        </TransitionLink>
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center gap-1">
@@ -121,7 +123,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
             <DropdownMenuContent align="start" className="w-64">
               {featuresItems.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href} className="flex items-start gap-3 p-3">
+                  <TransitionLink href={item.href} className="flex items-start gap-3 p-3">
                     <item.Icon className="h-5 w-5 mt-0.5 text-blue-500" />
                     <div>
                       <div className="font-medium">{item.label}</div>
@@ -129,7 +131,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                         {item.description}
                       </div>
                     </div>
-                  </Link>
+                  </TransitionLink>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -146,7 +148,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
             <DropdownMenuContent align="start" className="w-64">
               {useCasesItems.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href} className="flex items-start gap-3 p-3">
+                  <TransitionLink href={item.href} className="flex items-start gap-3 p-3">
                     <item.Icon className="h-5 w-5 mt-0.5 text-purple-500" />
                     <div>
                       <div className="font-medium">{item.label}</div>
@@ -154,22 +156,22 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                         {item.description}
                       </div>
                     </div>
-                  </Link>
+                  </TransitionLink>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
           {/* Regular Nav Items */}
-          <Link href="/testimonials">
+          <TransitionLink href="/testimonials">
             <Button variant="ghost">{tNav("testimonials")}</Button>
-          </Link>
+          </TransitionLink>
           <a href="/#pricing">
             <Button variant="ghost">{tNav("pricing")}</Button>
           </a>
-          <Link href="/about">
+          <TransitionLink href="/about">
             <Button variant="ghost">{tNav("about")}</Button>
-          </Link>
+          </TransitionLink>
         </nav>
 
         {/* Desktop Auth Buttons */}
@@ -194,20 +196,13 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
               )}
               <UserMenu showDashboardLink={false} />
             </>
-          ) : (
-            <>
-              <Link href="/login">
-                <Button variant="ghost" className="cursor-pointer">
-                  {t("login")}
-                </Button>
-              </Link>
-              <Link href="/register">
-                <Button variant="gradient" className="cursor-pointer">
-                  {t("getStarted")}
-                </Button>
-              </Link>
-            </>
-          )}
+          ) : !hideAuthButtons ? (
+            <Link href="/login">
+              <Button variant="gradient" className="cursor-pointer">
+                {t("login")}
+              </Button>
+            </Link>
+          ) : null}
         </div>
 
         {/* Mobile Menu */}
@@ -241,7 +236,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                 {featuresOpen && (
                   <div className="pl-4 space-y-2 pb-2">
                     {featuresItems.map((item) => (
-                      <Link
+                      <TransitionLink
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileOpen(false)}
@@ -249,7 +244,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                       >
                         <item.Icon className="h-4 w-4" />
                         {item.label}
-                      </Link>
+                      </TransitionLink>
                     ))}
                   </div>
                 )}
@@ -271,7 +266,7 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                 {useCasesOpen && (
                   <div className="pl-4 space-y-2 pb-2">
                     {useCasesItems.map((item) => (
-                      <Link
+                      <TransitionLink
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileOpen(false)}
@@ -279,20 +274,20 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                       >
                         <item.Icon className="h-4 w-4" />
                         {item.label}
-                      </Link>
+                      </TransitionLink>
                     ))}
                   </div>
                 )}
               </div>
 
               {/* Regular Links */}
-              <Link
+              <TransitionLink
                 href="/testimonials"
                 onClick={() => setMobileOpen(false)}
                 className="py-2 border-b font-medium"
               >
                 {tNav("testimonials")}
-              </Link>
+              </TransitionLink>
               <a
                 href="/#pricing"
                 onClick={() => setMobileOpen(false)}
@@ -300,20 +295,20 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
               >
                 {tNav("pricing")}
               </a>
-              <Link
+              <TransitionLink
                 href="/about"
                 onClick={() => setMobileOpen(false)}
                 className="py-2 border-b font-medium"
               >
                 {tNav("about")}
-              </Link>
-              <Link
+              </TransitionLink>
+              <TransitionLink
                 href="/contact"
                 onClick={() => setMobileOpen(false)}
                 className="py-2 border-b font-medium"
               >
                 {tNav("contact")}
-              </Link>
+              </TransitionLink>
 
               {/* Auth Buttons */}
               <div className="mt-6 space-y-3">
@@ -342,20 +337,13 @@ function MainNavInner({ variant = "default" }: MainNavProps) {
                       </Link>
                     )}
                   </>
-                ) : (
-                  <>
-                    <Link href="/login" onClick={() => setMobileOpen(false)}>
-                      <Button variant="outline" className="w-full">
-                        {t("login")}
-                      </Button>
-                    </Link>
-                    <Link href="/register" onClick={() => setMobileOpen(false)}>
-                      <Button variant="gradient" className="w-full">
-                        {t("getStarted")}
-                      </Button>
-                    </Link>
-                  </>
-                )}
+                ) : !hideAuthButtons ? (
+                  <Link href="/login" onClick={() => setMobileOpen(false)}>
+                    <Button variant="gradient" className="w-full">
+                      {t("login")}
+                    </Button>
+                  </Link>
+                ) : null}
               </div>
             </nav>
           </SheetContent>

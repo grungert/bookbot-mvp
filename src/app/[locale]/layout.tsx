@@ -1,6 +1,7 @@
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { ViewTransitions } from "next-view-transitions";
 import { routing } from "@/i18n/routing";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/providers/session-provider";
@@ -32,11 +33,13 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <SessionProvider>
-      <NextIntlClientProvider messages={messages}>
-        {children}
-        <Toaster />
-      </NextIntlClientProvider>
-    </SessionProvider>
+    <ViewTransitions>
+      <SessionProvider>
+        <NextIntlClientProvider messages={messages}>
+          {children}
+          <Toaster />
+        </NextIntlClientProvider>
+      </SessionProvider>
+    </ViewTransitions>
   );
 }
