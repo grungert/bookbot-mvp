@@ -117,24 +117,10 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="pt-8 border-t border-border/50 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} BookBot. {t("allRightsReserved")}
           </p>
-          <div className="flex items-center gap-6">
-            <Link
-              href="/privacy"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {t("privacy")}
-            </Link>
-            <Link
-              href="/terms"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {t("terms")}
-            </Link>
-          </div>
         </div>
       </div>
     </footer>
