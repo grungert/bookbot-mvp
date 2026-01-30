@@ -1,8 +1,11 @@
-import { setRequestLocale } from "next-intl/server";
+import { setRequestLocale, getTranslations } from "next-intl/server";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { LandingPage } from "@/components/landing/landing-page";
 import { DEFAULT_PRICING } from "@/lib/constants/pricing";
 import type { PublicPlan } from "@/app/api/plans/route";
+import { generatePageMetadata } from "@/lib/seo";
+import type { Locale } from "@/i18n/config";
 
 export interface PricingConfig {
   PRO_BASE: number;
@@ -20,6 +23,18 @@ export interface TokenPack {
 
 interface HomePageProps {
   params: Promise<{ locale: string }>;
+}
+
+export async function generateMetadata({ params }: HomePageProps): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "landing" });
+
+  return generatePageMetadata({
+    title: t("metaTitle"),
+    description: t("metaDescription"),
+    path: "",
+    locale: locale as Locale,
+  });
 }
 
 export default async function HomePage({ params }: HomePageProps) {

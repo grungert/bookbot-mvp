@@ -813,6 +813,8 @@
     }
   },
   "landing": {
+    "metaTitle": "BookBot - Smart Booking Platform",
+    "metaDescription": "All-in-one platform for appointment scheduling, invoicing, and AI-powered customer support. Automate your business operations today.",
     "heroTitle": "Automate Your Business Operations",
     "heroSubtitle": "Smart booking, invoicing & AI support in one platform",
     "startFreeTrial": "Start Free Trial",

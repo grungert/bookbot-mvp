@@ -813,6 +813,8 @@
     }
   },
   "landing": {
+    "metaTitle": "BookBot - Pametna Platforma za Zakazivanje",
+    "metaDescription": "Sve na jednom mestu za zakazivanje termina, fakturisanje i AI podrsku korisnicima. Automatizujte poslovanje danas.",
     "heroTitle": "Automatizujte Poslovanje",
     "heroSubtitle": "Pametno zakazivanje, fakturisanje i AI podrska u jednoj platformi",
     "startFreeTrial": "Pocnite besplatno",
