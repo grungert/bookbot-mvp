@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, Save, Building, CreditCard, RotateCcw, FileText } from "lucide-react";
+import { Loader2, Save, Building, CreditCard, RotateCcw, FileText, Mail } from "lucide-react";
 
 interface SystemSettings {
   BANK_NAME: string;
@@ -15,6 +15,9 @@ interface SystemSettings {
   BANK_BIC: string;
   MAX_DOCUMENT_TOKENS: string;
   MAX_CUSTOM_INSTRUCTIONS_TOKENS: string;
+  SUPPORT_EMAIL: string;
+  PRIVACY_EMAIL: string;
+  LEGAL_EMAIL: string;
 }
 
 const DEFAULT_MAX_DOCUMENT_TOKENS = 1500;
@@ -27,6 +30,9 @@ const DEFAULT_SETTINGS: SystemSettings = {
   BANK_BIC: "",
   MAX_DOCUMENT_TOKENS: String(DEFAULT_MAX_DOCUMENT_TOKENS),
   MAX_CUSTOM_INSTRUCTIONS_TOKENS: String(DEFAULT_MAX_CUSTOM_INSTRUCTIONS_TOKENS),
+  SUPPORT_EMAIL: "",
+  PRIVACY_EMAIL: "",
+  LEGAL_EMAIL: "",
 };
 
 export default function SettingsPage() {
@@ -292,6 +298,66 @@ export default function SettingsPage() {
               </p>
               <p className="text-xs text-muted-foreground">
                 Limit for bot custom instructions. Default: 500 tokens.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Contact Emails */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50 dark:bg-green-950/30">
+              <Mail className="h-5 w-5 text-green-500" />
+            </div>
+            <div>
+              <CardTitle>Contact Emails</CardTitle>
+              <CardDescription>
+                Configure email addresses displayed on public pages
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="supportEmail">Support Email</Label>
+              <Input
+                id="supportEmail"
+                type="email"
+                placeholder="support@bookbot.app"
+                value={settings.SUPPORT_EMAIL}
+                onChange={(e) => handleChange("SUPPORT_EMAIL", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Displayed on the contact page
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="privacyEmail">Privacy Email</Label>
+              <Input
+                id="privacyEmail"
+                type="email"
+                placeholder="privacy@bookbot.app"
+                value={settings.PRIVACY_EMAIL}
+                onChange={(e) => handleChange("PRIVACY_EMAIL", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Displayed on the privacy policy page
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="legalEmail">Legal Email</Label>
+              <Input
+                id="legalEmail"
+                type="email"
+                placeholder="legal@bookbot.app"
+                value={settings.LEGAL_EMAIL}
+                onChange={(e) => handleChange("LEGAL_EMAIL", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Displayed on the terms of service page
               </p>
             </div>
           </div>

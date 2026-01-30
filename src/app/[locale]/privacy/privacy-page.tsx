@@ -4,7 +4,11 @@ import { useTranslations } from "next-intl";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { UseCaseLayout } from "@/components/use-cases";
 
-export function PrivacyPageComponent() {
+interface PrivacyPageProps {
+  privacyEmail: string;
+}
+
+export function PrivacyPageComponent({ privacyEmail }: PrivacyPageProps) {
   const t = useTranslations("legal.privacy");
   const prefersReducedMotion = useReducedMotion();
 
@@ -35,7 +39,7 @@ export function PrivacyPageComponent() {
     { title: t("shareTitle"), content: t("shareText") },
     { title: t("securityTitle"), content: t("securityText") },
     { title: t("rightsTitle"), content: t("rightsText") },
-    { title: t("contactTitle"), content: t("contactText") },
+    { title: t("contactTitle"), content: t("contactText", { email: privacyEmail }) },
   ];
 
   return (

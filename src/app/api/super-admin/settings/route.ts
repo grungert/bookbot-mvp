@@ -16,14 +16,24 @@ const SYSTEM_LIMIT_KEYS = [
   "MAX_CUSTOM_INSTRUCTIONS_TOKENS",
 ];
 
+// Contact email settings keys
+const EMAIL_SETTINGS_KEYS = [
+  "SUPPORT_EMAIL",
+  "PRIVACY_EMAIL",
+  "LEGAL_EMAIL",
+];
+
 // All allowed settings keys
-const ALL_SETTINGS_KEYS = [...BANK_SETTINGS_KEYS, ...SYSTEM_LIMIT_KEYS];
+const ALL_SETTINGS_KEYS = [...BANK_SETTINGS_KEYS, ...SYSTEM_LIMIT_KEYS, ...EMAIL_SETTINGS_KEYS];
 
 // IBAN validation regex - basic format check (2 letters + 2 digits + up to 30 alphanumeric)
 const IBAN_REGEX = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{4,30}$/;
 
 // BIC/SWIFT validation regex (8 or 11 characters: 4 letters bank code, 2 letters country, 2 alphanumeric location, optional 3 alphanumeric branch)
 const BIC_REGEX = /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // GET system settings
 export async function GET() {
@@ -116,6 +126,21 @@ export async function PUT(request: Request) {
       }
       // Store the cleaned version
       settings.BANK_BIC = cleanBic;
+    }
+
+    // Validate email formats if provided
+    for (const emailKey of EMAIL_SETTINGS_KEYS) {
+      if (settings[emailKey] && typeof settings[emailKey] === "string" && settings[emailKey].trim() !== "") {
+        const cleanEmail = settings[emailKey].trim().toLowerCase();
+        if (!EMAIL_REGEX.test(cleanEmail)) {
+          return NextResponse.json(
+            { error: `Invalid email format for ${emailKey.replace("_EMAIL", "").toLowerCase()} email.` },
+            { status: 400 }
+          );
+        }
+        // Store the cleaned version
+        settings[emailKey] = cleanEmail;
+      }
     }
 
     // Update each setting

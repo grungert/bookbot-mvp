@@ -4,7 +4,11 @@ import { useTranslations } from "next-intl";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { UseCaseLayout } from "@/components/use-cases";
 
-export function TermsPageComponent() {
+interface TermsPageProps {
+  legalEmail: string;
+}
+
+export function TermsPageComponent({ legalEmail }: TermsPageProps) {
   const t = useTranslations("legal.terms");
   const prefersReducedMotion = useReducedMotion();
 
@@ -37,7 +41,7 @@ export function TermsPageComponent() {
     { title: t("terminationTitle"), content: t("terminationText") },
     { title: t("limitationTitle"), content: t("limitationText") },
     { title: t("changesTitle"), content: t("changesText") },
-    { title: t("contactTitle"), content: t("contactText") },
+    { title: t("contactTitle"), content: t("contactText", { email: legalEmail }) },
   ];
 
   return (

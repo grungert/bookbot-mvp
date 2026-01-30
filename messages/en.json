@@ -144,6 +144,13 @@
     "terms": "Terms of Service",
     "allRightsReserved": "All rights reserved."
   },
+  "cookieConsent": {
+    "title": "We use cookies",
+    "description": "We use cookies to enhance your browsing experience, analyze site traffic, and personalize content. By clicking \"Accept\", you consent to our use of cookies.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "learnMore": "Learn more"
+  },
   "calendar": {
     "week": "Week",
     "month": "Month",
@@ -1897,7 +1904,7 @@
       "rightsTitle": "Your Rights",
       "rightsText": "You have the right to access, correct, or delete your personal data. You can manage your preferences in your account settings or contact us for assistance.",
       "contactTitle": "Contact Us",
-      "contactText": "If you have questions about this privacy policy, please contact us at privacy@bookbot.app."
+      "contactText": "If you have questions about this privacy policy, please contact us at {email}."
     },
     "terms": {
       "metaTitle": "Terms of Service - BookBot",
@@ -1921,7 +1928,7 @@
       "changesTitle": "Changes to Terms",
       "changesText": "We reserve the right to modify these terms at any time. We will notify users of significant changes via email or through the platform.",
       "contactTitle": "Contact",
-      "contactText": "For questions about these terms, please contact us at legal@bookbot.app."
+      "contactText": "For questions about these terms, please contact us at {email}."
     }
   }
 }

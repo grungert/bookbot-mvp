@@ -10,7 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Mail, Clock, MessageSquare, Calendar, CheckCircle } from "lucide-react";
 import { UseCaseLayout } from "@/components/use-cases";
 
-export function ContactPageComponent() {
+interface ContactPageProps {
+  supportEmail: string;
+}
+
+export function ContactPageComponent({ supportEmail }: ContactPageProps) {
   const t = useTranslations("contactPage");
   const prefersReducedMotion = useReducedMotion();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,7 +53,7 @@ export function ContactPageComponent() {
     {
       icon: Mail,
       title: t("emailTitle"),
-      value: t("emailValue"),
+      value: supportEmail,
     },
     {
       icon: Clock,

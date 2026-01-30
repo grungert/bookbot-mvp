@@ -1,6 +1,7 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { PrivacyPageComponent } from "./privacy-page";
+import { getEmailSettings } from "@/lib/settings/emails";
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -20,5 +21,7 @@ export default async function PrivacyPage({ params }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <PrivacyPageComponent />;
+  const emails = await getEmailSettings();
+
+  return <PrivacyPageComponent privacyEmail={emails.privacy} />;
 }

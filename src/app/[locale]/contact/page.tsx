@@ -1,6 +1,7 @@
 import { setRequestLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { ContactPageComponent } from "./contact-page";
+import { getEmailSettings } from "@/lib/settings/emails";
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -20,5 +21,7 @@ export default async function ContactPage({ params }: PageProps) {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return <ContactPageComponent />;
+  const emails = await getEmailSettings();
+
+  return <ContactPageComponent supportEmail={emails.support} />;
 }

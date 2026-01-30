@@ -144,6 +144,13 @@
     "terms": "Uslovi Korišćenja",
     "allRightsReserved": "Sva prava zadržana."
   },
+  "cookieConsent": {
+    "title": "Koristimo kolačiće",
+    "description": "Koristimo kolačiće da poboljšamo vaše iskustvo pretraživanja, analiziramo posećenost sajta i personalizujemo sadržaj. Klikom na \"Prihvati\" pristajete na korišćenje kolačića.",
+    "accept": "Prihvati",
+    "decline": "Odbij",
+    "learnMore": "Saznaj više"
+  },
   "calendar": {
     "week": "Nedelja",
     "month": "Mesec",
@@ -1897,7 +1904,7 @@
       "rightsTitle": "Vaša Prava",
       "rightsText": "Imate pravo da pristupite, ispravite ili obrišete vaše lične podatke. Možete upravljati svojim preferencama u podešavanjima naloga ili nas kontaktirati za pomoć.",
       "contactTitle": "Kontaktirajte Nas",
-      "contactText": "Ako imate pitanja o ovoj politici privatnosti, molimo kontaktirajte nas na privacy@bookbot.app."
+      "contactText": "Ako imate pitanja o ovoj politici privatnosti, molimo kontaktirajte nas na {email}."
     },
     "terms": {
       "metaTitle": "Uslovi Korišćenja - BookBot",
@@ -1921,7 +1928,7 @@
       "changesTitle": "Promene Uslova",
       "changesText": "Zadržavamo pravo da izmenimo ove uslove u bilo kom trenutku. Obavestićemo korisnike o značajnim promenama putem emaila ili kroz platformu.",
       "contactTitle": "Kontakt",
-      "contactText": "Za pitanja o ovim uslovima, molimo kontaktirajte nas na legal@bookbot.app."
+      "contactText": "Za pitanja o ovim uslovima, molimo kontaktirajte nas na {email}."
     }
   }
 }
