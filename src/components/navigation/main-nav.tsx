@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, memo } from "react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { TransitionLink } from "@/i18n/link";
 import dynamic from "next/dynamic";
@@ -64,6 +64,7 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
   const { data: session, status } = useSession();
   const t = useTranslations("landing");
   const tNav = useTranslations("nav");
+  const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
@@ -166,7 +167,7 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
           <TransitionLink href="/testimonials">
             <Button variant="ghost">{tNav("testimonials")}</Button>
           </TransitionLink>
-          <a href="/#pricing">
+          <a href={`/${locale}/#pricing`}>
             <Button variant="ghost">{tNav("pricing")}</Button>
           </a>
           <TransitionLink href="/about">
@@ -289,7 +290,7 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
                 {tNav("testimonials")}
               </TransitionLink>
               <a
-                href="/#pricing"
+                href={`/${locale}/#pricing`}
                 onClick={() => setMobileOpen(false)}
                 className="py-2 border-b font-medium"
               >

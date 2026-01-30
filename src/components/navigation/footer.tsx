@@ -1,11 +1,12 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { Logo } from "@/components/ui/logo";
 
 export function Footer() {
   const t = useTranslations("footer");
+  const locale = useLocale();
 
   const quickLinks = [
     { href: "/features/chatbot", label: t("chatbot") },
@@ -87,12 +88,21 @@ export function Footer() {
             <ul className="space-y-2">
               {company.map((link) => (
                 <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
+                  {link.href.startsWith("/#") ? (
+                    <a
+                      href={`/${locale}${link.href}`}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  ) : (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
