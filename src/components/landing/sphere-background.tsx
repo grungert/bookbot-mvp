@@ -11,8 +11,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 // Base settings configuration
 const createSettings = (isMobile: boolean) => ({
   // population
-  baseCount: 50,
-  maxCount: isMobile ? 50 : 140, // max spheres at full scroll (no spawning on mobile)
+  baseCount: isMobile ? 30 : 40,
+  maxCount: isMobile ? 30 : 80, // max spheres at full scroll (reduced for performance)
   minSize: 0.55,
   maxSize: 1.55,
 
@@ -169,7 +169,9 @@ export function SphereBackground() {
       alpha: true,
       powerPreference: "high-performance",
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Limit pixel ratio for performance (1.5 is sufficient for most displays)
+    const pixelRatio = Math.min(window.devicePixelRatio, isMobile ? 1 : 1.5);
+    renderer.setPixelRatio(pixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = settings.exposure;
@@ -238,8 +240,8 @@ export function SphereBackground() {
     finalComposer.addPass(renderScene);
     finalComposer.addPass(finalPass);
 
-    // Sphere geometry
-    const sphereGeo = new THREE.SphereGeometry(0.55, 40, 28);
+    // Sphere geometry (reduced segments for better performance)
+    const sphereGeo = new THREE.SphereGeometry(0.55, 24, 16);
 
     // Leader sphere with emissive material
     const leaderMaterial = new THREE.MeshPhysicalMaterial({
@@ -551,11 +553,12 @@ export function SphereBackground() {
         fi.mesh.rotation.x += dt * 0.16;
       }
 
-      // Sphere-to-sphere collision with bounce
-      for (let i = 0; i < followers.length; i++) {
-        for (let j = i + 1; j < followers.length; j++) {
-          const a = followers[i];
-          const b = followers[j];
+      // Sphere-to-sphere collision with bounce (only run every other frame for performance)
+      if (frameCount % 2 === 0) {
+        for (let i = 0; i < followers.length; i++) {
+          for (let j = i + 1; j < followers.length; j++) {
+            const a = followers[i];
+            const b = followers[j];
 
           const radiusA = 0.55 * a.mesh.scale.x;
           const radiusB = 0.55 * b.mesh.scale.x;
@@ -584,17 +587,17 @@ export function SphereBackground() {
             }
           }
         }
+        }
       }
     }
 
     // Dynamic color tinting
-    let colorUpdateFrame = 0;
     const leaderLightCol = new THREE.Color();
     const tintedColor = new THREE.Color();
 
     function updateFollowerColors() {
-      colorUpdateFrame++;
-      if (colorUpdateFrame % 3 !== 0) return;
+      // Only update colors every 6 frames for performance
+      if (frameCount % 6 !== 0) return;
       if (settings.leaderColorInfluence <= 0) return;
 
       leaderLightCol.copy(leaderLight.color);
@@ -617,9 +620,25 @@ export function SphereBackground() {
     // Animation
     const clock = new THREE.Clock();
     let animationId: number;
+    let isDocumentVisible = true;
+    let frameCount = 0;
+
+    // Pause animation when tab is not visible
+    const onVisibilityChange = () => {
+      isDocumentVisible = !document.hidden;
+      if (isDocumentVisible) {
+        clock.getDelta(); // Reset delta to avoid huge time jump
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     function animate() {
       animationId = requestAnimationFrame(animate);
+
+      // Skip rendering when tab is hidden
+      if (!isDocumentVisible) return;
+
+      frameCount++;
       const dt = Math.min(clock.getDelta(), 0.033);
 
       updateFollowPlane();
@@ -675,6 +694,7 @@ export function SphereBackground() {
       window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
 
       // Dispose Three.js resources
       sphereGeo.dispose();

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
-import { UserMenu } from "@/components/navigation/user-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,11 +34,31 @@ import {
   Briefcase,
 } from "lucide-react";
 
+// Lazy load UserMenu to reduce initial bundle
+const UserMenu = dynamic(
+  () => import("@/components/navigation/user-menu").then((mod) => mod.UserMenu),
+  { ssr: false }
+);
+
 interface MainNavProps {
   variant?: "default" | "transparent";
 }
 
-export function MainNav({ variant = "default" }: MainNavProps) {
+// Memoized nav items to prevent recreation
+const FEATURES_ITEMS = [
+  { href: "/features/chatbot", labelKey: "featuresChatbot", descKey: "featuresChatbotDesc", Icon: MessageSquare },
+  { href: "/features/whatsapp", labelKey: "featuresWhatsapp", descKey: "featuresWhatsappDesc", Icon: MessageCircle },
+  { href: "/features/mobile", labelKey: "featuresMobile", descKey: "featuresMobileDesc", Icon: Smartphone },
+] as const;
+
+const USE_CASES_ITEMS = [
+  { href: "/use-cases/salons", labelKey: "useCasesSalons", descKey: "useCasesSalonsDesc", Icon: Scissors },
+  { href: "/use-cases/clinics", labelKey: "useCasesClinics", descKey: "useCasesClinicsDesc", Icon: Stethoscope },
+  { href: "/use-cases/fitness", labelKey: "useCasesFitness", descKey: "useCasesFitnessDesc", Icon: Dumbbell },
+  { href: "/use-cases/consultants", labelKey: "useCasesConsultants", descKey: "useCasesConsultantsDesc", Icon: Briefcase },
+] as const;
+
+function MainNavInner({ variant = "default" }: MainNavProps) {
   const { data: session, status } = useSession();
   const t = useTranslations("landing");
   const tNav = useTranslations("nav");
@@ -53,53 +73,32 @@ export function MainNav({ variant = "default" }: MainNavProps) {
 
   const isLoggedIn = mounted && status === "authenticated" && session?.user;
 
-  const featuresItems = [
-    {
-      href: "/features/chatbot",
-      label: tNav("featuresChatbot"),
-      icon: MessageSquare,
-      description: tNav("featuresChatbotDesc"),
-    },
-    {
-      href: "/features/whatsapp",
-      label: tNav("featuresWhatsapp"),
-      icon: MessageCircle,
-      description: tNav("featuresWhatsappDesc"),
-    },
-    {
-      href: "/features/mobile",
-      label: tNav("featuresMobile"),
-      icon: Smartphone,
-      description: tNav("featuresMobileDesc"),
-    },
-  ];
+  // Memoize translated items
+  const featuresItems = useMemo(() =>
+    FEATURES_ITEMS.map(item => ({
+      href: item.href,
+      label: tNav(item.labelKey),
+      description: tNav(item.descKey),
+      Icon: item.Icon,
+    })), [tNav]
+  );
 
-  const useCasesItems = [
-    {
-      href: "/use-cases/salons",
-      label: tNav("useCasesSalons"),
-      icon: Scissors,
-      description: tNav("useCasesSalonsDesc"),
-    },
-    {
-      href: "/use-cases/clinics",
-      label: tNav("useCasesClinics"),
-      icon: Stethoscope,
-      description: tNav("useCasesClinicsDesc"),
-    },
-    {
-      href: "/use-cases/fitness",
-      label: tNav("useCasesFitness"),
-      icon: Dumbbell,
-      description: tNav("useCasesFitnessDesc"),
-    },
-    {
-      href: "/use-cases/consultants",
-      label: tNav("useCasesConsultants"),
-      icon: Briefcase,
-      description: tNav("useCasesConsultantsDesc"),
-    },
-  ];
+  const useCasesItems = useMemo(() =>
+    USE_CASES_ITEMS.map(item => ({
+      href: item.href,
+      label: tNav(item.labelKey),
+      description: tNav(item.descKey),
+      Icon: item.Icon,
+    })), [tNav]
+  );
+
+  // Memoize dashboard href
+  const dashboardHref = useMemo(() => {
+    if (!session?.user) return "/onboarding";
+    return session.user.memberships?.[0]?.companySlug
+      ? `/c/${session.user.memberships[0].companySlug}/admin`
+      : "/onboarding";
+  }, [session?.user]);
 
   return (
     <header className="relative z-10">
@@ -123,7 +122,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
               {featuresItems.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
                   <Link href={item.href} className="flex items-start gap-3 p-3">
-                    <item.icon className="h-5 w-5 mt-0.5 text-blue-500" />
+                    <item.Icon className="h-5 w-5 mt-0.5 text-blue-500" />
                     <div>
                       <div className="font-medium">{item.label}</div>
                       <div className="text-xs text-muted-foreground">
@@ -148,7 +147,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
               {useCasesItems.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
                   <Link href={item.href} className="flex items-start gap-3 p-3">
-                    <item.icon className="h-5 w-5 mt-0.5 text-purple-500" />
+                    <item.Icon className="h-5 w-5 mt-0.5 text-purple-500" />
                     <div>
                       <div className="font-medium">{item.label}</div>
                       <div className="text-xs text-muted-foreground">
@@ -186,13 +185,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
                 </Link>
               )}
               {session.user.role !== "SUPER_ADMIN" && (
-                <Link
-                  href={
-                    session.user.memberships?.[0]?.companySlug
-                      ? `/c/${session.user.memberships[0].companySlug}/admin`
-                      : "/onboarding"
-                  }
-                >
+                <Link href={dashboardHref}>
                   <Button variant="ghost" className="cursor-pointer">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     {tNav("dashboard")}
@@ -254,7 +247,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center gap-3 py-2 text-muted-foreground hover:text-foreground"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.Icon className="h-4 w-4" />
                         {item.label}
                       </Link>
                     ))}
@@ -284,7 +277,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
                         onClick={() => setMobileOpen(false)}
                         className="flex items-center gap-3 py-2 text-muted-foreground hover:text-foreground"
                       >
-                        <item.icon className="h-4 w-4" />
+                        <item.Icon className="h-4 w-4" />
                         {item.label}
                       </Link>
                     ))}
@@ -339,11 +332,7 @@ export function MainNav({ variant = "default" }: MainNavProps) {
                     )}
                     {session.user.role !== "SUPER_ADMIN" && (
                       <Link
-                        href={
-                          session.user.memberships?.[0]?.companySlug
-                            ? `/c/${session.user.memberships[0].companySlug}/admin`
-                            : "/onboarding"
-                        }
+                        href={dashboardHref}
                         onClick={() => setMobileOpen(false)}
                       >
                         <Button variant="outline" className="w-full">
@@ -375,3 +364,6 @@ export function MainNav({ variant = "default" }: MainNavProps) {
     </header>
   );
 }
+
+// Memoize the entire component to prevent unnecessary re-renders
+export const MainNav = memo(MainNavInner);
