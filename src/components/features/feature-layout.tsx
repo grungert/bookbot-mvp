@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Logo } from "@/components/ui/logo";
 import { MainNav } from "@/components/navigation/main-nav";
+import { Footer } from "@/components/navigation/footer";
 
 // Lazy load sphere background
 const SphereBackground = dynamic(
@@ -58,22 +58,6 @@ function ScrollingGrid() {
   );
 }
 
-// Footer component
-function FeatureFooter() {
-  return (
-    <footer className="border-t bg-background/80 backdrop-blur-sm relative z-10">
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex flex-col items-center gap-6">
-          <Logo size="xxl" showText />
-          <p className="text-muted-foreground text-sm">
-            &copy; {new Date().getFullYear()} BookBot. All rights reserved.
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 interface FeatureLayoutProps {
   children: React.ReactNode;
 }
@@ -98,7 +82,7 @@ export function FeatureLayout({ children }: FeatureLayoutProps) {
       </div>
 
       {/* Footer */}
-      <FeatureFooter />
+      <Footer />
     </main>
   );
 }

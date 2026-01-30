@@ -123,6 +123,27 @@
     "about": "About",
     "contact": "Contact"
   },
+  "footer": {
+    "description": "AI-powered booking system for service businesses.",
+    "features": "Features",
+    "chatbot": "AI Chatbot",
+    "whatsapp": "WhatsApp Integration",
+    "mobile": "Mobile Experience",
+    "useCases": "Use Cases",
+    "salons": "Hair & Beauty Salons",
+    "clinics": "Medical Clinics",
+    "fitness": "Gyms & Fitness",
+    "consultants": "Consultants",
+    "company": "Company",
+    "about": "About Us",
+    "testimonials": "Testimonials",
+    "contact": "Contact",
+    "pricing": "Pricing",
+    "legal": "Legal",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "allRightsReserved": "All rights reserved."
+  },
   "calendar": {
     "week": "Week",
     "month": "Month",

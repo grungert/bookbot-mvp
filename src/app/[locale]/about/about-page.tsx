@@ -88,7 +88,7 @@ export function AboutPageComponent() {
       <section className="py-24">
         <div className="container mx-auto px-4">
           <motion.div
-            className="max-w-3xl mx-auto"
+            className="max-w-3xl mx-auto p-8 md:p-12 rounded-2xl bg-white/60 dark:bg-gray-900/60 backdrop-blur-md border border-white/20 dark:border-gray-700/30 shadow-xl"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-100px" }}

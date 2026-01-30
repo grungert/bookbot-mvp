@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Logo } from "@/components/ui/logo";
 import { HeroSection } from "./hero-section";
+import { Footer } from "@/components/navigation/footer";
 import { HowItWorksSection } from "./how-it-works-section";
 import { FeaturesSection } from "./features-section";
 import { UseCasesSection } from "./use-cases-section";
@@ -95,16 +95,7 @@ export function LandingPage({ plans, pricing, tokenPacks }: LandingPageProps) {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-background/80 backdrop-blur-sm relative z-10">
-        <div className="container mx-auto px-4 py-12">
-          <div className="flex flex-col items-center gap-6">
-            <Logo size="xxl" showText />
-            <p className="text-muted-foreground text-sm">
-              &copy; {new Date().getFullYear()} BookBot. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }
