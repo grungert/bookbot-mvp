@@ -136,7 +136,15 @@ trackPageView("/some/page");
 2. Restart your dev server: `npm run dev`
 3. Open your site and accept cookies
 4. Open browser DevTools → Network tab
-5. Filter by "google" - you should see requests to `googletagmanager.com`
+5. Filter by `collect` or your Measurement ID - you should see requests with **status 204** (success)
+
+> **Note:** Google's "Test" button in the GA4 setup wizard doesn't work well with localhost. Use the methods below instead.
+
+### Use GA4 Realtime Report (Recommended)
+
+1. Go to GA4 → Reports → **Realtime**
+2. Visit your localhost site
+3. You should see yourself as an active user within seconds
 
 ### Use GA4 DebugView
 
@@ -144,6 +152,12 @@ trackPageView("/some/page");
 2. Enable the extension
 3. Go to GA4 → Admin → DebugView
 4. Browse your site - events appear in real-time
+
+### Testing Tips
+
+- **Use incognito mode** if ad blockers are interfering
+- GA4 works on localhost - the Measurement ID doesn't care about the domain
+- Standard reports can take 24-48 hours to populate; use Realtime for instant verification
 
 ## Privacy Considerations
 
