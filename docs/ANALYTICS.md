@@ -38,9 +38,13 @@ NEXT_PUBLIC_GA_MEASUREMENT_ID="G-XXXXXXXXXX"
 ### Step 4: Set Up Data Stream
 
 1. Select **Web** as your platform
-2. Enter your **Website URL** (e.g., `https://yourdomain.com`)
+2. Enter your **Website URL**:
+   - **Production:** `https://yourdomain.com`
+   - **Local testing:** `http://localhost:3000` (GA4 accepts localhost)
 3. Enter a **Stream name** (e.g., "BookBot Website")
 4. Click **Create stream**
+
+> **Tip:** You can use the same Measurement ID for both local and production. GA4 will track both, and you can filter by hostname in reports if needed. Alternatively, create separate streams for dev/production.
 
 ### Step 5: Get Your Measurement ID
 
