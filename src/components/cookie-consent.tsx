@@ -30,12 +30,15 @@ export function CookieConsent() {
     localStorage.setItem(COOKIE_CONSENT_KEY, "accepted");
     setConsentStatus("accepted");
     setIsVisible(false);
+    // Dispatch event for Google Analytics to pick up
+    window.dispatchEvent(new CustomEvent("cookieConsentChange", { detail: "accepted" }));
   };
 
   const handleDecline = () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, "declined");
     setConsentStatus("declined");
     setIsVisible(false);
+    window.dispatchEvent(new CustomEvent("cookieConsentChange", { detail: "declined" }));
   };
 
   // Don't render if consent already given or not ready to show
