@@ -226,6 +226,33 @@ export default function robots(): MetadataRoute.Robots {
 }
 ```
 
+### Super Admin SEO Settings
+
+Currently, SEO settings are managed in code (`src/lib/seo.ts`). For most use cases, this is sufficient since these values rarely change. However, if marketing needs to frequently update SEO settings without deployments, consider adding a Super Admin interface:
+
+**Proposed UI:** Super Admin → Settings → SEO
+
+| Setting | Description |
+|---------|-------------|
+| Site name | Brand name shown in titles and structured data |
+| Default description | Fallback meta description |
+| Twitter handle | @username for Twitter cards |
+| Default OG image | Upload custom social sharing image |
+| Google site verification | Verification meta tag code |
+
+**Implementation notes:**
+- Store settings in database (new `SeoSettings` model)
+- Load settings server-side in `src/lib/seo.ts`
+- Cache aggressively (settings change infrequently)
+- Provide "Reset to defaults" option
+
+**When to implement:**
+- Multiple non-technical users need to update SEO
+- Frequent A/B testing of titles/descriptions
+- Managing SEO across multiple brands/domains
+
+For MVP, the current code-based approach is recommended.
+
 ## Translations
 
 SEO metadata is translated using next-intl. Each page namespace should include:
