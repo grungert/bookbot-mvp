@@ -5,6 +5,7 @@ import { ViewTransitions } from "next-view-transitions";
 import { routing } from "@/i18n/routing";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "@/components/providers/session-provider";
+import { CookieConsent } from "@/components/cookie-consent";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -38,6 +39,7 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           {children}
           <Toaster />
+          <CookieConsent />
         </NextIntlClientProvider>
       </SessionProvider>
     </ViewTransitions>
