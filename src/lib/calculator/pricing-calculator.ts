@@ -29,6 +29,10 @@ export interface SimulationParams {
   avgTokensPerDoc: number;
   embeddingCostPer1M: number;  // USD per 1M tokens for embeddings
 
+  // First message overhead (system prompt tokens)
+  firstMessageOverheadTokens: number;  // System prompt tokens for first message
+  avgMessagesPerConversation: number;  // Average messages per conversation (to calculate conversations/month)
+
   // Growth & churn
   monthlyGrowthRate: number;   // % (0-100)
   monthlyChurnRate: number;    // % (0-100)
@@ -39,6 +43,12 @@ export interface SimulationParams {
   supportHoursPer100: number;  // Hours per 100 customers
   supportHourlyRate: number;   // USD per hour
   paymentFeePercent: number;   // % (e.g., 2.9)
+
+  // Business tier multipliers
+  businessLlmMultiplier: number;        // Multiplier for LLM usage (default: 1.5)
+  businessInfraMultiplier: number;      // Multiplier for infra cost (default: 1.2)
+  businessSupportMultiplier: number;    // Multiplier for support cost (default: 0.8)
+  businessCompaniesMultiplier: number;  // Multiplier for companies/embedding (default: 3)
 
   // LLM pricing (USD per 1M tokens)
   selectedModelId: string;
@@ -62,6 +72,7 @@ export interface MonthlyProjection {
   llmCosts: number;
   infraCosts: number;
   supportCosts: number;
+  embeddingCosts: number;
   paymentFees: number;
   totalCosts: number;
   profit: number;
@@ -128,6 +139,10 @@ export interface CalculationResults {
   costPerMessage: number;
   tokensPerMessage: number;
   llmCostPerUserMonth: number;
+
+  // First message overhead
+  firstMessageOverheadCost: number;  // Monthly cost of system prompt overhead per user
+  conversationsPerMonth: number;     // Estimated conversations per user per month
 }
 
 // EUR/USD exchange rate (configurable)
@@ -154,8 +169,18 @@ export function calculatePricing(params: SimulationParams): CalculationResults {
     (params.avgInputTokens / 1_000_000 * params.inputPricePer1M) +
     ((params.avgOutputTokens + params.toolCallsPerMessage * params.tokensPerToolCall) / 1_000_000 * params.outputPricePer1M);
 
-  // Monthly LLM cost per chatbot user
-  const llmCostPerUserMonth = costPerMessage * params.avgMessagesPerMonth;
+  // First message overhead calculation
+  // Each conversation starts with a system prompt that adds significant token cost
+  const conversationsPerMonth = params.avgMessagesPerConversation > 0
+    ? params.avgMessagesPerMonth / params.avgMessagesPerConversation
+    : params.avgMessagesPerMonth / 5; // Default to 5 messages per conversation
+
+  const firstMessageOverheadCost =
+    (params.firstMessageOverheadTokens / 1_000_000) * params.inputPricePer1M * conversationsPerMonth;
+
+  // Monthly LLM cost per chatbot user (including first message overhead)
+  const baseLlmCost = costPerMessage * params.avgMessagesPerMonth;
+  const llmCostPerUserMonth = baseLlmCost + firstMessageOverheadCost;
 
   // Embedding cost per company (one-time amortized over months - assume refreshed monthly)
   const embeddingCostPerCompany =
@@ -184,10 +209,10 @@ export function calculatePricing(params: SimulationParams): CalculationResults {
       embedding: embeddingCostPerCompany * (1 + params.avgExtraCompaniesProUser),
     },
     business: {
-      llm: llmCostPerUserMonth * 1.5, // Business users use more (assumption)
-      infra: infraCostPerCustomer * 1.2, // Slightly higher infra
-      support: supportCostPerCustomer * 0.8, // Less support (self-serve)
-      embedding: embeddingCostPerCompany * 3, // More companies
+      llm: llmCostPerUserMonth * params.businessLlmMultiplier,
+      infra: infraCostPerCustomer * params.businessInfraMultiplier,
+      support: supportCostPerCustomer * params.businessSupportMultiplier,
+      embedding: embeddingCostPerCompany * params.businessCompaniesMultiplier,
     },
   };
 
@@ -276,11 +301,15 @@ export function calculatePricing(params: SimulationParams): CalculationResults {
 
     // Calculate costs
     const llmCosts = (monthProChatbotCustomers * llmCostPerUserMonth) +
-      (monthBusinessCustomers * llmCostPerUserMonth * 1.5);
+      (monthBusinessCustomers * llmCostPerUserMonth * params.businessLlmMultiplier);
     const infraCosts = currentCustomers > 0 ? params.infraMonthlyCost : 0;
     const supportCosts = currentCustomers * supportCostPerCustomer;
+    // Embedding costs: Pro chatbot users with their extra companies + Business users with more companies
+    const embeddingCosts =
+      (monthProChatbotCustomers * embeddingCostPerCompany * (1 + params.avgExtraCompaniesProUser)) +
+      (monthBusinessCustomers * embeddingCostPerCompany * params.businessCompaniesMultiplier);
     const paymentFees = totalRevenueUSD * (params.paymentFeePercent / 100);
-    const totalCosts = llmCosts + infraCosts + supportCosts + paymentFees;
+    const totalCosts = llmCosts + infraCosts + supportCosts + embeddingCosts + paymentFees;
 
     const profit = totalRevenueUSD - totalCosts;
     cumulativeProfit += profit;
@@ -295,6 +324,7 @@ export function calculatePricing(params: SimulationParams): CalculationResults {
       llmCosts,
       infraCosts,
       supportCosts,
+      embeddingCosts,
       paymentFees,
       totalCosts,
       profit,
@@ -352,6 +382,10 @@ export function calculatePricing(params: SimulationParams): CalculationResults {
     costPerMessage,
     tokensPerMessage,
     llmCostPerUserMonth,
+
+    // First message overhead
+    firstMessageOverheadCost,
+    conversationsPerMonth,
   };
 }
 
@@ -379,6 +413,10 @@ export function getDefaultParams(): SimulationParams {
     avgTokensPerDoc: 1000,
     embeddingCostPer1M: 0.02,
 
+    // First message overhead
+    firstMessageOverheadTokens: 1500, // System prompt tokens (base + docs + services)
+    avgMessagesPerConversation: 5,    // Average messages per conversation
+
     // Growth & churn
     monthlyGrowthRate: 5,
     monthlyChurnRate: 3,
@@ -389,6 +427,12 @@ export function getDefaultParams(): SimulationParams {
     supportHoursPer100: 5,
     supportHourlyRate: 15,
     paymentFeePercent: 2.9,
+
+    // Business tier multipliers
+    businessLlmMultiplier: 1.5,
+    businessInfraMultiplier: 1.2,
+    businessSupportMultiplier: 0.8,
+    businessCompaniesMultiplier: 3,
 
     // LLM pricing (GPT-4o defaults)
     selectedModelId: "",

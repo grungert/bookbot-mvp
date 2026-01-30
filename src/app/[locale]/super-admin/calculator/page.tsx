@@ -39,6 +39,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit,
+  Database,
 } from "lucide-react";
 import {
   AreaChart,
@@ -82,6 +83,30 @@ interface PricingScenario {
   results: CalculationResults;
   createdAt: string;
   updatedAt: string;
+}
+
+interface UsageStats {
+  avgInputTokensPerMessage: number;
+  avgOutputTokensPerMessage: number;
+  totalMessages: number;
+  avgMessagesPerUserMonth: number;
+  avgTokensPerUserMonth: number;
+  avgDocsPerCompany: number;
+  avgTokensPerDoc: number;
+  totalDocuments: number;
+  totalCustomers: number;
+  proCustomers: number;
+  businessCustomers: number;
+  proChatbotCustomers: number;
+  proPercent: number;
+  businessPercent: number;
+  proChatbotPercent: number;
+  baseSystemPromptTokens: number;
+  avgSystemPromptTokens: number;
+  avgFirstMessageInputTokens: number;
+  dataStartDate: string;
+  dataEndDate: string;
+  sampleSize: number;
 }
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -152,6 +177,10 @@ export default function CalculatorPage() {
   const [params, setParams] = useState<SimulationParams>(getDefaultParams());
   const [loading, setLoading] = useState(true);
   const [savingScenario, setSavingScenario] = useState(false);
+
+  // Real data state
+  const [realStats, setRealStats] = useState<UsageStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   // UI state
   const [showAddModel, setShowAddModel] = useState(false);
@@ -379,7 +408,57 @@ export default function CalculatorPage() {
 
   const handleReset = () => {
     setParams(getDefaultParams());
+    setRealStats(null);
     toast.success("Parameters reset to defaults");
+  };
+
+  const loadRealData = async () => {
+    setIsLoadingStats(true);
+    try {
+      const response = await fetch("/api/super-admin/calculator/stats");
+      if (!response.ok) throw new Error("Failed to fetch usage stats");
+      const data = await response.json();
+      const stats = data.stats as UsageStats;
+      setRealStats(stats);
+
+      // Update form with real values (only if they have meaningful data)
+      setParams((prev) => ({
+        ...prev,
+        // Customer base (only update if we have real customers)
+        ...(stats.totalCustomers > 0 && {
+          totalCustomers: stats.totalCustomers,
+          proPercent: stats.proPercent,
+          businessPercent: stats.businessPercent,
+          proChatbotPercent: stats.proChatbotPercent,
+        }),
+        // Usage patterns (only update if we have real message data)
+        ...(stats.totalMessages > 0 && {
+          avgMessagesPerMonth: stats.avgMessagesPerUserMonth,
+          avgInputTokens: stats.avgInputTokensPerMessage,
+          avgOutputTokens: stats.avgOutputTokensPerMessage,
+        }),
+        // Content (only update if we have documents)
+        ...(stats.totalDocuments > 0 && {
+          avgDocsPerCompany: stats.avgDocsPerCompany,
+          avgTokensPerDoc: stats.avgTokensPerDoc,
+        }),
+        // First message overhead (only update if we have first message data)
+        ...(stats.avgFirstMessageInputTokens > 0 && {
+          firstMessageOverheadTokens: stats.avgFirstMessageInputTokens,
+        }),
+      }));
+
+      toast.success(
+        stats.sampleSize > 0
+          ? `Loaded data from ${stats.sampleSize.toLocaleString()} messages`
+          : "No usage data available yet - using defaults"
+      );
+    } catch (error) {
+      console.error("Error loading real data:", error);
+      toast.error("Failed to load real usage data");
+    } finally {
+      setIsLoadingStats(false);
+    }
   };
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -412,6 +491,18 @@ export default function CalculatorPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={loadRealData}
+            disabled={isLoadingStats}
+          >
+            {isLoadingStats ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Database className="mr-2 h-4 w-4" />
+            )}
+            Load Real Data
+          </Button>
           <Button variant="outline" onClick={handleReset}>
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset
@@ -422,6 +513,55 @@ export default function CalculatorPage() {
           </Button>
         </div>
       </div>
+
+      {/* Real Data Info Banner */}
+      {realStats && (
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                Real Data Loaded
+              </span>
+            </div>
+            <div className="text-xs text-blue-700 dark:text-blue-300">
+              {realStats.sampleSize > 0 ? (
+                <>
+                  Based on {realStats.sampleSize.toLocaleString()} messages
+                  {realStats.dataStartDate && realStats.dataEndDate && (
+                    <>
+                      {" "}from {new Date(realStats.dataStartDate).toLocaleDateString()} to{" "}
+                      {new Date(realStats.dataEndDate).toLocaleDateString()}
+                    </>
+                  )}
+                </>
+              ) : (
+                "No usage data available yet"
+              )}
+            </div>
+          </div>
+          {realStats.sampleSize > 0 && (
+            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div>
+                <span className="text-muted-foreground">Customers:</span>{" "}
+                <span className="font-medium">{realStats.totalCustomers}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Messages:</span>{" "}
+                <span className="font-medium">{realStats.totalMessages.toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Avg Input Tokens:</span>{" "}
+                <span className="font-medium">{realStats.avgInputTokensPerMessage}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Avg Output Tokens:</span>{" "}
+                <span className="font-medium">{realStats.avgOutputTokensPerMessage}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Section 1: LLM Model Configuration */}
       <Card>
@@ -809,6 +949,33 @@ export default function CalculatorPage() {
                     className="mt-1"
                   />
                 </div>
+                <div>
+                  <Label>System Prompt Tokens (first msg)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={params.firstMessageOverheadTokens}
+                    onChange={(e) =>
+                      handleParamChange("firstMessageOverheadTokens", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Token overhead for system prompt in first message
+                  </p>
+                </div>
+                <div>
+                  <Label>Avg Messages per Conversation</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={params.avgMessagesPerConversation}
+                    onChange={(e) =>
+                      handleParamChange("avgMessagesPerConversation", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                </div>
               </div>
 
               {/* Growth & Churn */}
@@ -915,6 +1082,78 @@ export default function CalculatorPage() {
                 </div>
               </div>
 
+              {/* Business Tier Multipliers */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+                  Business Tier Multipliers
+                </h4>
+                <div>
+                  <Label>LLM Usage Multiplier ({params.businessLlmMultiplier}x)</Label>
+                  <Input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.1"
+                    value={params.businessLlmMultiplier}
+                    onChange={(e) =>
+                      handleParamChange("businessLlmMultiplier", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Business users LLM usage relative to Pro
+                  </p>
+                </div>
+                <div>
+                  <Label>Infra Cost Multiplier ({params.businessInfraMultiplier}x)</Label>
+                  <Input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.1"
+                    value={params.businessInfraMultiplier}
+                    onChange={(e) =>
+                      handleParamChange("businessInfraMultiplier", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label>Support Cost Multiplier ({params.businessSupportMultiplier}x)</Label>
+                  <Input
+                    type="range"
+                    min="0.5"
+                    max="1.5"
+                    step="0.1"
+                    value={params.businessSupportMultiplier}
+                    onChange={(e) =>
+                      handleParamChange("businessSupportMultiplier", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Lower = more self-serve
+                  </p>
+                </div>
+                <div>
+                  <Label>Companies Multiplier ({params.businessCompaniesMultiplier}x)</Label>
+                  <Input
+                    type="range"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={params.businessCompaniesMultiplier}
+                    onChange={(e) =>
+                      handleParamChange("businessCompaniesMultiplier", e.target.value)
+                    }
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Avg companies for embedding cost
+                  </p>
+                </div>
+              </div>
+
               {/* Current Pricing */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
@@ -996,7 +1235,7 @@ export default function CalculatorPage() {
           <CardContent>
             <div className="space-y-6">
               {/* Key Metrics */}
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-5">
                 <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4">
                   <p className="text-sm text-muted-foreground">
                     Cost per Message
@@ -1019,6 +1258,20 @@ export default function CalculatorPage() {
                   </p>
                   <p className="text-2xl font-bold">
                     {formatUSD(results.llmCostPerUserMonth)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    incl. {formatUSD(results.firstMessageOverheadCost)} prompt overhead
+                  </p>
+                </div>
+                <div className="bg-cyan-50 dark:bg-cyan-950/30 rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Conversations/Month
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {Math.round(results.conversationsPerMonth)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    per user
                   </p>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-4">
@@ -1499,7 +1752,7 @@ export default function CalculatorPage() {
               <div className="border rounded-xl p-5 bg-card/50">
                 <h4 className="font-semibold">Monthly Cost Breakdown</h4>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Stacked view of monthly costs: LLM API usage, infrastructure, support, and payment fees
+                  Stacked view of monthly costs: LLM API usage, embeddings, infrastructure, support, and payment fees
                 </p>
                 <div className="h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -1537,6 +1790,12 @@ export default function CalculatorPage() {
                         stackId="a"
                         fill="#3b82f6"
                         radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="embeddingCosts"
+                        name="Embeddings"
+                        stackId="a"
+                        fill="#06b6d4"
                       />
                       <Bar
                         dataKey="infraCosts"
