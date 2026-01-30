@@ -1114,7 +1114,7 @@ export default function DocumentsPage() {
         currentUsage={modalState.currentUsage}
         limit={modalState.limit}
         resetsAt={modalState.resetsAt}
-        onUpgrade={() => router.push("/pricing")}
+        onUpgrade={() => router.push("/#pricing")}
       />
     </div>
   );

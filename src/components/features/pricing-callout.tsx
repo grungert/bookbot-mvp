@@ -22,7 +22,7 @@ export function PricingCallout({
   price,
   features,
   ctaText = "View Pricing",
-  ctaHref = "/pricing",
+  ctaHref = "/#pricing",
 }: PricingCalloutProps) {
   const prefersReducedMotion = useReducedMotion();
 

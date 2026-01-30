@@ -153,7 +153,7 @@ export async function canCreateCompany(
       maxCompanies: 1,
       canAddSlots: false,
       extraSlotPrice: null,
-      upgradeUrl: "/pricing",
+      upgradeUrl: "/#pricing",
     };
   }
 
@@ -170,7 +170,7 @@ export async function canCreateCompany(
       maxCompanies: slots.totalSlots,
       canAddSlots: false,
       extraSlotPrice: null,
-      upgradeUrl: "/pricing",
+      upgradeUrl: "/#pricing",
     };
   }
 
@@ -183,7 +183,7 @@ export async function canCreateCompany(
       maxCompanies: -1,
       canAddSlots: false,
       extraSlotPrice: null,
-      upgradeUrl: "/pricing",
+      upgradeUrl: "/#pricing",
     };
   }
 
@@ -202,7 +202,7 @@ export async function canCreateCompany(
       maxCompanies: slots.totalSlots,
       canAddSlots: canAddMore,
       extraSlotPrice: canAddMore ? plan.extraCompanyPrice : null,
-      upgradeUrl: "/pricing",
+      upgradeUrl: "/#pricing",
     };
   }
 
@@ -216,7 +216,7 @@ export async function canCreateCompany(
       (subscription.plan.maxCompanies === -1 ||
         slots.totalSlots < subscription.plan.maxCompanies),
     extraSlotPrice: subscription.plan.extraCompanyPrice,
-    upgradeUrl: "/pricing",
+    upgradeUrl: "/#pricing",
   };
 }
 

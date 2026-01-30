@@ -112,7 +112,7 @@ export function MobileFeaturePage() {
         ctaHref="/register"
         secondaryCta={{
           text: t("secondaryCta"),
-          href: "/pricing",
+          href: "/#pricing",
         }}
       />
 
@@ -145,7 +145,7 @@ export function MobileFeaturePage() {
           t("pricingFeature3"),
         ]}
         ctaText={t("pricingCta")}
-        ctaHref="/pricing"
+        ctaHref="/#pricing"
       />
 
       <FeatureFAQ

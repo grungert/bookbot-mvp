@@ -113,7 +113,7 @@ export function ChatbotFeaturePage() {
         ctaHref="/register"
         secondaryCta={{
           text: t("secondaryCta"),
-          href: "/pricing",
+          href: "/#pricing",
         }}
       />
 
@@ -146,7 +146,7 @@ export function ChatbotFeaturePage() {
           t("pricingFeature3"),
         ]}
         ctaText={t("pricingCta")}
-        ctaHref="/pricing"
+        ctaHref="/#pricing"
       />
 
       <FeatureFAQ

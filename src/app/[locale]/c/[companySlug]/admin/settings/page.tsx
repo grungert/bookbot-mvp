@@ -739,7 +739,7 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   {tSub("upgradeToCustomize")}
                 </p>
-                <Link href="/pricing">
+                <Link href="/#pricing">
                   <Button size="sm">
                     <Crown className="h-4 w-4 mr-2" />
                     {tSub("upgradeToPro")}
@@ -1899,7 +1899,7 @@ export default function SettingsPage() {
           <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="font-semibold mb-2">{tSub("noSubscription")}</h3>
           <p className="text-sm text-muted-foreground mb-4">{tSub("noSubscriptionDescription")}</p>
-          <Link href="/pricing">
+          <Link href="/#pricing">
             <Button>
               <Crown className="h-4 w-4 mr-2" />
               {tSub("viewPricing")}

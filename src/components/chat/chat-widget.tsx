@@ -704,7 +704,7 @@ export function ChatWidget({ companySlug, primaryColor, embedded = false }: Chat
         currentUsage={modalState.currentUsage}
         limit={modalState.limit}
         resetsAt={modalState.resetsAt}
-        onUpgrade={() => router.push("/pricing")}
+        onUpgrade={() => router.push("/#pricing")}
       />
     </>
   );

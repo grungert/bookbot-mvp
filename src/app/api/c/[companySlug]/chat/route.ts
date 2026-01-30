@@ -89,7 +89,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             subscriptionStatus.status === "TRIAL_EXPIRED"
               ? "TRIAL_EXPIRED"
               : "SUBSCRIPTION_INACTIVE",
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 403 }
       );
@@ -106,7 +106,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         {
           error: "AI Chatbot is not enabled for your subscription",
           code: "CHATBOT_NOT_ENABLED",
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 403 }
       );
@@ -122,7 +122,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           currentUsage: chatLimitResult.currentUsage,
           limit: chatLimitResult.limit,
           resetsAt: chatLimitResult.resetsAt.toISOString(),
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 429 }
       );

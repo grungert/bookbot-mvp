@@ -33,7 +33,7 @@ export async function POST(request: Request) {
           limit: canCreate.maxCount,
           canAddSlots: canCreate.canAddSlots,
           extraSlotPrice: canCreate.extraSlotPrice,
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 429 }
       );

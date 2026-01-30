@@ -114,7 +114,7 @@ export function WhatsAppFeaturePage() {
         ctaHref="/register"
         secondaryCta={{
           text: t("secondaryCta"),
-          href: "/pricing",
+          href: "/#pricing",
         }}
       />
 
@@ -147,7 +147,7 @@ export function WhatsAppFeaturePage() {
           t("pricingFeature3"),
         ]}
         ctaText={t("pricingCta")}
-        ctaHref="/pricing"
+        ctaHref="/#pricing"
       />
 
       <FeatureFAQ

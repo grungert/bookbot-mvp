@@ -95,7 +95,7 @@ export function TrialBanner({
               </p>
             </div>
           </div>
-          <Link href="/pricing">
+          <Link href="/#pricing">
             <Button
               size="sm"
               className="bg-amber-600 hover:bg-amber-700 text-white"

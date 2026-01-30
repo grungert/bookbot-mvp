@@ -97,7 +97,7 @@ export async function POST(request: Request, { params }: RouteParams) {
             subscriptionStatus.status === "TRIAL_EXPIRED"
               ? "TRIAL_EXPIRED"
               : "SUBSCRIPTION_INACTIVE",
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 403 }
       );
@@ -112,7 +112,7 @@ export async function POST(request: Request, { params }: RouteParams) {
           code: "DOCUMENT_LIMIT",
           currentUsage: documentLimit.currentCount,
           limit: documentLimit.limit,
-          upgradeUrl: "/pricing",
+          upgradeUrl: "/#pricing",
         },
         { status: 429 }
       );
