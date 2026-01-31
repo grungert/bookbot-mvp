@@ -1,5 +1,6 @@
 import { Composition } from "remotion";
 import { BookBotVideo } from "./BookBotVideo";
+import { ChatbotVideo } from "./ChatbotVideo";
 import {
   BOOKBOT_COMP_NAME,
   defaultBookBotProps,
@@ -8,6 +9,14 @@ import {
   BOOKBOT_VIDEO_HEIGHT,
   BOOKBOT_VIDEO_WIDTH,
 } from "./constants";
+import {
+  CHATBOT_COMP_NAME,
+  defaultChatbotProps,
+  CHATBOT_DURATION_IN_FRAMES,
+  CHATBOT_VIDEO_FPS,
+  CHATBOT_VIDEO_HEIGHT,
+  CHATBOT_VIDEO_WIDTH,
+} from "./chatbotConstants";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -21,6 +30,17 @@ export const RemotionRoot: React.FC = () => {
         width={BOOKBOT_VIDEO_WIDTH}
         height={BOOKBOT_VIDEO_HEIGHT}
         defaultProps={defaultBookBotProps}
+      />
+
+      {/* Chatbot Feature Video - 45 seconds at 1080p */}
+      <Composition
+        id={CHATBOT_COMP_NAME}
+        component={ChatbotVideo}
+        durationInFrames={CHATBOT_DURATION_IN_FRAMES}
+        fps={CHATBOT_VIDEO_FPS}
+        width={CHATBOT_VIDEO_WIDTH}
+        height={CHATBOT_VIDEO_HEIGHT}
+        defaultProps={defaultChatbotProps}
       />
     </>
   );
