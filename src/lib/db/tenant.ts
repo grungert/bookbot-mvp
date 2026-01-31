@@ -1221,6 +1221,23 @@ export interface RecentConversation {
   createdAt: Date;
 }
 
+// Helper to extract plain text from message content (handles JSON rich text format)
+function extractMessageText(content: string | null | undefined): string {
+  if (!content) return "";
+
+  // Try to parse as JSON (rich text format)
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed.text === "string") {
+      return parsed.text;
+    }
+  } catch {
+    // Not JSON, return as-is (plain text)
+  }
+
+  return content;
+}
+
 // Get recent conversations for dashboard
 export async function getRecentConversations(
   companyId: string,
@@ -1247,7 +1264,7 @@ export async function getRecentConversations(
     id: session.id,
     customerName: session.user?.name || session.user?.email || "Guest",
     customerImage: session.user?.image || null,
-    lastMessage: session.messages[0]?.content?.slice(0, 50) || "",
+    lastMessage: extractMessageText(session.messages[0]?.content)?.slice(0, 50) || "",
     messageCount: session._count.messages,
     isRead: session.isRead,
     createdAt: session.createdAt,

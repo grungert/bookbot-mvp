@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 import { Link } from "@/i18n/routing";
+import { cn } from "@/lib/utils";
 import { UserMenu } from "./user-menu";
 import { MobileNav } from "./mobile-nav";
 import { LanguageSwitcher } from "./language-switcher";
@@ -41,13 +43,21 @@ export function Header({
   whatsappPhoneNumber,
   botName,
 }: HeaderProps) {
+  const pathname = usePathname();
   const tNav = useTranslations("nav");
 
   const adminHref = companySlug ? `/c/${companySlug}/admin` : "/admin";
   const myAppointmentsHref = companySlug ? `/c/${companySlug}/my-appointments` : "/my-appointments";
 
+  // Check if we're in admin routes
+  const isAdminRoute = pathname?.includes("/admin");
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className={cn(
+      "sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+      // Hide on mobile for admin routes (admin has its own mobile header)
+      isAdminRoute && "hidden lg:block"
+    )}>
       <div className="w-full flex h-14 items-center px-4">
         {/* Mobile nav trigger */}
         <MobileNav

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, memo } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
 import { TransitionLink } from "@/i18n/link";
@@ -33,6 +33,8 @@ import {
   Stethoscope,
   Dumbbell,
   Briefcase,
+  LogOut,
+  User,
 } from "lucide-react";
 
 // Lazy load UserMenu to reduce initial bundle
@@ -50,6 +52,7 @@ interface MainNavProps {
 const FEATURES_ITEMS = [
   { href: "/features/chatbot", labelKey: "featuresChatbot", descKey: "featuresChatbotDesc", Icon: MessageSquare },
   { href: "/features/whatsapp", labelKey: "featuresWhatsapp", descKey: "featuresWhatsappDesc", Icon: MessageCircle },
+  { href: "/features/viber", labelKey: "featuresViber", descKey: "featuresViberDesc", Icon: Smartphone },
   { href: "/features/mobile", labelKey: "featuresMobile", descKey: "featuresMobileDesc", Icon: Smartphone },
 ] as const;
 
@@ -64,6 +67,7 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
   const { data: session, status } = useSession();
   const t = useTranslations("landing");
   const tNav = useTranslations("nav");
+  const tAuth = useTranslations("auth");
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -220,7 +224,7 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
                 <Logo size="md" showText />
               </SheetTitle>
             </SheetHeader>
-            <nav className="flex flex-col gap-2 mt-8">
+            <nav className="flex flex-col gap-2 mt-8 px-4">
               {/* Features Accordion */}
               <div className="border-b pb-2">
                 <button
@@ -315,6 +319,23 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
               <div className="mt-6 space-y-3">
                 {isLoggedIn ? (
                   <>
+                    {/* User Info */}
+                    <div className="flex items-center gap-3 py-2 px-3 bg-muted/50 rounded-lg">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {session.user.name || session.user.email}
+                        </p>
+                        {session.user.name && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {session.user.email}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     {session.user.role === "SUPER_ADMIN" && (
                       <Link
                         href="/super-admin"
@@ -337,6 +358,19 @@ function MainNavInner({ variant = "default", hideAuthButtons = false }: MainNavP
                         </Button>
                       </Link>
                     )}
+
+                    {/* Logout Button */}
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        signOut({ callbackUrl: "/" });
+                      }}
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      {tAuth("logout")}
+                    </Button>
                   </>
                 ) : !hideAuthButtons ? (
                   <Link href="/login" onClick={() => setMobileOpen(false)}>
