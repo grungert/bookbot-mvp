@@ -152,6 +152,7 @@ export default async function AdminDashboard({ params, searchParams }: AdminDash
         bot: t("sourceBot"),
         whatsapp: t("sourceWhatsapp"),
         admin: t("sourceAdmin"),
+        viber: t("sourceViber"),
       }}
     />
   );

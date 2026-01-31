@@ -172,7 +172,7 @@ export default function ConversationsPage() {
 
   // Filter state
   const [userType, setUserType] = useState<"all" | "guest" | "authenticated">("all");
-  const [channel, setChannel] = useState<"all" | "web" | "whatsapp">("all");
+  const [channel, setChannel] = useState<"all" | "web" | "whatsapp" | "viber">("all");
   const [searchEmail, setSearchEmail] = useState("");
   const [viewMode, setViewMode] = useState<"session" | "user">("session");
   const [expandedUserIds, setExpandedUserIds] = useState<Set<string | null>>(new Set());
@@ -726,6 +726,7 @@ export default function ConversationsPage() {
             <SelectItem value="all">{t("channelAll")}</SelectItem>
             <SelectItem value="web">{t("channelWeb")}</SelectItem>
             <SelectItem value="whatsapp">{t("channelWhatsapp")}</SelectItem>
+            <SelectItem value="viber">{t("channelViber")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
@@ -892,6 +893,10 @@ export default function ConversationsPage() {
                           {session.channel === "whatsapp" ? (
                             <Badge variant="outline" className="border-green-500/50 text-green-600 text-xs">
                               {t("channelWhatsapp")}
+                            </Badge>
+                          ) : session.channel === "viber" ? (
+                            <Badge variant="outline" className="border-violet-500/50 text-violet-600 text-xs">
+                              {t("channelViber")}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-xs">
@@ -1070,6 +1075,10 @@ export default function ConversationsPage() {
                           {session.channel === "whatsapp" ? (
                             <Badge variant="outline" className="ml-2 border-green-500/50 text-green-600">
                               {t("channelWhatsapp")}
+                            </Badge>
+                          ) : session.channel === "viber" ? (
+                            <Badge variant="outline" className="ml-2 border-violet-500/50 text-violet-600">
+                              {t("channelViber")}
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="ml-2">

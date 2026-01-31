@@ -554,6 +554,8 @@ export default function AppointmentsPage() {
         return { icon: Bot, color: "text-purple-600", label: tCalendar("sourceBot") };
       case "whatsapp":
         return { icon: MessageSquare, color: "text-green-600", label: tCalendar("sourceWhatsapp") };
+      case "viber":
+        return { icon: MessageSquare, color: "text-violet-600", label: tCalendar("sourceViber") };
       case "admin":
         return { icon: ShieldCheck, color: "text-orange-600", label: tCalendar("sourceAdmin") };
       case "website":

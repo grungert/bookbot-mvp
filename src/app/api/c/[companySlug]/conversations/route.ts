@@ -10,7 +10,7 @@ interface RouteParams {
 
 const querySchema = z.object({
   userType: z.enum(["all", "guest", "authenticated"]).optional().default("all"),
-  channel: z.enum(["all", "web", "whatsapp"]).optional().default("all"),
+  channel: z.enum(["all", "web", "whatsapp", "viber"]).optional().default("all"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   search: z.string().optional(),

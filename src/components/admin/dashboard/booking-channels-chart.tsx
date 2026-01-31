@@ -9,6 +9,7 @@ interface BookingChannelsChartProps {
     bot: number;
     whatsapp: number;
     admin: number;
+    viber: number;
   };
   title: string;
   noDataMessage: string;
@@ -17,6 +18,7 @@ interface BookingChannelsChartProps {
     bot: string;
     whatsapp: string;
     admin: string;
+    viber: string;
   };
   prefersReducedMotion?: boolean;
 }
@@ -26,6 +28,7 @@ const COLORS = {
   bot: "#8B5CF6",       // Purple
   whatsapp: "#22C55E",  // Green
   admin: "#F97316",     // Orange
+  viber: "#7C3AED",     // Violet (Viber's brand color)
 };
 
 interface CustomTooltipProps {
@@ -69,6 +72,7 @@ export function BookingChannelsChart({
     { name: labels.bot, value: data.bot, type: "bot" },
     { name: labels.whatsapp, value: data.whatsapp, type: "whatsapp" },
     { name: labels.admin, value: data.admin, type: "admin" },
+    { name: labels.viber, value: data.viber, type: "viber" },
   ].filter((d) => d.value > 0);
 
   const hasData = chartData.length > 0;

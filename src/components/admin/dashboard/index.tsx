@@ -61,6 +61,7 @@ interface DashboardContentProps {
       bot: number;
       whatsapp: number;
       admin: number;
+      viber: number;
     };
   };
   todaySummary: {
@@ -174,6 +175,7 @@ interface DashboardContentProps {
     bot: string;
     whatsapp: string;
     admin: string;
+    viber: string;
   };
   currency?: string;
   primaryColor?: string;
@@ -539,6 +541,7 @@ export function DashboardContent({
             bot: bookingChannelLabels.bot,
             whatsapp: bookingChannelLabels.whatsapp,
             admin: bookingChannelLabels.admin,
+            viber: bookingChannelLabels.viber,
           }}
           prefersReducedMotion={prefersReducedMotion}
         />

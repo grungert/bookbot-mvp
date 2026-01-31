@@ -456,6 +456,8 @@ export function AppointmentDetailModal({
                         Icon = Bot; iconColor = "text-purple-600"; label = t("sourceBot"); break;
                       case "whatsapp":
                         Icon = MessageSquare; iconColor = "text-green-600"; label = t("sourceWhatsapp"); break;
+                      case "viber":
+                        Icon = MessageSquare; iconColor = "text-violet-600"; label = t("sourceViber"); break;
                       case "admin":
                         Icon = ShieldCheck; iconColor = "text-orange-600"; label = t("sourceAdmin"); break;
                     }

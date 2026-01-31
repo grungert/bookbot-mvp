@@ -819,7 +819,7 @@ export async function getCompanyDashboardStats(
   );
 
   // Normalize booking channel counts
-  const bookingChannelStats = { website: 0, bot: 0, whatsapp: 0, admin: 0 };
+  const bookingChannelStats = { website: 0, bot: 0, whatsapp: 0, admin: 0, viber: 0 };
   bookingChannelGroups.forEach((item) => {
     const channel = item.bookingChannel;
     if (channel === null || channel === "web" || channel === "website") {
@@ -830,6 +830,8 @@ export async function getCompanyDashboardStats(
       bookingChannelStats.whatsapp += item._count;
     } else if (channel === "admin") {
       bookingChannelStats.admin += item._count;
+    } else if (channel === "viber") {
+      bookingChannelStats.viber += item._count;
     } else {
       // Unknown channels fall into website
       bookingChannelStats.website += item._count;
