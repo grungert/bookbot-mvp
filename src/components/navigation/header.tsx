@@ -49,8 +49,9 @@ export function Header({
   const adminHref = companySlug ? `/c/${companySlug}/admin` : "/admin";
   const myAppointmentsHref = companySlug ? `/c/${companySlug}/my-appointments` : "/my-appointments";
 
-  // Check if we're in admin routes
+  // Check if we're in admin or my-appointments routes
   const isAdminRoute = pathname?.includes("/admin");
+  const isMyAppointmentsRoute = pathname?.includes("/my-appointments");
 
   return (
     <header className={cn(
@@ -124,7 +125,14 @@ export function Header({
           )}
           {showMyAppointments && (
             <Link href={myAppointmentsHref} className="hidden md:flex" data-tour="my-appointments">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "gap-2",
+                  isMyAppointmentsRoute && "bg-primary/10 text-primary hover:bg-primary/20"
+                )}
+              >
                 <Calendar className="h-4 w-4" />
                 <span>{tNav("myAppointments")}</span>
                 <AppointmentBadge initialCount={appointmentCount} />
@@ -133,7 +141,14 @@ export function Header({
           )}
           {showAdminLink && (
             <Link href={adminHref} className="hidden md:flex" data-tour="admin-link">
-              <Button variant="ghost" size="sm" className="gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "gap-2",
+                  isAdminRoute && "bg-primary/10 text-primary hover:bg-primary/20"
+                )}
+              >
                 <Settings className="h-4 w-4" />
                 <span>{tNav("admin")}</span>
               </Button>
