@@ -123,7 +123,7 @@ export function Header({
             </a>
           )}
           {showMyAppointments && (
-            <Link href={myAppointmentsHref} className="hidden md:flex">
+            <Link href={myAppointmentsHref} className="hidden md:flex" data-tour="my-appointments">
               <Button variant="ghost" size="sm" className="gap-2">
                 <Calendar className="h-4 w-4" />
                 <span>{tNav("myAppointments")}</span>
@@ -132,7 +132,7 @@ export function Header({
             </Link>
           )}
           {showAdminLink && (
-            <Link href={adminHref} className="hidden md:flex">
+            <Link href={adminHref} className="hidden md:flex" data-tour="admin-link">
               <Button variant="ghost" size="sm" className="gap-2">
                 <Settings className="h-4 w-4" />
                 <span>{tNav("admin")}</span>

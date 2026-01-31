@@ -226,7 +226,14 @@
     "appointmentPending": "Vas termin je na cekanju potvrde. Uskoro cete dobiti email.",
     "appointmentCancelled": "Termin otkazan",
     "cancelAppointment": "Otkazi termin",
-    "reschedule": "Promeni termin"
+    "reschedule": "Promeni termin",
+    "subtitle": "Zakazite termin",
+    "noServices": "Trenutno nema dostupnih usluga za zakazivanje."
+  },
+  "userDashboard": {
+    "title": "Moj panel",
+    "bookAppointment": "Zakaži termin",
+    "bookFirstAppointment": "Zakažite svoj prvi termin"
   },
   "services": {
     "title": "Usluge",
@@ -2037,6 +2044,181 @@
       "changesText": "Zadržavamo pravo da izmenimo ove uslove u bilo kom trenutku. Obavestićemo korisnike o značajnim promenama putem emaila ili kroz platformu.",
       "contactTitle": "Kontakt",
       "contactText": "Za pitanja o ovim uslovima, molimo kontaktirajte nas na {email}."
+    }
+  },
+  "onboarding": {
+    "helpButton": "Pomoć",
+    "tour": {
+      "skip": "Preskoči",
+      "finish": "Završi",
+      "dashboard": {
+        "title": "Dobrodošli na Kontrolnu Tablu",
+        "content": "Pregledajte poslovne metrike, predstojeće termine i nedavne aktivnosti na jednom mestu."
+      },
+      "services": {
+        "title": "Upravljanje Uslugama",
+        "content": "Dodajte i konfigurišite usluge koje nudite. Podesite cene, trajanje i opise za svaku uslugu."
+      },
+      "workingHours": {
+        "title": "Podešavanje Radnog Vremena",
+        "content": "Definišite radno vreme i dostupnost. Klijenti mogu zakazivati samo tokom ovih perioda."
+      },
+      "appointments": {
+        "title": "Pregled Termina",
+        "content": "Pogledajte sve rezervacije u kalendaru ili listi. Upravljajte, potvrdite ili promenite termine."
+      },
+      "invoices": {
+        "title": "Kreiranje Faktura",
+        "content": "Generišite i šaljite profesionalne fakture klijentima. Lako pratite status plaćanja."
+      },
+      "conversations": {
+        "title": "Razgovori sa Klijentima",
+        "content": "Pregledajte i odgovarajte na poruke klijenata. Dostupno sa Pro planom za AI podršku."
+      },
+      "documents": {
+        "title": "Baza Znanja",
+        "content": "Otpremite dokumente za obuku vašeg AI asistenta. Koristiće ovo znanje za odgovore na pitanja."
+      },
+      "profile": {
+        "title": "Vaš Profil",
+        "content": "Upravljajte vašim ličnim podacima i podešavanjima naloga."
+      },
+      "settings": {
+        "title": "Podešavanja Kompanije",
+        "content": "Konfigurišite detalje kompanije, brending, integracije i ponašanje AI asistenta."
+      },
+      "companySwitcher": {
+        "title": "Promena Kompanije",
+        "content": "Kliknite ovde da promenite kompaniju ili kreirate novu. Svaka kompanija ima svoje usluge, termine i podešavanja."
+      },
+      "myAppointments": {
+        "title": "Moji Termini",
+        "content": "Pogledajte sve vaše predstojeće termine iz svih kompanija na jednom mestu. Ovo je vaš lični kalendar termina kao korisnika."
+      },
+      "adminLink": {
+        "title": "Administracija",
+        "content": "Pristupite administrativnom panelu za upravljanje vašim poslovanjem. Konfigurišite usluge, pregledajte rezervacije i prilagodite podešavanja."
+      }
+    },
+    "checklist": {
+      "progress": "{completed} od {total} završeno",
+      "loadError": "Nije moguće učitati napredak",
+      "addService": {
+        "title": "Dodajte prvu uslugu",
+        "description": "Definišite koje usluge nudite klijentima"
+      },
+      "setWorkingHours": {
+        "title": "Podesite radno vreme",
+        "description": "Konfigurišite kada klijenti mogu zakazivati termine"
+      },
+      "configureSettings": {
+        "title": "Konfigurišite podešavanja",
+        "description": "Podesite ime kompanije, vremensku zonu i brending"
+      },
+      "uploadLogo": {
+        "title": "Otpremite logo kompanije",
+        "description": "Dodajte logo da personalizujete stranicu za rezervacije"
+      },
+      "enableChannel": {
+        "title": "Omogućite kanal za rezervacije",
+        "description": "Povežite WhatsApp ili Viber za komunikaciju sa klijentima"
+      },
+      "customizeBot": {
+        "title": "Prilagodite AI asistenta",
+        "description": "Dajte vašem botu ime i ličnost"
+      },
+      "createAppointment": {
+        "title": "Kreirajte prvi termin",
+        "description": "Ručno zakažite termin ili sačekajte rezervacije klijenata"
+      },
+      "sendInvoice": {
+        "title": "Pošaljite fakturu",
+        "description": "Generišite i pošaljite prvu fakturu klijentu"
+      },
+      "uploadDocument": {
+        "title": "Otpremite AI dokument",
+        "description": "Dodajte znanje koje vaš AI asistent može da koristi"
+      }
+    },
+    "helpCenter": {
+      "title": "Centar za Pomoć",
+      "description": "Naučite kako da najbolje iskoristite admin panel",
+      "tabs": {
+        "guide": "Vodič",
+        "checklist": "Lista",
+        "sections": "Sekcije"
+      },
+      "proBadge": "PRO",
+      "restartTour": "Ponovi Obilazak",
+      "navigationLabel": "Navigacija i Nalog",
+      "adminSectionsLabel": "Admin Panel",
+      "guide": {
+        "welcome": "Dobrodošli u BookBot!",
+        "intro": "Ovaj admin panel vam pomaže da efikasno upravljate poslovanjem. Dozvolite nam da vam pokažemo okolo.",
+        "quickStart": "Vodič za Brzi Početak",
+        "step1": "Dodajte usluge sa cenama i trajanjem",
+        "step2": "Podesite radno vreme i dostupnost",
+        "step3": "Konfigurišite podešavanja kompanije i brending",
+        "step4": "Podelite stranicu za zakazivanje sa klijentima"
+      },
+      "sections": {
+        "dashboard": {
+          "title": "Kontrolna Tabla",
+          "description": "Pregledajte poslovne metrike, predstojeće termine i nedavne aktivnosti klijenata."
+        },
+        "services": {
+          "title": "Usluge",
+          "description": "Kreirajte i upravljajte uslugama koje nudite. Podesite cene, trajanje i opise."
+        },
+        "workingHours": {
+          "title": "Radno Vreme",
+          "description": "Definišite kada ste dostupni za rezervacije. Podesite različito vreme za svaki dan."
+        },
+        "appointments": {
+          "title": "Termini",
+          "description": "Pregledajte i upravljajte svim rezervacijama. Potvrdite, promenite ili otkažite termine."
+        },
+        "invoices": {
+          "title": "Fakture",
+          "description": "Generišite profesionalne fakture i pratite plaćanja od klijenata."
+        },
+        "conversations": {
+          "title": "Razgovori",
+          "description": "Pregledajte istoriju četa sa klijentima. Odgovarajte na upite direktno."
+        },
+        "documents": {
+          "title": "Baza Znanja",
+          "description": "Otpremite dokumente iz kojih vaš AI asistent može da uči i koristi pri odgovaranju."
+        },
+        "settings": {
+          "title": "Podešavanja",
+          "description": "Konfigurišite detalje kompanije, boje brendinga, integracije i ponašanje AI asistenta."
+        },
+        "companySwitcher": {
+          "title": "Promena Kompanije",
+          "description": "Promenite kompaniju ili kreirajte novu. Svaka kompanija funkcioniše nezavisno sa svojim podešavanjima."
+        },
+        "myAppointments": {
+          "title": "Moji Termini",
+          "description": "Pregledajte vaše lične termine kao korisnik kod svih kompanija kod kojih ste zakazali."
+        },
+        "adminLink": {
+          "title": "Pristup Administraciji",
+          "description": "Brz pristup administrativnom panelu gde upravljate vašim poslovnim operacijama."
+        }
+      }
+    },
+    "tooltip": {
+      "services": "Usluge su ono što nudite klijentima. Svaka usluga ima ime, cenu i trajanje.",
+      "workingHours": "Radno vreme definiše kada klijenti mogu zakazivati. Podesite različito vreme za svaki dan.",
+      "appointments": "Pregledajte sve vaše rezervacije. Kliknite na bilo koji termin za više detalja.",
+      "invoices": "Pratite i upravljajte plaćanjima. Šaljite fakture emailom klijentima.",
+      "conversations": "Istorija četa sa klijentima koji su koristili AI asistenta ili kanale za poruke.",
+      "documents": "Dokumenti pomažu vašem AI asistentu da odgovara na pitanja o vašem poslovanju.",
+      "settings": "Konfigurišite profil kompanije, brending i integracije.",
+      "companySwitcher": "Upravljajte više kompanija sa jednog naloga. Promenite ili kreirajte nove kompanije ovde.",
+      "myAppointments": "Vaš lični kalendar koji prikazuje sve termine koje ste zakazali kao korisnik.",
+      "adminLink": "Pristupite admin panelu za upravljanje podešavanjima i operacijama vašeg poslovanja."
     }
   }
 }

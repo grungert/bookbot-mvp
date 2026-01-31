@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, createContext, useContext } from "react";
+import { useState, useEffect, useCallback, useRef, createContext, useContext, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
@@ -19,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   User,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { CompanySwitcher } from "./company-switcher";
+import { useOnboarding } from "./onboarding";
 
 // Sidebar context for sharing collapsed state
 interface SidebarContextType {
@@ -65,22 +67,22 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const handleSetIsCollapsed = (value: boolean) => {
+  const handleSetIsCollapsed = useCallback((value: boolean) => {
     setIsCollapsed(value);
     localStorage.setItem("admin-sidebar-collapsed", String(value));
-  };
+  }, []);
 
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return (
-      <SidebarContext.Provider value={{ isCollapsed: false, setIsCollapsed: handleSetIsCollapsed }}>
-        {children}
-      </SidebarContext.Provider>
-    );
-  }
+  // Memoize context value to prevent unnecessary re-renders during navigation
+  const contextValue = useMemo(
+    () => ({
+      isCollapsed: mounted ? isCollapsed : false,
+      setIsCollapsed: handleSetIsCollapsed,
+    }),
+    [mounted, isCollapsed, handleSetIsCollapsed]
+  );
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed: handleSetIsCollapsed }}>
+    <SidebarContext.Provider value={contextValue}>
       {children}
     </SidebarContext.Provider>
   );
@@ -135,6 +137,7 @@ interface NavItem {
   badgeTooltip?: string;
   disabled?: boolean;
   disabledTooltip?: string;
+  dataTour?: string;
 }
 
 function useNavItems(companySlug: string, pendingAppointmentsCount?: number, actionableInvoicesCount?: number, hasChatbotAccess: boolean = false) {
@@ -151,6 +154,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       href: basePath,
       label: tAdmin("dashboard"),
       icon: LayoutDashboard,
+      dataTour: "dashboard",
     },
     {
       href: `${basePath}/appointments`,
@@ -158,6 +162,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       icon: Calendar,
       badge: pendingAppointmentsCount,
       badgeTooltip: tAdmin("pendingAppointments"),
+      dataTour: "appointments",
     },
     {
       href: `${basePath}/invoices`,
@@ -165,6 +170,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       icon: FileText,
       badge: actionableInvoicesCount,
       badgeTooltip: tAdmin("actionableInvoices"),
+      dataTour: "invoices",
     },
     {
       href: `${basePath}/conversations`,
@@ -172,16 +178,19 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       icon: MessageSquare,
       disabled: !hasChatbotAccess,
       disabledTooltip: chatbotDisabledTooltip,
+      dataTour: "conversations",
     },
     {
       href: `${basePath}/services`,
       label: t("services"),
       icon: Briefcase,
+      dataTour: "services",
     },
     {
       href: `${basePath}/working-hours`,
       label: tWorkingHours("title"),
       icon: Clock,
+      dataTour: "working-hours",
     },
     {
       href: `${basePath}/documents`,
@@ -189,6 +198,7 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       icon: FileArchive,
       disabled: !hasChatbotAccess,
       disabledTooltip: chatbotDisabledTooltip,
+      dataTour: "documents",
     },
   ];
 
@@ -197,11 +207,13 @@ function useNavItems(companySlug: string, pendingAppointmentsCount?: number, act
       href: `${basePath}/profile`,
       label: t("profile"),
       icon: User,
+      dataTour: "profile",
     },
     {
       href: `${basePath}/settings`,
       label: t("settings"),
       icon: Settings,
+      dataTour: "settings",
     },
   ];
 
@@ -218,6 +230,7 @@ function NavContent({
   primaryColor,
   onItemClick,
   isCollapsed = false,
+  onHelpClick,
 }: {
   mainItems: NavItem[];
   bottomItems: NavItem[];
@@ -228,8 +241,10 @@ function NavContent({
   primaryColor?: string | null;
   onItemClick?: () => void;
   isCollapsed?: boolean;
+  onHelpClick?: () => void;
 }) {
   const tNav = useTranslations("nav");
+  const tOnboarding = useTranslations("onboarding");
 
   const renderNavItem = (item: NavItem) => {
     const isActive =
@@ -241,6 +256,7 @@ function NavContent({
       const disabledContent = (
         <div
           key={item.href}
+          data-tour={item.dataTour}
           className={cn(
             "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
             "opacity-50 cursor-not-allowed",
@@ -274,6 +290,7 @@ function NavContent({
     const navLink = (
       <Link key={item.href} href={item.href} onClick={onItemClick}>
         <div
+          data-tour={item.dataTour}
           className={cn(
             "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200",
             "hover:bg-muted/80",
@@ -391,7 +408,7 @@ function NavContent({
         )}
       </div>
       {/* Company Switcher */}
-      <div className={cn("p-2 border-b", isCollapsed && "p-1")}>
+      <div className={cn("p-2 border-b", isCollapsed && "p-1")} data-tour="company-switcher">
         <CompanySwitcher
           currentCompanySlug={companySlug}
           currentCompanyName={companyName}
@@ -404,6 +421,32 @@ function NavContent({
         </nav>
         <div className={cn("mt-auto p-2", isCollapsed && "p-1")}>
           {bottomItems.map(renderNavItem)}
+          {/* Help button */}
+          {onHelpClick && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onHelpClick}
+                  className={cn(
+                    "relative flex items-center gap-2 px-3 py-2 rounded-md mb-1 transition-all duration-200 w-full",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/80",
+                    isCollapsed && "justify-center px-2"
+                  )}
+                >
+                  <HelpCircle className="h-4 w-4 shrink-0" />
+                  {!isCollapsed && <span>{tOnboarding("helpButton")}</span>}
+                </button>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent
+                  side="right"
+                  style={primaryColor ? { backgroundColor: primaryColor, color: 'white' } : undefined}
+                >
+                  {tOnboarding("helpButton")}
+                </TooltipContent>
+              )}
+            </Tooltip>
+          )}
         </div>
       </div>
     </TooltipProvider>
@@ -416,6 +459,7 @@ export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAp
   const livePendingCount = usePendingCount(companySlug, pendingAppointmentsCount);
   const { mainItems, bottomItems } = useNavItems(companySlug, livePendingCount, actionableInvoicesCount, hasChatbotAccess);
   const { isCollapsed, setIsCollapsed } = useSidebar();
+  const { actions: onboardingActions } = useOnboarding();
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -435,6 +479,7 @@ export function AdminSidebar({ companySlug, companyName, primaryColor, pendingAp
           companyName={companyName}
           primaryColor={primaryColor}
           isCollapsed={isCollapsed}
+          onHelpClick={() => onboardingActions.setHelpOpen(true)}
         />
         {/* Collapse toggle button */}
         <div className={cn("p-2 border-t mt-auto", isCollapsed && "flex justify-center")}>
@@ -479,6 +524,12 @@ export function AdminMobileNav({
   const basePath = `/c/${companySlug}/admin`;
   const livePendingCount = usePendingCount(companySlug, pendingAppointmentsCount);
   const { mainItems, bottomItems } = useNavItems(companySlug, livePendingCount, actionableInvoicesCount, hasChatbotAccess);
+  const { actions: onboardingActions } = useOnboarding();
+
+  const handleHelpClick = () => {
+    setOpen(false);
+    onboardingActions.setHelpOpen(true);
+  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -502,6 +553,7 @@ export function AdminMobileNav({
           primaryColor={primaryColor}
           onItemClick={() => setOpen(false)}
           isCollapsed={false}
+          onHelpClick={handleHelpClick}
         />
       </SheetContent>
     </Sheet>
@@ -515,7 +567,7 @@ export function AdminMainContent({ children }: { children: React.ReactNode }) {
   return (
     <main
       className={cn(
-        "flex-1 p-4 lg:p-6 transition-all duration-300",
+        "flex-1 min-w-0 overflow-x-auto p-4 lg:p-6 transition-all duration-300",
         isCollapsed ? "lg:ml-16" : "lg:ml-64"
       )}
     >

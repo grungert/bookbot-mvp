@@ -226,7 +226,14 @@
     "appointmentPending": "Your appointment is pending confirmation. We'll send you an email shortly.",
     "appointmentCancelled": "Appointment Cancelled",
     "cancelAppointment": "Cancel Appointment",
-    "reschedule": "Reschedule"
+    "reschedule": "Reschedule",
+    "subtitle": "Book an appointment",
+    "noServices": "No services available for booking at this time."
+  },
+  "userDashboard": {
+    "title": "My Dashboard",
+    "bookAppointment": "Book Appointment",
+    "bookFirstAppointment": "Book your first appointment"
   },
   "services": {
     "title": "Services",
@@ -2035,6 +2042,181 @@
       "changesText": "We reserve the right to modify these terms at any time. We will notify users of significant changes via email or through the platform.",
       "contactTitle": "Contact",
       "contactText": "For questions about these terms, please contact us at {email}."
+    }
+  },
+  "onboarding": {
+    "helpButton": "Help",
+    "tour": {
+      "skip": "Skip Tour",
+      "finish": "Finish",
+      "dashboard": {
+        "title": "Welcome to Dashboard",
+        "content": "Get an overview of your business metrics, upcoming appointments, and recent activity all in one place."
+      },
+      "services": {
+        "title": "Manage Services",
+        "content": "Add and configure the services you offer. Set prices, durations, and descriptions for each service."
+      },
+      "workingHours": {
+        "title": "Set Working Hours",
+        "content": "Define your business hours and availability. Customers can only book during these times."
+      },
+      "appointments": {
+        "title": "View Appointments",
+        "content": "See all your bookings in calendar or list view. Manage, confirm, or reschedule appointments."
+      },
+      "invoices": {
+        "title": "Create Invoices",
+        "content": "Generate and send professional invoices to your customers. Track payment status easily."
+      },
+      "conversations": {
+        "title": "Customer Conversations",
+        "content": "View and respond to customer messages. Available with Pro plan for AI-powered chat support."
+      },
+      "documents": {
+        "title": "Knowledge Base",
+        "content": "Upload documents to train your AI assistant. It will use this knowledge to answer customer questions."
+      },
+      "profile": {
+        "title": "Your Profile",
+        "content": "Manage your personal information and account settings."
+      },
+      "settings": {
+        "title": "Company Settings",
+        "content": "Configure your company details, branding, integrations, and AI assistant behavior."
+      },
+      "companySwitcher": {
+        "title": "Switch Companies",
+        "content": "Click here to switch between your companies or create a new one. Each company has its own services, appointments, and settings."
+      },
+      "myAppointments": {
+        "title": "My Appointments",
+        "content": "View all your upcoming appointments across all companies in one place. This is your personal appointment calendar as a customer."
+      },
+      "adminLink": {
+        "title": "Admin Panel",
+        "content": "Access the administration panel to manage your business. Configure services, view bookings, and customize settings."
+      }
+    },
+    "checklist": {
+      "progress": "{completed} of {total} complete",
+      "loadError": "Unable to load progress",
+      "addService": {
+        "title": "Add your first service",
+        "description": "Define what services you offer to customers"
+      },
+      "setWorkingHours": {
+        "title": "Set your working hours",
+        "description": "Configure when customers can book appointments"
+      },
+      "configureSettings": {
+        "title": "Configure company settings",
+        "description": "Set your company name, timezone, and branding"
+      },
+      "uploadLogo": {
+        "title": "Upload your company logo",
+        "description": "Add a logo to personalize your booking page"
+      },
+      "enableChannel": {
+        "title": "Enable a booking channel",
+        "description": "Connect WhatsApp or Viber for customer messaging"
+      },
+      "customizeBot": {
+        "title": "Customize your AI assistant",
+        "description": "Give your bot a name and personality"
+      },
+      "createAppointment": {
+        "title": "Create your first appointment",
+        "description": "Book an appointment manually or wait for customer bookings"
+      },
+      "sendInvoice": {
+        "title": "Send an invoice",
+        "description": "Generate and send your first invoice to a customer"
+      },
+      "uploadDocument": {
+        "title": "Upload an AI document",
+        "description": "Add knowledge for your AI assistant to reference"
+      }
+    },
+    "helpCenter": {
+      "title": "Help Center",
+      "description": "Learn how to get the most out of your admin panel",
+      "tabs": {
+        "guide": "Guide",
+        "checklist": "Checklist",
+        "sections": "Sections"
+      },
+      "proBadge": "PRO",
+      "restartTour": "Restart Tour",
+      "navigationLabel": "Navigation & Account",
+      "adminSectionsLabel": "Admin Panel",
+      "guide": {
+        "welcome": "Welcome to BookBot!",
+        "intro": "This admin panel helps you manage your booking business efficiently. Let us show you around.",
+        "quickStart": "Quick Start Guide",
+        "step1": "Add your services with prices and durations",
+        "step2": "Set your working hours and availability",
+        "step3": "Configure your company settings and branding",
+        "step4": "Share your booking page with customers"
+      },
+      "sections": {
+        "dashboard": {
+          "title": "Dashboard",
+          "description": "View business metrics, upcoming appointments, and recent customer activity at a glance."
+        },
+        "services": {
+          "title": "Services",
+          "description": "Create and manage the services you offer. Set pricing, duration, and descriptions."
+        },
+        "workingHours": {
+          "title": "Working Hours",
+          "description": "Define when you're available for bookings. Set different hours for each day of the week."
+        },
+        "appointments": {
+          "title": "Appointments",
+          "description": "View and manage all bookings. Confirm, reschedule, or cancel appointments."
+        },
+        "invoices": {
+          "title": "Invoices",
+          "description": "Generate professional invoices and track payments from your customers."
+        },
+        "conversations": {
+          "title": "Conversations",
+          "description": "View customer chat history and messages. Respond to inquiries directly."
+        },
+        "documents": {
+          "title": "Knowledge Base",
+          "description": "Upload documents for your AI assistant to learn from and use when answering questions."
+        },
+        "settings": {
+          "title": "Settings",
+          "description": "Configure company details, branding colors, integrations, and AI assistant behavior."
+        },
+        "companySwitcher": {
+          "title": "Company Switcher",
+          "description": "Switch between your companies or create a new one. Each company operates independently with its own settings."
+        },
+        "myAppointments": {
+          "title": "My Appointments",
+          "description": "View your personal appointments as a customer across all companies you've booked with."
+        },
+        "adminLink": {
+          "title": "Admin Panel Access",
+          "description": "Quick access to the administration panel where you manage your business operations."
+        }
+      }
+    },
+    "tooltip": {
+      "services": "Services are what you offer to customers. Each service has a name, price, and duration.",
+      "workingHours": "Working hours define when customers can book. Set different hours for each day.",
+      "appointments": "View all your bookings. Click on any appointment for more details.",
+      "invoices": "Track and manage payments. Send invoices via email to customers.",
+      "conversations": "Chat history with customers who used your AI assistant or messaging channels.",
+      "documents": "Documents help your AI assistant answer questions about your business.",
+      "settings": "Configure your company profile, branding, and integrations.",
+      "companySwitcher": "Manage multiple companies from one account. Switch or create new companies here.",
+      "myAppointments": "Your personal calendar showing all appointments you've booked as a customer.",
+      "adminLink": "Access the admin panel to manage your business settings and operations."
     }
   }
 }
