@@ -13,6 +13,7 @@ import {
 import { srLatn, enUS } from "date-fns/locale";
 import { useLocale } from "next-intl";
 import { cn } from "@/lib/utils";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { AppointmentCard, Appointment } from "./appointment-card";
 
 interface WorkingHoursEntry {
@@ -112,6 +113,7 @@ export function WeekGridView({
   // Locale for date formatting
   const locale = useLocale();
   const dateLocale = locale === "sr" ? srLatn : enUS;
+  const prefersReducedMotion = useReducedMotion();
 
   // Ref for the grid container to enable scrolling
   const gridRef = useRef<HTMLDivElement>(null);
@@ -306,172 +308,188 @@ export function WeekGridView({
   }, [timezone]);
 
   return (
-    <div className="flex flex-col rounded-xl border bg-card overflow-hidden">
-      {/* Day headers */}
-      <div className="grid grid-cols-[70px_repeat(7,1fr)] border-b bg-muted/30">
-        <div className="p-3 text-xs text-muted-foreground font-medium">
-          {timezoneDisplay}
-        </div>
-        {weekDays.map((day) => {
-          const today = isToday(day);
-          return (
-            <div
-              key={day.toISOString()}
-              className="p-3 text-center border-l"
-            >
-              <div className={cn(
-                "text-xs font-medium uppercase tracking-wide",
-                today ? "text-primary" : "text-muted-foreground"
-              )}>
-                {format(day, "EEE", { locale: dateLocale })}
-              </div>
-              <div
-                className={cn(
-                  "mt-1 inline-flex h-9 w-9 items-center justify-center rounded-full text-lg font-semibold",
-                  today
-                    ? "bg-primary text-primary-foreground"
-                    : "text-foreground"
-                )}
-              >
-                {format(day, "d")}
-              </div>
+    <div className="rounded-xl border overflow-hidden">
+      {/* Scrollable container - both horizontal and vertical */}
+      <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 280px)" }} ref={gridRef}>
+        <div className="min-w-[800px]">
+          {/* Sticky header row */}
+          <div className="sticky top-0 z-30 flex border-b shadow-[0_2px_4px_rgba(0,0,0,0.05)]" style={{ backgroundColor: 'rgba(255, 255, 255, 0.584)' }}>
+            {/* Corner cell - sticky both left and top */}
+            <div className="sticky left-0 z-40 w-[60px] shrink-0 h-[60px] p-2 text-xs text-muted-foreground font-medium border-r shadow-[2px_0_4px_rgba(0,0,0,0.05)] flex items-center justify-center" style={{ backgroundColor: 'rgba(255, 255, 255, 0.584)' }}>
+              {timezoneDisplay}
             </div>
-          );
-        })}
-      </div>
-
-      {/* Time grid */}
-      <div
-        ref={gridRef}
-        className="relative grid grid-cols-[70px_repeat(7,1fr)] overflow-y-auto"
-        style={{ maxHeight: "calc(100vh - 300px)" }}
-      >
-        {/* Time column */}
-        <div className="sticky left-0 z-10 bg-card">
-          {timeSlots.map((hour) => (
-            <div
-              key={hour}
-              className="relative border-b border-dashed"
-              style={{ height: `${HOUR_HEIGHT}px` }}
-            >
-              <span className="absolute -top-2.5 right-3 text-xs text-muted-foreground font-medium">
-                {hour.toString().padStart(2, "0")}:00
-              </span>
+            {/* Day headers */}
+            <div className="flex-1 grid grid-cols-7 h-[60px]">
+              {weekDays.map((day, dayIndex) => {
+                const today = isToday(day);
+                return (
+                  <div
+                    key={day.toISOString()}
+                    className="p-2 text-center border-l flex flex-col items-center justify-center"
+                  >
+                    <div className={cn(
+                      "text-xs font-medium uppercase tracking-wide",
+                      today ? "text-primary" : "text-muted-foreground"
+                    )}>
+                      {format(day, "EEE", { locale: dateLocale })}
+                    </div>
+                    <div
+                      className={cn(
+                        "mt-1 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold",
+                        today
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Day columns */}
-        {weekDays.map((day) => {
-          const dateKey = format(day, "yyyy-MM-dd");
-          const dayAppointments = appointmentsByDay.get(dateKey) || [];
-          const dayOverlaps = overlapByDay.get(dateKey);
-          const today = isToday(day);
-          const isClosed = isDayClosed(day);
-          const dayHours = getDayWorkingHours(day);
-
-          return (
-            <div
-              key={day.toISOString()}
-              className={cn(
-                "relative border-l",
-                today && !isClosed && "bg-primary/5 dark:bg-primary/10",
-                isClosed && "bg-muted/50"
-              )}
-            >
-              {/* Hour grid lines */}
-              {timeSlots.map((hour) => (
+          {/* Grid body */}
+          <div className="flex">
+            {/* Sticky time column */}
+            <div className="sticky left-0 z-20 w-[60px] shrink-0 border-r shadow-[2px_0_4px_rgba(0,0,0,0.05)]" style={{ backgroundColor: 'rgba(255, 255, 255, 0.584)' }}>
+              {/* Time slots */}
+              {timeSlots.map((hour, index) => (
                 <div
                   key={hour}
-                  className="border-b border-dashed"
+                  className="relative border-b border-dashed"
                   style={{ height: `${HOUR_HEIGHT}px` }}
-                />
-              ))}
-
-              {/* Clickable time slots overlay */}
-              {!isClosed && onSlotClick && (
-                <div className="absolute inset-0 z-5">
-                  {timeSlots.map((hour) => (
-                    <div
-                      key={`slot-${hour}`}
-                      className="relative"
-                      style={{ height: `${HOUR_HEIGHT}px` }}
-                    >
-                      {/* First 30-minute slot */}
-                      <button
-                        type="button"
-                        className="absolute inset-x-0 top-0 h-1/2 hover:bg-primary/20 transition-colors cursor-pointer"
-                        onClick={() => onSlotClick(day, `${hour.toString().padStart(2, "0")}:00`)}
-                        aria-label={`Book at ${hour}:00`}
-                      />
-                      {/* Second 30-minute slot */}
-                      <button
-                        type="button"
-                        className="absolute inset-x-0 bottom-0 h-1/2 hover:bg-primary/20 transition-colors cursor-pointer"
-                        onClick={() => onSlotClick(day, `${hour.toString().padStart(2, "0")}:30`)}
-                        aria-label={`Book at ${hour}:30`}
-                      />
-                      {/* Half-hour divider line */}
-                      <div className="absolute inset-x-0 top-1/2 border-t border-dotted border-muted-foreground/20 pointer-events-none" />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Closed day overlay */}
-              {isClosed && (
-                <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-                  <div className="bg-muted/80 px-4 py-2 rounded-lg">
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Closed
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Working hours indicator for open days */}
-              {!isClosed && dayHours && (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-                  <span className="text-[10px] text-muted-foreground bg-card/80 px-1.5 py-0.5 rounded">
-                    {dayHours.start} - {dayHours.end}
+                >
+                  <span className={cn(
+                    "absolute right-2 text-xs text-muted-foreground font-medium",
+                    index === 0 ? "top-1" : "-top-2.5"
+                  )}>
+                    {hour.toString().padStart(2, "0")}:00
                   </span>
                 </div>
-              )}
-
-              {/* "Now" indicator - only on today's column */}
-              {today && nowIndicatorPosition !== null && (
-                <div
-                  className="absolute left-0 right-0 z-20 pointer-events-none"
-                  style={{ top: `${nowIndicatorPosition}px` }}
-                >
-                  {/* Red dot on the left */}
-                  <div className="absolute -left-1.5 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
-                  {/* Red horizontal line */}
-                  <div className="absolute left-0 right-0 h-0.5 bg-red-500" />
-                </div>
-              )}
-
-              {/* Appointments - rendered on top with pointer-events-none container */}
-              {!isClosed && (
-                <div className="absolute inset-0 p-1 z-10 pointer-events-none">
-                  {dayAppointments.map((appointment) => {
-                    const overlapInfo = dayOverlaps?.get(appointment.id);
-                    return (
-                      <AppointmentCard
-                        key={appointment.id}
-                        appointment={appointment}
-                        style={getCardStyle(appointment, overlapInfo)}
-                        onClick={onAppointmentClick}
-                        className="pointer-events-auto"
-                        isSelected={selectedAppointmentId === appointment.id}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+              ))}
             </div>
-          );
-        })}
+
+            {/* Day columns grid */}
+            <div className="flex-1 relative grid grid-cols-7">
+
+          {/* Day columns */}
+          {weekDays.map((day, dayIndex) => {
+            const dateKey = format(day, "yyyy-MM-dd");
+            const dayAppointments = appointmentsByDay.get(dateKey) || [];
+            const dayOverlaps = overlapByDay.get(dateKey);
+            const today = isToday(day);
+            const isClosed = isDayClosed(day);
+            const dayHours = getDayWorkingHours(day);
+
+            return (
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "relative border-l",
+                  today && !isClosed && "bg-primary/5 dark:bg-primary/10",
+                  isClosed && "bg-muted/50",
+                  !prefersReducedMotion && "animate-fade-in-scale"
+                )}
+                style={!prefersReducedMotion ? { opacity: 0, animationDelay: `${dayIndex * 50 + 50}ms` } : undefined}
+              >
+                {/* Hour grid lines */}
+                {timeSlots.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-b border-dashed"
+                    style={{ height: `${HOUR_HEIGHT}px` }}
+                  />
+                ))}
+
+                {/* Clickable time slots overlay */}
+                {!isClosed && onSlotClick && (
+                  <div className="absolute inset-0 z-5">
+                    {timeSlots.map((hour) => (
+                      <div
+                        key={`slot-${hour}`}
+                        className="relative"
+                        style={{ height: `${HOUR_HEIGHT}px` }}
+                      >
+                        {/* First 30-minute slot */}
+                        <button
+                          type="button"
+                          className="absolute inset-x-0 top-0 h-1/2 hover:bg-primary/20 transition-colors cursor-pointer"
+                          onClick={() => onSlotClick(day, `${hour.toString().padStart(2, "0")}:00`)}
+                          aria-label={`Book at ${hour}:00`}
+                        />
+                        {/* Second 30-minute slot */}
+                        <button
+                          type="button"
+                          className="absolute inset-x-0 bottom-0 h-1/2 hover:bg-primary/20 transition-colors cursor-pointer"
+                          onClick={() => onSlotClick(day, `${hour.toString().padStart(2, "0")}:30`)}
+                          aria-label={`Book at ${hour}:30`}
+                        />
+                        {/* Half-hour divider line */}
+                        <div className="absolute inset-x-0 top-1/2 border-t border-dotted border-muted-foreground/20 pointer-events-none" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Closed day overlay */}
+                {isClosed && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+                    <div className="bg-muted/80 px-4 py-2 rounded-lg">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Closed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Working hours indicator for open days */}
+                {!isClosed && dayHours && (
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                    <span className="text-[10px] text-muted-foreground bg-card/80 px-1.5 py-0.5 rounded whitespace-nowrap">
+                      {dayHours.start} - {dayHours.end}
+                    </span>
+                  </div>
+                )}
+
+                {/* "Now" indicator - only on today's column */}
+                {today && nowIndicatorPosition !== null && (
+                  <div
+                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                    style={{ top: `${nowIndicatorPosition}px` }}
+                  >
+                    {/* Red dot on the left */}
+                    <div className="absolute -left-1.5 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
+                    {/* Red horizontal line */}
+                    <div className="absolute left-0 right-0 h-0.5 bg-red-500" />
+                  </div>
+                )}
+
+                {/* Appointments - rendered on top with pointer-events-none container */}
+                {!isClosed && (
+                  <div className="absolute inset-0 p-1 z-10 pointer-events-none">
+                    {dayAppointments.map((appointment) => {
+                      const overlapInfo = dayOverlaps?.get(appointment.id);
+                      const cardStyle = getCardStyle(appointment, overlapInfo);
+                      return (
+                        <AppointmentCard
+                          key={appointment.id}
+                          appointment={appointment}
+                          style={cardStyle}
+                          onClick={onAppointmentClick}
+                          className="pointer-events-auto"
+                          isSelected={selectedAppointmentId === appointment.id}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
