@@ -2,6 +2,7 @@ import { Composition } from "remotion";
 import { BookBotVideo } from "./BookBotVideo";
 import { ChatbotVideo } from "./ChatbotVideo";
 import { WhatsAppVideo } from "./WhatsAppVideo";
+import { ViberVideo } from "./ViberVideo";
 import {
   BOOKBOT_COMP_NAME,
   defaultBookBotProps,
@@ -26,6 +27,14 @@ import {
   WHATSAPP_VIDEO_HEIGHT,
   WHATSAPP_VIDEO_WIDTH,
 } from "./whatsappConstants";
+import {
+  VIBER_COMP_NAME,
+  defaultViberProps,
+  VIBER_DURATION_IN_FRAMES,
+  VIBER_VIDEO_FPS,
+  VIBER_VIDEO_HEIGHT,
+  VIBER_VIDEO_WIDTH,
+} from "./viberConstants";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -61,6 +70,17 @@ export const RemotionRoot: React.FC = () => {
         width={WHATSAPP_VIDEO_WIDTH}
         height={WHATSAPP_VIDEO_HEIGHT}
         defaultProps={defaultWhatsAppProps}
+      />
+
+      {/* Viber Feature Video - 36 seconds at 1080p */}
+      <Composition
+        id={VIBER_COMP_NAME}
+        component={ViberVideo}
+        durationInFrames={VIBER_DURATION_IN_FRAMES}
+        fps={VIBER_VIDEO_FPS}
+        width={VIBER_VIDEO_WIDTH}
+        height={VIBER_VIDEO_HEIGHT}
+        defaultProps={defaultViberProps}
       />
     </>
   );
