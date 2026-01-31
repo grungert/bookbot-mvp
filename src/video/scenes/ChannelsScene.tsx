@@ -14,6 +14,7 @@ import {
   WidgetIcon,
   MobileIcon,
 } from "../components/FeatureCard";
+import { useTranslations } from "../translations";
 
 interface ChannelCardProps {
   name: string;
@@ -23,6 +24,7 @@ interface ChannelCardProps {
   delay: number;
   isNew?: boolean;
   isGradient?: boolean;
+  newBadgeText?: string;
 }
 
 const ChannelCard: React.FC<ChannelCardProps> = ({
@@ -33,6 +35,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   delay,
   isNew = false,
   isGradient = false,
+  newBadgeText,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -75,7 +78,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         border: "1px solid rgba(255, 255, 255, 0.8)",
       }}
     >
-      {isNew && (
+      {isNew && newBadgeText && (
         <div
           style={{
             position: "absolute",
@@ -91,7 +94,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
             boxShadow: shadows.md,
           }}
         >
-          NEW
+          {newBadgeText}
         </div>
       )}
 
@@ -141,6 +144,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
 export const ChannelsScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const t = useTranslations();
 
   const titleOpacity = interpolate(frame, [0, 8], [0, 1], {
     extrapolateLeft: "clamp",
@@ -155,30 +159,31 @@ export const ChannelsScene: React.FC = () => {
 
   const channels = [
     {
-      name: "WhatsApp",
-      tagline: "#1 messaging worldwide",
+      name: t.channels.whatsapp.name,
+      tagline: t.channels.whatsapp.tagline,
       icon: <WhatsAppIcon size={40} />,
       color: colors.channelColors.whatsapp,
       delay: 30,
     },
     {
-      name: "Viber",
-      tagline: "Dominate Eastern Europe",
+      name: t.channels.viber.name,
+      tagline: t.channels.viber.tagline,
       icon: <ViberIcon size={40} />,
       color: colors.channelColors.viber,
       delay: 45,
       isNew: true,
     },
     {
-      name: "Website Widget",
-      tagline: "24/7 on your site",
+      name: t.channels.website.name,
+      tagline: t.channels.website.tagline,
       icon: <WidgetIcon size={40} />,
-      color: colors.channelColors.website,
+      color: colors.primary,
       delay: 60,
+      isGradient: true,
     },
     {
-      name: "Mobile",
-      tagline: "Any device, anywhere",
+      name: t.channels.mobile.name,
+      tagline: t.channels.mobile.tagline,
       icon: <MobileIcon size={40} />,
       color: colors.primary,
       delay: 75,
@@ -212,7 +217,7 @@ export const ChannelsScene: React.FC = () => {
             textAlign: "center",
           }}
         >
-          Reach customers on <GradientText>every channel</GradientText>
+          {t.channels.title} <GradientText>{t.channels.titleHighlight}</GradientText>
         </h2>
       </div>
 
@@ -235,6 +240,7 @@ export const ChannelsScene: React.FC = () => {
             delay={channel.delay}
             isNew={channel.isNew}
             isGradient={channel.isGradient}
+            newBadgeText={t.channels.newBadge}
           />
         ))}
       </div>

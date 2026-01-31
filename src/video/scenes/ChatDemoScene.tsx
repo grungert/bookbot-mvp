@@ -8,6 +8,7 @@ import {
 } from "remotion";
 import { colors, fonts, shadows } from "../styles/theme";
 import { GradientText } from "../components/AnimatedBackground";
+import { useTranslations } from "../translations";
 
 // Inline chat components to avoid Sequence issues
 const ChatBubbleInline: React.FC<{
@@ -212,14 +213,12 @@ const ServiceCardInline: React.FC<{
   );
 };
 
-const TimeSlotsInline: React.FC<{ startFrame: number }> = ({ startFrame }) => {
+const TimeSlotsInline: React.FC<{ startFrame: number; times: readonly string[]; label: string }> = ({ startFrame, times, label }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const localFrame = frame - startFrame;
 
   if (localFrame < 0) return null;
-
-  const times = ["9:00 AM", "11:30 AM", "2:00 PM"];
 
   return (
     <div style={{ marginLeft: 40, marginBottom: 10 }}>
@@ -232,7 +231,7 @@ const TimeSlotsInline: React.FC<{ startFrame: number }> = ({ startFrame }) => {
           opacity: interpolate(localFrame, [0, 10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
         }}
       >
-        Available times:
+        {label}
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {times.map((time, i) => {
@@ -281,7 +280,7 @@ const TimeSlotsInline: React.FC<{ startFrame: number }> = ({ startFrame }) => {
   );
 };
 
-const ConfirmationInline: React.FC<{ startFrame: number }> = ({ startFrame }) => {
+const ConfirmationInline: React.FC<{ startFrame: number; text: string }> = ({ startFrame, text }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const localFrame = frame - startFrame;
@@ -348,7 +347,7 @@ const ConfirmationInline: React.FC<{ startFrame: number }> = ({ startFrame }) =>
           color: colors.success,
         }}
       >
-        Booking Confirmed!
+        {text}
       </div>
     </div>
   );
@@ -418,6 +417,7 @@ const FeatureHighlight: React.FC<{
 export const ChatDemoScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const t = useTranslations();
 
   const titleOpacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateLeft: "clamp",
@@ -494,8 +494,8 @@ export const ChatDemoScene: React.FC = () => {
               lineHeight: 1.2,
             }}
           >
-            Book through{" "}
-            <span style={{ color: "rgba(255, 255, 255, 0.9)" }}>conversation</span>
+            {t.chatDemo.title}{" "}
+            <span style={{ color: "rgba(255, 255, 255, 0.9)" }}>{t.chatDemo.titleHighlight}</span>
           </h2>
           <p
             style={{
@@ -508,7 +508,7 @@ export const ChatDemoScene: React.FC = () => {
               lineHeight: 1.6,
             }}
           >
-            Your AI assistant handles bookings 24/7, just like chatting with a real receptionist.
+            {t.chatDemo.subtitle}
           </p>
 
           {/* Feature highlights */}
@@ -519,7 +519,7 @@ export const ChatDemoScene: React.FC = () => {
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
                 </svg>
               }
-              text="Instant booking confirmation"
+              text={t.chatDemo.features.instant}
               delay={40}
             />
             <FeatureHighlight
@@ -528,7 +528,7 @@ export const ChatDemoScene: React.FC = () => {
                   <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
                 </svg>
               }
-              text="Available slots in real-time"
+              text={t.chatDemo.features.realtime}
               delay={60}
             />
             <FeatureHighlight
@@ -537,7 +537,7 @@ export const ChatDemoScene: React.FC = () => {
                   <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z" />
                 </svg>
               }
-              text="Automatic reminders sent"
+              text={t.chatDemo.features.reminders}
               delay={80}
             />
           </div>
@@ -617,11 +617,11 @@ export const ChatDemoScene: React.FC = () => {
                 </div>
                 <div>
                   <div style={{ fontFamily: fonts.primary, fontSize: 13, fontWeight: 600, color: colors.text }}>
-                    BookBot Assistant
+                    {t.chatDemo.chat.botName}
                   </div>
                   <div style={{ fontFamily: fonts.primary, fontSize: 10, color: colors.success, display: "flex", alignItems: "center", gap: 4 }}>
                     <span style={{ width: 5, height: 5, borderRadius: "50%", background: colors.success }} />
-                    Online
+                    {t.chatDemo.chat.online}
                   </div>
                 </div>
               </div>
@@ -701,25 +701,25 @@ export const ChatDemoScene: React.FC = () => {
             {/* Chat content */}
             <div style={{ flex: 1, padding: "0 6px", overflow: "hidden" }}>
               <ChatBubbleInline
-                message="I'd like to book a haircut"
+                message={t.chatDemo.chat.userMessage}
                 isUser={true}
                 startFrame={30}
                 typingDuration={35}
               />
               <ChatBubbleInline
-                message="Sure! Here are available services:"
+                message={t.chatDemo.chat.botResponse}
                 isUser={false}
                 startFrame={80}
                 typingDuration={25}
               />
               <ServiceCardInline
-                title="Men's Haircut"
-                price="$35"
-                duration="45 min"
+                title={t.chatDemo.chat.serviceName}
+                price={t.chatDemo.chat.servicePrice}
+                duration={t.chatDemo.chat.serviceDuration}
                 startFrame={130}
               />
-              <TimeSlotsInline startFrame={180} />
-              <ConfirmationInline startFrame={260} />
+              <TimeSlotsInline startFrame={180} times={t.chatDemo.chat.times} label={t.chatDemo.chat.availableTimes} />
+              <ConfirmationInline startFrame={260} text={t.chatDemo.chat.confirmation} />
             </div>
           </div>
         </div>
