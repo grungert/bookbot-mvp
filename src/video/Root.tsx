@@ -3,6 +3,7 @@ import { BookBotVideo } from "./BookBotVideo";
 import { ChatbotVideo } from "./ChatbotVideo";
 import { WhatsAppVideo } from "./WhatsAppVideo";
 import { ViberVideo } from "./ViberVideo";
+import { MobileVideo } from "./MobileVideo";
 import {
   BOOKBOT_COMP_NAME,
   defaultBookBotProps,
@@ -35,6 +36,14 @@ import {
   VIBER_VIDEO_HEIGHT,
   VIBER_VIDEO_WIDTH,
 } from "./viberConstants";
+import {
+  MOBILE_COMP_NAME,
+  defaultMobileProps,
+  MOBILE_DURATION_IN_FRAMES,
+  MOBILE_VIDEO_FPS,
+  MOBILE_VIDEO_HEIGHT,
+  MOBILE_VIDEO_WIDTH,
+} from "./mobileConstants";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -81,6 +90,17 @@ export const RemotionRoot: React.FC = () => {
         width={VIBER_VIDEO_WIDTH}
         height={VIBER_VIDEO_HEIGHT}
         defaultProps={defaultViberProps}
+      />
+
+      {/* Mobile Feature Video - 40 seconds at 1080p */}
+      <Composition
+        id={MOBILE_COMP_NAME}
+        component={MobileVideo}
+        durationInFrames={MOBILE_DURATION_IN_FRAMES}
+        fps={MOBILE_VIDEO_FPS}
+        width={MOBILE_VIDEO_WIDTH}
+        height={MOBILE_VIDEO_HEIGHT}
+        defaultProps={defaultMobileProps}
       />
     </>
   );
