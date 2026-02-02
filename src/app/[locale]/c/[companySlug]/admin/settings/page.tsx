@@ -8,13 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle, Bell, Coins } from "lucide-react";
+import { Loader2, Save, Eye, EyeOff, Check, Building2, Palette, Bot, MessageSquare, FileText, Camera, X, ImageIcon, Code, Copy, CreditCard, Crown, Clock, AlertTriangle, ExternalLink, Calendar, Plus, Briefcase, Info, Radio, Phone, Zap, HelpCircle, Send, AlertCircle, Bell, Coins, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Link } from "@/i18n/routing";
 import { UsageMeter } from "@/components/subscription/usage-meter";
 import { UpgradeModal } from "@/components/subscription/upgrade-modal";
 import { BuyTokensModal } from "@/components/subscription/buy-tokens-modal";
 import { CreateCompanyModal } from "@/components/admin/create-company-modal";
 import { InvoicesSection } from "@/components/admin/settings/invoices-section";
+import { QrCodeSection } from "@/components/admin/settings/qr-code-section";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -27,6 +29,7 @@ import { BOT_PERSONALITIES, type PersonalityKey } from "@/lib/ai/personalities";
 import { cn } from "@/lib/utils";
 import { formatTokenCount } from "@/lib/utils/format-tokens";
 import { generateThemePalette } from "@/lib/utils/colors";
+import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 // Token display component for Custom Instructions (defined outside to prevent re-render issues)
 function CustomInstructionsTokenDisplay({
@@ -112,6 +115,14 @@ interface CompanySettings {
   hasWhatsappAccessToken: boolean;
   hasWhatsappAppSecret: boolean;
   notifyOnStatusChange: boolean;
+  // Viber Channel Settings
+  viberEnabled: boolean;
+  viberBotName: string | null;
+  viberBotAvatar: string | null;
+  viberGreeting: string | null;
+  viberAutoReply: string | null;
+  viberAuthToken: string | null;
+  hasViberAuthToken: boolean;
 }
 
 type SettingsTab = "general" | "branding" | "ai" | "bot" | "business" | "embed" | "channels" | "subscription" | "invoices";
@@ -183,6 +194,7 @@ export default function SettingsPage() {
   const tCommon = useTranslations("common");
   const tSub = useTranslations("subscription");
   const tUpgrade = useTranslations("upgrade");
+  const prefersReducedMotion = useReducedMotion();
 
   const [isLoading, setIsLoading] = useState(true);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
@@ -262,6 +274,28 @@ export default function SettingsPage() {
     error?: string;
   } | null>(null);
 
+  // Viber Channel Settings
+  const [viberEnabled, setViberEnabled] = useState(false);
+  const [viberBotName, setViberBotName] = useState("");
+  const [viberBotAvatar, setViberBotAvatar] = useState("");
+  const [viberGreeting, setViberGreeting] = useState("");
+  const [viberAutoReply, setViberAutoReply] = useState("");
+  const [viberAuthToken, setViberAuthToken] = useState("");
+  const [hasExistingViberToken, setHasExistingViberToken] = useState(false);
+  const [showViberToken, setShowViberToken] = useState(false);
+  const [isTestingViber, setIsTestingViber] = useState(false);
+  const [viberTestResult, setViberTestResult] = useState<{
+    success: boolean;
+    name?: string;
+    uri?: string;
+    subscribers?: number;
+    error?: string;
+  } | null>(null);
+
+  // Collapsible sections state
+  const [whatsappExpanded, setWhatsappExpanded] = useState(false);
+  const [viberExpanded, setViberExpanded] = useState(false);
+
   // Business Details state
   const [businessAddress, setBusinessAddress] = useState("");
   const [taxId, setTaxId] = useState("");
@@ -330,7 +364,7 @@ export default function SettingsPage() {
       setActiveTab("subscription");
       setShowUpgradeModal(true);
     }
-  }, []);
+  }, [searchParams]);
 
   // Apply primary color changes in real-time
   useEffect(() => {
@@ -349,9 +383,13 @@ export default function SettingsPage() {
     }
   }, [primaryColor]);
 
-  // Update hash on tab change
+  // Update hash on tab change (only if different to avoid triggering navigation)
   useEffect(() => {
-    window.location.hash = activeTab;
+    const currentHash = window.location.hash.slice(1);
+    if (currentHash !== activeTab) {
+      // Use replaceState to avoid triggering navigation events
+      window.history.replaceState(null, "", `#${activeTab}`);
+    }
   }, [activeTab]);
 
   useEffect(() => {
@@ -535,6 +573,14 @@ export default function SettingsPage() {
       setHasExistingWhatsappSecret(settings.hasWhatsappAppSecret);
       setWhatsappScope((settings.whatsappScope as "company" | "all") || "company");
       setNotifyOnStatusChange(settings.notifyOnStatusChange ?? true);
+      // Viber Channel Settings
+      setViberEnabled(settings.viberEnabled ?? false);
+      setViberBotName(settings.viberBotName || "");
+      setViberBotAvatar(settings.viberBotAvatar || "");
+      setViberGreeting(settings.viberGreeting || "");
+      setViberAutoReply(settings.viberAutoReply || "");
+      setViberAuthToken(settings.viberAuthToken || "");
+      setHasExistingViberToken(settings.hasViberAuthToken);
     } catch (error) {
       console.error("Error loading settings:", error);
       toast.error(tCommon("error"));
@@ -580,6 +626,12 @@ export default function SettingsPage() {
         whatsappPhoneNumberId: whatsappPhoneNumberId || null,
         whatsappScope,
         notifyOnStatusChange,
+        // Viber Channel Settings
+        viberEnabled,
+        viberBotName: viberBotName || null,
+        viberBotAvatar: viberBotAvatar || null,
+        viberGreeting: viberGreeting || null,
+        viberAutoReply: viberAutoReply || null,
       };
 
       // Only include API key if it's been changed (not masked)
@@ -593,6 +645,11 @@ export default function SettingsPage() {
       }
       if (whatsappAppSecret && !whatsappAppSecret.startsWith("****")) {
         updateData.whatsappAppSecret = whatsappAppSecret || null;
+      }
+
+      // Only include Viber credentials if they've been changed (not masked)
+      if (viberAuthToken && !viberAuthToken.startsWith("****")) {
+        updateData.viberAuthToken = viberAuthToken || null;
       }
 
       const response = await fetch(`/api/c/${companySlug}/settings`, {
@@ -616,6 +673,9 @@ export default function SettingsPage() {
       setHasExistingWhatsappToken(updatedSettings.hasWhatsappAccessToken);
       setWhatsappAppSecret(updatedSettings.whatsappAppSecret || "");
       setHasExistingWhatsappSecret(updatedSettings.hasWhatsappAppSecret);
+      // Update Viber values
+      setViberAuthToken(updatedSettings.viberAuthToken || "");
+      setHasExistingViberToken(updatedSettings.hasViberAuthToken);
 
       // Refresh the page to update header/layout with new settings
       router.refresh();
@@ -639,36 +699,54 @@ export default function SettingsPage() {
 
   // Section Components
   const GeneralSection = () => (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
         {t("generalInfo")}
       </h3>
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm font-medium">{t("companyName")}</Label>
+          <div
+            className={cn(
+              "space-y-2 group",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+          >
+            <Label htmlFor="name" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("companyName")}</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-10"
+              className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="timezone" className="text-sm font-medium">{t("timezone")}</Label>
+          <div
+            className={cn(
+              "space-y-2 group",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+          >
+            <Label htmlFor="timezone" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("timezone")}</Label>
             <Input
               id="timezone"
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="h-10"
+              className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="currency" className="text-sm font-medium">{t("currency")}</Label>
+          <div
+            className={cn(
+              "space-y-2 group",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+          >
+            <Label htmlFor="currency" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("currency")}</Label>
             <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -681,13 +759,20 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="description" className="text-sm font-medium">{t("description")}</Label>
+        <div
+          className={cn(
+            "space-y-2 group",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "250ms" } : undefined}
+        >
+          <Label htmlFor="description" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("description")}</Label>
           <Textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
+            className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
       </div>
@@ -753,18 +838,24 @@ export default function SettingsPage() {
     }
 
     return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
         {t("branding")}
       </h3>
       <div className="space-y-4">
-        <div className="space-y-2">
+        <div
+          className={cn(
+            "space-y-2",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+        >
           <Label className="text-sm font-medium">{t("companyLogo")}</Label>
           <div className="flex items-center gap-6">
             <div className="relative group">
               <div
                 onClick={handleLogoClick}
-                className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden bg-muted/50"
+                className="h-24 w-24 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:scale-105 transition-all duration-200 overflow-hidden bg-muted/50"
               >
                 {displayLogo ? (
                   <img
@@ -844,13 +935,19 @@ export default function SettingsPage() {
               className="w-28 h-10"
             />
             <div className="flex gap-1.5">
-              {colorPresets.map((preset) => (
+              {colorPresets.map((preset, index) => (
                 <button
                   key={preset.value}
                   type="button"
                   onClick={() => setPrimaryColor(preset.value)}
-                  className="relative h-8 w-8 rounded-full border-2 border-white shadow-sm transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                  style={{ backgroundColor: preset.value }}
+                  className={cn(
+                    "relative h-8 w-8 rounded-full border-2 border-white shadow-sm transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary",
+                    !prefersReducedMotion && "animate-fade-in-scale"
+                  )}
+                  style={!prefersReducedMotion
+                    ? { backgroundColor: preset.value, opacity: 0, animationDelay: `${index * 50 + 150}ms` }
+                    : { backgroundColor: preset.value }
+                  }
                   title={preset.name}
                 >
                   {primaryColor.toUpperCase() === preset.value.toUpperCase() && (
@@ -870,7 +967,7 @@ export default function SettingsPage() {
   };
 
   const AiChatbotSection = () => (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
       <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
         {t("aiChatbot")}
       </h3>
@@ -879,8 +976,14 @@ export default function SettingsPage() {
       </p>
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="aiApiKey" className="text-sm font-medium">{t("aiApiKey")}</Label>
+          <div
+            className={cn(
+              "space-y-2 group",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+          >
+            <Label htmlFor="aiApiKey" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiApiKey")}</Label>
             <div className="flex gap-2">
               <Input
                 id="aiApiKey"
@@ -888,13 +991,13 @@ export default function SettingsPage() {
                 value={aiApiKey}
                 onChange={(e) => setAiApiKey(e.target.value)}
                 placeholder={hasExistingApiKey ? t("enterNewKeyToReplace") : "sk-..."}
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-10 w-10"
+                className="h-10 w-10 transition-all duration-200 hover:scale-105"
                 onClick={() => setShowApiKey(!showApiKey)}
               >
                 {showApiKey ? (
@@ -910,25 +1013,37 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="aiModel" className="text-sm font-medium">{t("aiModel")}</Label>
+          <div
+            className={cn(
+              "space-y-2 group",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+          >
+            <Label htmlFor="aiModel" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiModel")}</Label>
             <Input
               id="aiModel"
               value={aiModel}
               onChange={(e) => setAiModel(e.target.value)}
               placeholder="gpt-3.5-turbo"
-              className="h-10"
+              className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="aiEndpoint" className="text-sm font-medium">{t("aiEndpoint")}</Label>
+        <div
+          className={cn(
+            "space-y-2 group",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+        >
+          <Label htmlFor="aiEndpoint" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiEndpoint")}</Label>
           <Input
             id="aiEndpoint"
             value={aiEndpoint}
             onChange={(e) => setAiEndpoint(e.target.value)}
             placeholder="https://api.openai.com/v1 (leave empty for default)"
-            className="h-10"
+            className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
       </div>
@@ -969,7 +1084,7 @@ export default function SettingsPage() {
     };
 
     return (
-      <div className="rounded-xl border bg-card p-4">
+      <div className="rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
           {t("businessDetails")}
         </h3>
@@ -977,86 +1092,105 @@ export default function SettingsPage() {
           {t("businessDetailsDescription")}
         </p>
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="businessAddress" className="text-sm font-medium">{t("businessAddress")}</Label>
+          <div
+            className={cn(
+              "grid grid-cols-1 md:grid-cols-2 gap-4",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+          >
+            <div className="space-y-2 group">
+              <Label htmlFor="businessAddress" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("businessAddress")}</Label>
               <Textarea
                 id="businessAddress"
                 value={businessAddress}
                 onChange={(e) => setBusinessAddress(e.target.value)}
                 placeholder="123 Business St, City, Country"
                 rows={2}
+                className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="taxId" className="text-sm font-medium">{t("taxId")}</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="taxId" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("taxId")}</Label>
                 <Input
                   id="taxId"
                   value={taxId}
                   onChange={(e) => setTaxId(e.target.value)}
                   placeholder="123456789"
-                  className="h-10"
+                  className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="vatNumber" className="text-sm font-medium">{t("vatNumber")}</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="vatNumber" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("vatNumber")}</Label>
                 <Input
                   id="vatNumber"
                   value={vatNumber}
                   onChange={(e) => setVatNumber(e.target.value)}
                   placeholder="RS123456789"
-                  className="h-10"
+                  className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="bankName" className="text-sm font-medium">{t("bankName")}</Label>
+          <div
+            className={cn(
+              "grid grid-cols-1 md:grid-cols-2 gap-4",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+          >
+            <div className="space-y-2 group">
+              <Label htmlFor="bankName" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("bankName")}</Label>
               <Input
                 id="bankName"
                 value={bankName}
                 onChange={(e) => setBankName(e.target.value)}
                 placeholder="Bank Name"
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="bankAccount" className="text-sm font-medium">{t("bankAccount")}</Label>
+            <div className="space-y-2 group">
+              <Label htmlFor="bankAccount" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("bankAccount")}</Label>
               <Input
                 id="bankAccount"
                 value={bankAccount}
                 onChange={(e) => setBankAccount(e.target.value)}
                 placeholder="123-4567890123456-78"
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="businessPhone" className="text-sm font-medium">{t("businessPhone")}</Label>
+          <div
+            className={cn(
+              "grid grid-cols-1 md:grid-cols-3 gap-4",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+          >
+            <div className="space-y-2 group">
+              <Label htmlFor="businessPhone" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("businessPhone")}</Label>
               <Input
                 id="businessPhone"
                 value={businessPhone}
                 onChange={(e) => setBusinessPhone(e.target.value)}
                 placeholder="+381 11 123 4567"
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="businessEmail" className="text-sm font-medium">{t("businessEmail")}</Label>
+            <div className="space-y-2 group">
+              <Label htmlFor="businessEmail" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("businessEmail")}</Label>
               <Input
                 id="businessEmail"
                 type="email"
                 value={businessEmail}
                 onChange={(e) => setBusinessEmail(e.target.value)}
                 placeholder="billing@company.com"
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxRate" className="text-sm font-medium">{t("taxRate")}</Label>
+            <div className="space-y-2 group">
+              <Label htmlFor="taxRate" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("taxRate")}</Label>
               <Input
                 id="taxRate"
                 type="number"
@@ -1066,7 +1200,7 @@ export default function SettingsPage() {
                 value={taxRate}
                 onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                 placeholder="20"
-                className="h-10"
+                className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               <p className="text-xs text-muted-foreground">
                 {t("taxRateHint")}
@@ -1151,72 +1285,148 @@ export default function SettingsPage() {
     };
 
     return (
-      <div className="rounded-xl border bg-card p-4">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-          {t("embedChatbot")}
-        </h3>
-        <p className="text-xs text-muted-foreground mb-4">
-          {t("embedDescription")}
-        </p>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">{t("embedCode")}</Label>
-            <div className="relative">
-              <pre className="bg-zinc-950 text-zinc-100 rounded-lg p-4 text-xs overflow-x-auto font-mono">
-                {embedCode}
-              </pre>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleCopy}
-                className="absolute top-2 right-2"
-              >
-                {copiedEmbedCode ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 mr-1" />
-                    {t("copied")}
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 mr-1" />
-                    {t("copy")}
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">{t("embedInstructions")}</Label>
-            <div className="text-sm text-muted-foreground space-y-2">
-              <p>1. {t("embedStep1")}</p>
-              <p>2. {t("embedStep2")}</p>
-              <p>3. {t("embedStep3")}</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">{t("embedPreview")}</Label>
-            <div className="border rounded-lg p-4 bg-muted/50">
-              <div className="flex items-center gap-4">
-                <div className="text-sm text-muted-foreground">
-                  {t("embedDimensions")}: <span className="font-mono">400 × 600px</span>
-                </div>
-                <a
-                  href={embedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline"
+      <>
+        <div className="rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+            {t("embedChatbot")}
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            {t("embedDescription")}
+          </p>
+          <div className="space-y-4">
+            <div
+              className={cn(
+                "space-y-2",
+                !prefersReducedMotion && "animate-fade-in-scale"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+            >
+              <Label className="text-sm font-medium">{t("embedCode")}</Label>
+              <div className="relative group">
+                <pre className="bg-zinc-950 text-zinc-100 rounded-lg p-4 text-xs overflow-x-auto font-mono transition-all duration-200 group-hover:shadow-lg">
+                  {embedCode}
+                </pre>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="absolute top-2 right-2 transition-all duration-200 hover:scale-105"
                 >
-                  {t("openInNewTab")}
-                </a>
+                  {copiedEmbedCode ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                      {t("copied")}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1" />
+                      {t("copy")}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "space-y-2",
+                !prefersReducedMotion && "animate-fade-in-scale"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+            >
+              <Label className="text-sm font-medium">{t("embedInstructions")}</Label>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>1. {t("embedStep1")}</p>
+                <p>2. {t("embedStep2")}</p>
+                <p>3. {t("embedStep3")}</p>
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "space-y-2",
+                !prefersReducedMotion && "animate-fade-in-scale"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+            >
+              <Label className="text-sm font-medium">{t("embedPreview")}</Label>
+              <div className="border rounded-lg p-4 bg-muted/50 transition-all duration-200 hover:bg-muted/70">
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-muted-foreground">
+                    {t("embedDimensions")}: <span className="font-mono">400 × 600px</span>
+                  </div>
+                  <a
+                    href={embedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    {t("openInNewTab")}
+                  </a>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+
+        <QrCodeSection
+          companySlug={companySlug}
+          primaryColor={primaryColor}
+          locale={locale}
+          companyName={name}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+      </>
     );
+  };
+
+  // Viber test connection handler
+  const handleTestViberConnection = async () => {
+    if (!viberAuthToken && !hasExistingViberToken) {
+      toast.error(t("viber.authTokenRequired") || "Auth Token is required");
+      return;
+    }
+
+    setIsTestingViber(true);
+    setViberTestResult(null);
+
+    try {
+      const response = await fetch(`/api/c/${companySlug}/settings/viber-test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authToken: viberAuthToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setViberTestResult({
+          success: true,
+          name: data.name,
+          uri: data.uri,
+          subscribers: data.subscribers,
+        });
+        toast.success(t("viber.connectionSuccess") || "Connection successful!");
+      } else {
+        setViberTestResult({
+          success: false,
+          error: data.error || "Connection failed",
+        });
+        toast.error(data.error || "Connection test failed");
+      }
+    } catch (error) {
+      console.error("Viber test error:", error);
+      setViberTestResult({
+        success: false,
+        error: "Network error. Please try again.",
+      });
+      toast.error("Network error. Please try again.");
+    } finally {
+      setIsTestingViber(false);
+    }
   };
 
   // WhatsApp test connection handler
@@ -1349,18 +1559,31 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         {/* WhatsApp Business Integration */}
-        <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-              <Phone className="h-5 w-5 text-green-600" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold">{t("whatsapp.title") || "WhatsApp Business Integration"}</h3>
-              <p className="text-xs text-muted-foreground">{t("whatsapp.description") || "Connect your WhatsApp Business account to receive and send messages"}</p>
-            </div>
-          </div>
+        <Collapsible open={whatsappExpanded} onOpenChange={setWhatsappExpanded}>
+          <div
+            className={cn(
+              "rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+          >
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 transition-transform duration-200 group-hover:scale-110">
+                    <Phone className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">{t("whatsapp.title") || "WhatsApp Business Integration"}</h3>
+                    <p className="text-xs text-muted-foreground">{t("whatsapp.description") || "Connect your WhatsApp Business account to receive and send messages"}</p>
+                  </div>
+                </div>
+                <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform duration-200", whatsappExpanded && "rotate-180")} />
+              </button>
+            </CollapsibleTrigger>
 
-          {/* API Credentials */}
+            <CollapsibleContent className="mt-4">
+              {/* API Credentials */}
           <div className="space-y-4">
             <div className="space-y-1">
               <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("whatsapp.apiCredentials") || "API Credentials"}</h4>
@@ -1726,7 +1949,249 @@ export default function SettingsPage() {
               <ExternalLink className="h-4 w-4" />
             </a>
           </div>
-        </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+
+        {/* Viber Bot Integration */}
+        <Collapsible open={viberExpanded} onOpenChange={setViberExpanded}>
+          <div
+            className={cn(
+              "rounded-xl border bg-card p-4 transition-all duration-300 hover:shadow-lg hover:border-primary/20",
+              !prefersReducedMotion && "animate-fade-in-scale"
+            )}
+            style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+          >
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30 transition-transform duration-200 group-hover:scale-110">
+                    <MessageSquare className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">{t("viber.title") || "Viber Bot Integration"}</h3>
+                    <p className="text-xs text-muted-foreground">{t("viber.description") || "Connect your Viber Bot to receive and send messages"}</p>
+                  </div>
+                </div>
+                <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform duration-200", viberExpanded && "rotate-180")} />
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="mt-4">
+              {/* API Credentials */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("viber.apiCredentials") || "API Credentials"}</h4>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viberAuthToken" className="text-sm font-medium">
+                {t("viber.authToken") || "Viber Auth Token"} *
+              </Label>
+              <div className="relative">
+                <Input
+                  id="viberAuthToken"
+                  type={showViberToken ? "text" : "password"}
+                  value={viberAuthToken}
+                  onChange={(e) => setViberAuthToken(e.target.value)}
+                  placeholder={hasExistingViberToken ? (t("enterNewKeyToReplace") || "Enter new key to replace") : "Enter auth token..."}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowViberToken(!showViberToken)}
+                >
+                  {showViberToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {hasExistingViberToken && viberAuthToken?.startsWith("****") && (
+                <p className="text-xs text-muted-foreground">{t("viber.tokenConfigured") || "Auth token is configured"}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viberBotName" className="text-sm font-medium">
+                {t("viber.botName") || "Bot Name"}
+              </Label>
+              <Input
+                id="viberBotName"
+                value={viberBotName}
+                onChange={(e) => setViberBotName(e.target.value)}
+                placeholder={t("viber.botNamePlaceholder") || "My Booking Bot"}
+              />
+              <p className="text-xs text-muted-foreground">{t("viber.botNameHint") || "Display name shown to users"}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viberBotAvatar" className="text-sm font-medium">
+                {t("viber.botAvatar") || "Bot Avatar URL"}
+              </Label>
+              <Input
+                id="viberBotAvatar"
+                value={viberBotAvatar}
+                onChange={(e) => setViberBotAvatar(e.target.value)}
+                placeholder="https://example.com/avatar.png"
+              />
+              <p className="text-xs text-muted-foreground">{t("viber.botAvatarHint") || "URL to your bot's avatar image"}</p>
+            </div>
+
+            {/* Test Connection Button */}
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTestViberConnection}
+                disabled={isTestingViber || (!viberAuthToken && !hasExistingViberToken)}
+              >
+                {isTestingViber ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
+                {t("viber.testConnection") || "Test Connection"}
+              </Button>
+
+              {viberTestResult && (
+                <div className={cn(
+                  "flex items-center gap-2 text-sm",
+                  viberTestResult.success ? "text-green-600" : "text-destructive"
+                )}>
+                  {viberTestResult.success ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>{viberTestResult.name}</span>
+                      {viberTestResult.subscribers !== undefined && (
+                        <Badge variant="outline" className="ml-2">{viberTestResult.subscribers} subscribers</Badge>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      <span>{viberTestResult.error}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Customization */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("viber.customization") || "Customization"}</h4>
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div className="flex items-center gap-3">
+                <Check className={cn("h-5 w-5", viberEnabled ? "text-green-600" : "text-muted-foreground")} />
+                <div>
+                  <div className="font-medium text-sm">{t("viber.enableBooking") || "Enable Viber Booking"}</div>
+                  <div className="text-xs text-muted-foreground">{t("viber.enableBookingHint") || "Allow customers to book appointments via Viber"}</div>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant={viberEnabled ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViberEnabled(!viberEnabled)}
+              >
+                {viberEnabled ? (t("viber.enabled") || "Enabled") : (t("viber.disabled") || "Disabled")}
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viberGreeting" className="text-sm font-medium">{t("viber.welcomeMessage") || "Welcome Message"}</Label>
+              <Textarea
+                id="viberGreeting"
+                value={viberGreeting}
+                onChange={(e) => setViberGreeting(e.target.value)}
+                placeholder={t("viber.welcomeMessagePlaceholder") || "Hi! Welcome to our booking service. How can I help you today?"}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="viberAutoReply" className="text-sm font-medium">{t("viber.autoReply") || "Outside Hours Auto-Reply"}</Label>
+              <Textarea
+                id="viberAutoReply"
+                value={viberAutoReply}
+                onChange={(e) => setViberAutoReply(e.target.value)}
+                placeholder={t("viber.autoReplyPlaceholder") || "Thanks for your message! We're currently outside business hours..."}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Webhook Configuration */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("viber.webhookConfig") || "Webhook Configuration"}</h4>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("viber.webhookUrl") || "Webhook URL"}</Label>
+              <p className="text-xs text-muted-foreground">{t("viber.webhookUrlHint") || "Use the Viber API to set this webhook URL"}</p>
+              <div className="flex gap-2">
+                <Input
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/viber/${companySlug}`}
+                  readOnly
+                  className="font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/viber/${companySlug}`);
+                    toast.success(t("copied") || "Copied to clipboard");
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t my-6" />
+
+          {/* Setup Instructions */}
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("viber.setupInstructions") || "Setup Instructions"}</h4>
+            </div>
+
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>1. {t("viber.step1") || "Create a Viber Bot account at partners.viber.com"}</p>
+              <p>2. {t("viber.step2") || "Get your bot's auth token from the Viber Admin Panel"}</p>
+              <p>3. {t("viber.step3") || "Enter the auth token above and test connection"}</p>
+              <p>4. {t("viber.step4") || "Set up the webhook URL using the Viber API"}</p>
+              <p>5. {t("viber.step5") || "Enable Viber booking to start receiving messages"}</p>
+            </div>
+
+            <a
+              href="https://developers.viber.com/docs/api/rest-bot-api/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+            >
+              {t("viber.viewDocs") || "View Documentation"}
+              <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
 
         {/* Booking Notifications */}
         <div className="rounded-xl border bg-card p-4">
@@ -1786,7 +2251,14 @@ export default function SettingsPage() {
       if (!pendingUpgradeRequest) return null;
 
       return (
-        <div className="rounded-xl border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 p-4 mb-4">
+        <div
+          className={cn(
+            "rounded-xl border-2 border-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 p-4 mb-4",
+            "transition-all duration-300",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "50ms" } : undefined}
+        >
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/30">
               <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
@@ -1851,7 +2323,14 @@ export default function SettingsPage() {
       if (!pendingTokenPurchase) return null;
 
       return (
-        <div className="rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-4 mb-4">
+        <div
+          className={cn(
+            "rounded-xl border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/20 p-4 mb-4",
+            "transition-all duration-300",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "50ms" } : undefined}
+        >
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
               <Coins className="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -1927,7 +2406,14 @@ export default function SettingsPage() {
         <PendingTokenPurchaseBanner />
 
         {/* Current Plan */}
-        <div className="rounded-xl border bg-card p-4">
+        <div
+          className={cn(
+            "rounded-xl border bg-card p-4 transition-all duration-300",
+            "hover:shadow-lg hover:border-primary/20",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+        >
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             {tSub("currentPlan")}
           </h3>
@@ -1992,7 +2478,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Usage Stats */}
-        <div className="rounded-xl border bg-card p-4">
+        <div
+          className={cn(
+            "rounded-xl border bg-card p-4 transition-all duration-300",
+            "hover:shadow-lg hover:border-primary/20",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+        >
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             {tSub("usage")}
           </h3>
@@ -2001,7 +2494,13 @@ export default function SettingsPage() {
             {subscriptionData.features.aiChatbot ? (
               <>
                 {/* Chat Messages */}
-                <div className="space-y-2">
+                <div
+                  className={cn(
+                    "space-y-2",
+                    !prefersReducedMotion && "animate-fade-in-scale"
+                  )}
+                  style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+                >
                   <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4" style={{ color: primaryColor }} />
                     <span className="font-medium">{tSub("chatMessages")}</span>
@@ -2038,7 +2537,13 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Knowledge Base (Documents) */}
-                <div className="space-y-2">
+                <div
+                  className={cn(
+                    "space-y-2",
+                    !prefersReducedMotion && "animate-fade-in-scale"
+                  )}
+                  style={!prefersReducedMotion ? { opacity: 0, animationDelay: "250ms" } : undefined}
+                >
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4" style={{ color: primaryColor }} />
                     <span className="font-medium">{tSub("knowledgeBase")}</span>
@@ -2059,8 +2564,15 @@ export default function SettingsPage() {
             ) : (
               /* Combined AI Chatbot features - not available */
               <div
-                className="col-span-2 space-y-3 rounded-lg border border-dashed p-4"
-                style={{ borderColor: `${primaryColor}40` }}
+                className={cn(
+                  "col-span-2 space-y-3 rounded-lg border border-dashed p-4",
+                  "transition-all duration-200 hover:shadow-sm",
+                  !prefersReducedMotion && "animate-fade-in-scale"
+                )}
+                style={{
+                  borderColor: `${primaryColor}40`,
+                  ...(!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : {}),
+                }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -2091,7 +2603,13 @@ export default function SettingsPage() {
             )}
 
             {/* Company Slots */}
-            <div className="space-y-2">
+            <div
+              className={cn(
+                "space-y-2",
+                !prefersReducedMotion && "animate-fade-in-scale"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0, animationDelay: "300ms" } : undefined}
+            >
               <div className="flex items-center gap-2">
                 <Building2 className="h-4 w-4" style={{ color: primaryColor }} />
                 <span className="font-medium">{tSub("companySlots")}</span>
@@ -2114,7 +2632,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Companies List */}
-        <div className="rounded-xl border bg-card p-4">
+        <div
+          className={cn(
+            "rounded-xl border bg-card p-4 transition-all duration-300",
+            "hover:shadow-lg hover:border-primary/20",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {tSub("yourCompanies")}
@@ -2130,13 +2655,22 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">{tSub("noCompanies")}</p>
           ) : (
             <div className="space-y-3">
-              {subscriptionData.companies.map((company) => (
+              {subscriptionData.companies.map((company, index) => (
                   <div
                     key={company.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg bg-muted/50 group",
+                      "transition-all duration-200 hover:bg-muted hover:shadow-sm",
+                      !prefersReducedMotion && "animate-fade-in-scale"
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0, animationDelay: `${index * 40 + 250}ms` } : undefined}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                      <div className={cn(
+                        "flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10",
+                        "transition-transform duration-200",
+                        !prefersReducedMotion && "group-hover:scale-110"
+                      )}>
                         <Building2 className="h-5 w-5 text-primary" />
                       </div>
                       <div>
@@ -2148,7 +2682,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <Link href={`/c/${company.slug}/admin`}>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="transition-transform duration-200 group-hover:scale-105">
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </Link>
@@ -2159,7 +2693,14 @@ export default function SettingsPage() {
         </div>
 
         {/* Features */}
-        <div className="rounded-xl border bg-card p-4">
+        <div
+          className={cn(
+            "rounded-xl border bg-card p-4 transition-all duration-300",
+            "hover:shadow-lg hover:border-primary/20",
+            !prefersReducedMotion && "animate-fade-in-scale"
+          )}
+          style={!prefersReducedMotion ? { opacity: 0, animationDelay: "250ms" } : undefined}
+        >
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             {tSub("planFeatures")}
           </h3>
@@ -2167,13 +2708,18 @@ export default function SettingsPage() {
             {/* AI Chatbot */}
             <div
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
-                !subscriptionData.features.aiChatbot && "bg-muted/30 border-transparent"
+                "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200",
+                "hover:shadow-sm hover:-translate-y-0.5",
+                !subscriptionData.features.aiChatbot && "bg-muted/30 border-transparent",
+                !prefersReducedMotion && "animate-fade-in-scale"
               )}
-              style={subscriptionData.features.aiChatbot ? {
-                backgroundColor: `${primaryColor}10`,
-                borderColor: `${primaryColor}30`,
-              } : undefined}
+              style={{
+                ...(subscriptionData.features.aiChatbot ? {
+                  backgroundColor: `${primaryColor}10`,
+                  borderColor: `${primaryColor}30`,
+                } : {}),
+                ...(!prefersReducedMotion ? { opacity: 0, animationDelay: "300ms" } : {}),
+              }}
             >
               <div
                 className={cn(
@@ -2207,13 +2753,18 @@ export default function SettingsPage() {
             {/* Custom Branding */}
             <div
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
-                !subscriptionData.features.customBranding && "bg-muted/30 border-transparent"
+                "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200",
+                "hover:shadow-sm hover:-translate-y-0.5",
+                !subscriptionData.features.customBranding && "bg-muted/30 border-transparent",
+                !prefersReducedMotion && "animate-fade-in-scale"
               )}
-              style={subscriptionData.features.customBranding ? {
-                backgroundColor: `${primaryColor}10`,
-                borderColor: `${primaryColor}30`,
-              } : undefined}
+              style={{
+                ...(subscriptionData.features.customBranding ? {
+                  backgroundColor: `${primaryColor}10`,
+                  borderColor: `${primaryColor}30`,
+                } : {}),
+                ...(!prefersReducedMotion ? { opacity: 0, animationDelay: "350ms" } : {}),
+              }}
             >
               <div
                 className={cn(
@@ -2247,13 +2798,18 @@ export default function SettingsPage() {
             {/* Priority Support */}
             <div
               className={cn(
-                "flex items-center gap-3 p-3 rounded-lg border transition-colors",
-                !subscriptionData.features.prioritySupport && "bg-muted/30 border-transparent"
+                "flex items-center gap-3 p-3 rounded-lg border transition-all duration-200",
+                "hover:shadow-sm hover:-translate-y-0.5",
+                !subscriptionData.features.prioritySupport && "bg-muted/30 border-transparent",
+                !prefersReducedMotion && "animate-fade-in-scale"
               )}
-              style={subscriptionData.features.prioritySupport ? {
-                backgroundColor: `${primaryColor}10`,
-                borderColor: `${primaryColor}30`,
-              } : undefined}
+              style={{
+                ...(subscriptionData.features.prioritySupport ? {
+                  backgroundColor: `${primaryColor}10`,
+                  borderColor: `${primaryColor}30`,
+                } : {}),
+                ...(!prefersReducedMotion ? { opacity: 0, animationDelay: "400ms" } : {}),
+              }}
             >
               <div
                 className={cn(
@@ -2324,7 +2880,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div
+        className={cn(
+          "flex items-center justify-between",
+          !prefersReducedMotion && "animate-fade-up stagger-1"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
         <div>
           <h1 className="text-2xl font-bold">{t("settings")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -2342,36 +2904,15 @@ export default function SettingsPage() {
       </div>
 
       {/* Mobile: Horizontal scrollable tabs */}
-      <div className="md:hidden flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-        {tabConfig.map((tab) => {
-          const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed" || tab.id === "channels") && !hasChatbotAccess;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => !isDisabled && setActiveTab(tab.id)}
-              disabled={isDisabled}
-              title={isDisabled ? tSub("upgradeToPro") : undefined}
-              className={cn(
-                "shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm rounded-full transition-colors whitespace-nowrap",
-                isDisabled
-                  ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
-                  : activeTab === tab.id
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              <tab.icon className="h-3.5 w-3.5" />
-              {t(tab.labelKey)}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Desktop: Vertical sidebar + Content area */}
-      <div className="flex gap-6">
-        {/* Desktop Sidebar Navigation */}
-        <nav className="hidden md:block w-48 shrink-0 space-y-1 sticky top-4 self-start">
-          {tabConfig.map((tab) => {
+      <div
+        className={cn(
+          "md:hidden overflow-x-auto pb-3 -mx-4 px-4",
+          !prefersReducedMotion && "animate-fade-up stagger-2"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        <div className="flex gap-1.5 min-w-max">
+          {tabConfig.map((tab, index) => {
             const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed" || tab.id === "channels") && !hasChatbotAccess;
             return (
               <button
@@ -2380,15 +2921,57 @@ export default function SettingsPage() {
                 disabled={isDisabled}
                 title={isDisabled ? tSub("upgradeToPro") : undefined}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-left",
+                  "shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-full transition-all duration-200 whitespace-nowrap",
+                  isDisabled
+                    ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
+                    : activeTab === tab.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80",
+                  !prefersReducedMotion && "animate-fade-in-scale"
+                )}
+                style={!prefersReducedMotion ? { opacity: 0, animationDelay: `${index * 30 + 100}ms` } : undefined}
+              >
+                <tab.icon className="h-3 w-3" />
+                {t(tab.labelKey)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Desktop: Vertical sidebar + Content area */}
+      <div
+        className={cn(
+          "flex gap-6",
+          !prefersReducedMotion && "animate-fade-up stagger-3"
+        )}
+        style={!prefersReducedMotion ? { opacity: 0 } : undefined}
+      >
+        {/* Desktop Sidebar Navigation */}
+        <nav className="hidden md:block w-48 shrink-0 space-y-1 sticky top-4 self-start">
+          {tabConfig.map((tab, index) => {
+            const isDisabled = (tab.id === "ai" || tab.id === "bot" || tab.id === "embed" || tab.id === "channels") && !hasChatbotAccess;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => !isDisabled && setActiveTab(tab.id)}
+                disabled={isDisabled}
+                title={isDisabled ? tSub("upgradeToPro") : undefined}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-200 text-left",
                   isDisabled
                     ? "opacity-50 cursor-not-allowed text-muted-foreground"
                     : activeTab === tab.id
                       ? "bg-primary/10 text-primary font-medium"
-                      : "text-muted-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:bg-muted hover:translate-x-1",
+                  !prefersReducedMotion && "animate-fade-in-scale"
                 )}
+                style={!prefersReducedMotion ? { opacity: 0, animationDelay: `${index * 40 + 200}ms` } : undefined}
               >
-                <tab.icon className="h-4 w-4" />
+                <tab.icon className={cn(
+                  "h-4 w-4 transition-transform duration-200",
+                  !isDisabled && activeTab !== tab.id && !prefersReducedMotion && "group-hover:scale-110"
+                )} />
                 {t(tab.labelKey)}
               </button>
             );
@@ -2401,7 +2984,14 @@ export default function SettingsPage() {
           {activeTab === "branding" && BrandingSection()}
           {activeTab === "ai" && AiChatbotSection()}
           {activeTab === "bot" && (
-            <div className="rounded-xl border bg-card p-4">
+            <div
+              className={cn(
+                "rounded-xl border bg-card p-4 transition-all duration-300",
+                "hover:shadow-lg hover:border-primary/20",
+                !prefersReducedMotion && "animate-fade-in-scale"
+              )}
+              style={!prefersReducedMotion ? { opacity: 0, animationDelay: "100ms" } : undefined}
+            >
               <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 {t("botPersonality")}
               </h3>
@@ -2410,23 +3000,35 @@ export default function SettingsPage() {
               </p>
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="aiBotName" className="text-sm font-medium">{t("aiBotName")}</Label>
+                  <div
+                    className={cn(
+                      "space-y-2 group",
+                      !prefersReducedMotion && "animate-fade-in-scale"
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0, animationDelay: "150ms" } : undefined}
+                  >
+                    <Label htmlFor="aiBotName" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiBotName")}</Label>
                     <Input
                       id="aiBotName"
                       value={aiBotName}
                       onChange={(e) => setAiBotName(e.target.value)}
                       placeholder="Assistant"
-                      className="h-10"
+                      className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                     <p className="text-xs text-muted-foreground">
                       {t("aiBotNameDescription")}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="aiPersonality" className="text-sm font-medium">{t("aiPersonalityLabel")}</Label>
+                  <div
+                    className={cn(
+                      "space-y-2 group",
+                      !prefersReducedMotion && "animate-fade-in-scale"
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0, animationDelay: "200ms" } : undefined}
+                  >
+                    <Label htmlFor="aiPersonality" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiPersonalityLabel")}</Label>
                     <Select value={aiPersonality} onValueChange={setAiPersonality}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary">
                         <SelectValue placeholder="Select a personality" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2443,23 +3045,35 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="aiGreeting" className="text-sm font-medium">{t("aiGreeting")}</Label>
+                  <div
+                    className={cn(
+                      "space-y-2 group",
+                      !prefersReducedMotion && "animate-fade-in-scale"
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0, animationDelay: "250ms" } : undefined}
+                  >
+                    <Label htmlFor="aiGreeting" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiGreeting")}</Label>
                     <Input
                       id="aiGreeting"
                       value={aiGreeting}
                       onChange={(e) => setAiGreeting(e.target.value)}
                       placeholder="Hello! How can I help you today?"
-                      className="h-10"
+                      className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                     />
                     <p className="text-xs text-muted-foreground">
                       {t("aiGreetingDescription")}
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="language" className="text-sm font-medium">{t("language")}</Label>
+                  <div
+                    className={cn(
+                      "space-y-2 group",
+                      !prefersReducedMotion && "animate-fade-in-scale"
+                    )}
+                    style={!prefersReducedMotion ? { opacity: 0, animationDelay: "300ms" } : undefined}
+                  >
+                    <Label htmlFor="language" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("language")}</Label>
                     <Select value={language} onValueChange={setLanguage}>
-                      <SelectTrigger className="h-10">
+                      <SelectTrigger className="h-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2472,14 +3086,21 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="aiSystemPrompt" className="text-sm font-medium">{t("aiSystemPrompt")}</Label>
+                <div
+                  className={cn(
+                    "space-y-2 group",
+                    !prefersReducedMotion && "animate-fade-in-scale"
+                  )}
+                  style={!prefersReducedMotion ? { opacity: 0, animationDelay: "350ms" } : undefined}
+                >
+                  <Label htmlFor="aiSystemPrompt" className="text-sm font-medium transition-colors duration-200 group-focus-within:text-primary">{t("aiSystemPrompt")}</Label>
                   <Textarea
                     id="aiSystemPrompt"
                     value={aiSystemPrompt}
                     onChange={(e) => setAiSystemPrompt(e.target.value)}
                     placeholder="Custom instructions for the AI assistant..."
                     rows={4}
+                    className="transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
                   <CustomInstructionsTokenDisplay
                     content={aiSystemPrompt}
